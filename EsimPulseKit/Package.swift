@@ -9,6 +9,10 @@ let package = Package(
     ],
     targets: [
         .target(name: "EsimPulseKit"),
-        .testTarget(name: "EsimPulseKitTests", dependencies: ["EsimPulseKit"]),
+        .testTarget(
+            name: "EsimPulseKitTests",
+            dependencies: ["EsimPulseKit"],
+            resources: [.copy("Fixtures")]
+        ),
     ]
 )

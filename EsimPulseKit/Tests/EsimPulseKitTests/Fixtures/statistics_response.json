@@ -1,0 +1,16 @@
+{
+  "tenants": 5,
+  "success_orders": 1234,
+  "revenue": "100000.00",
+  "revenue_today": "1523.45",
+  "revenue_yesterday": "1402.10",
+  "current": {
+    "success_orders": 87,
+    "revenue": "9000.00",
+    "revenue_per_date": [
+      { "date": "2026-06-11", "revenue": "1100.00" },
+      { "date": "2026-06-12", "revenue": "1250.50" },
+      { "date": "2026-06-13", "revenue": "1523.45" }
+    ]
+  }
+}
