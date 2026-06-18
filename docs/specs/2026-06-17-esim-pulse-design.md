@@ -25,7 +25,7 @@ WHERE payment_status = 'success'
 
 Reuses the existing **Admin Dashboard Statistics** endpoint — no new endpoint.
 
-- **Request:** `GET {adminHost}/api/v1/statistics/?date_range=last_7_days`
+- **Request:** `GET {adminHost}/api/statistics/?date_range=last_7_days`
 - **Auth:** `Authorization: Bearer <token>` (OAuth2; endpoint also has a Basic-Auth fallback we are not using)
 - **Scope:** `statistics:read`
 - **View:** `api_admin/views.py:852` `DashboardDataAPI`
@@ -65,7 +65,7 @@ the Keychain Services API. Round-trip unit-tested.
 ### 2. `StatisticsClient`
 One async function: `fetch(dateRange:) async throws -> DashboardStats`.
 
-- Builds `GET {host}/api/v1/statistics/?date_range=<range>` with the Bearer header.
+- Builds `GET {host}/api/statistics/?date_range=<range>` with the Bearer header.
 - Decodes JSON into a typed `DashboardStats` struct (only the fields above).
 - Error mapping: `401 → StatsError.authExpired`, transport failure →
   `StatsError.unreachable`, malformed/empty body → `StatsError.noData`.

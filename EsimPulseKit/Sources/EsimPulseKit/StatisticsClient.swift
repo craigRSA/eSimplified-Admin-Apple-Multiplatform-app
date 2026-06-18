@@ -28,7 +28,7 @@ public final class LiveStatisticsClient: StatisticsClient {
         guard var components = URLComponents(string: credentials.host) else {
             throw StatsError.unreachable
         }
-        components.path = "/api/v1/statistics/"
+        components.path = "/api/statistics/"
         components.queryItems = [URLQueryItem(name: "date_range", value: dateRange.rawValue)]
         guard let url = components.url else { throw StatsError.unreachable }
 

@@ -25,7 +25,7 @@ final class StatisticsClientTests: XCTestCase {
         _ = try await makeClient().fetch(dateRange: .last7Days)
 
         XCTAssertEqual(captured?.url?.absoluteString,
-                       "https://admin.example.com/api/v1/statistics/?date_range=last_7_days")
+                       "https://admin.example.com/api/statistics/?date_range=last_7_days")
         XCTAssertEqual(captured?.value(forHTTPHeaderField: "Authorization"), "Bearer tok-123")
         XCTAssertEqual(captured?.value(forHTTPHeaderField: "Accept"), "application/json")
     }

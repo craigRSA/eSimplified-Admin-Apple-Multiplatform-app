@@ -18,7 +18,7 @@ WHERE payment_status = 'success'
 It gets this from the existing **Admin Dashboard** endpoint — no SQL or DB
 connection in the app:
 
-- `GET {adminHost}/api/v1/statistics/?date_range=last_7_days`
+- `GET {adminHost}/api/statistics/?date_range=last_7_days`
 - Auth: `Authorization: Bearer <token>` (scope `statistics:read`)
 - Fields used: `revenue_today`, `revenue_yesterday`, `current.revenue_per_date[]`,
   `current.success_orders`
