@@ -17,6 +17,13 @@
 		E52000000000000000000022 /* eSimPulseWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = E52000000000000000000012 /* eSimPulseWidgetBundle.swift */; };
 		E52000000000000000000032 /* EsimPulseKit in Frameworks */ = {isa = PBXBuildFile; productRef = E52000000000000000000031 /* EsimPulseKit */; };
 		E52000000000000000000040 /* eSimPulseWidgetExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = E52000000000000000000006 /* eSimPulseWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		E53000000000000000000020 /* eSimPulseiOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E53000000000000000000010 /* eSimPulseiOSApp.swift */; };
+		E53000000000000000000032 /* EsimPulseKit in Frameworks */ = {isa = PBXBuildFile; productRef = E53000000000000000000031 /* EsimPulseKit */; };
+		E53000000000000000000040 /* eSimPulseWidgetiOSExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = E54000000000000000000006 /* eSimPulseWidgetiOSExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		E54000000000000000000020 /* RevenueProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = E52000000000000000000010 /* RevenueProvider.swift */; };
+		E54000000000000000000021 /* RevenueWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E52000000000000000000011 /* RevenueWidgetView.swift */; };
+		E54000000000000000000022 /* eSimPulseWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = E52000000000000000000012 /* eSimPulseWidgetBundle.swift */; };
+		E54000000000000000000032 /* EsimPulseKit in Frameworks */ = {isa = PBXBuildFile; productRef = E54000000000000000000031 /* EsimPulseKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -26,6 +33,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = E52000000000000000000005;
 			remoteInfo = eSimPulseWidgetExtension;
+		};
+		E53000000000000000000043 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E51000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E54000000000000000000005;
+			remoteInfo = eSimPulseWidgetiOSExtension;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -37,6 +51,17 @@
 			dstSubfolderSpec = 13;
 			files = (
 				E52000000000000000000040 /* eSimPulseWidgetExtension.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E53000000000000000000041 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				E53000000000000000000040 /* eSimPulseWidgetiOSExtension.appex in Embed App Extensions */,
 			);
 			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -56,6 +81,11 @@
 		E52000000000000000000012 /* eSimPulseWidgetBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = eSimPulseWidgetBundle.swift; sourceTree = "<group>"; };
 		E52000000000000000000013 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		E52000000000000000000014 /* eSimPulseWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = eSimPulseWidget.entitlements; sourceTree = "<group>"; };
+		E54000000000000000000014 /* Widget-iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Widget-iOS.entitlements"; sourceTree = "<group>"; };
+		E53000000000000000000006 /* eSimPulseiOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = eSimPulseiOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E53000000000000000000010 /* eSimPulseiOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = eSimPulseiOSApp.swift; sourceTree = "<group>"; };
+		E53000000000000000000014 /* eSimPulseiOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = eSimPulseiOS.entitlements; sourceTree = "<group>"; };
+		E54000000000000000000006 /* eSimPulseWidgetiOSExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = eSimPulseWidgetiOSExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -75,6 +105,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E5300000000000000000000E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E53000000000000000000032 /* EsimPulseKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E5400000000000000000000E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E54000000000000000000032 /* EsimPulseKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -82,6 +128,7 @@
 			isa = PBXGroup;
 			children = (
 				E51000000000000000000004 /* eSimPulse */,
+				E53000000000000000000004 /* eSimPulseiOS */,
 				E52000000000000000000004 /* eSimPulseWidget */,
 				E51000000000000000000003 /* Products */,
 			);
@@ -92,6 +139,8 @@
 			children = (
 				E51000000000000000000006 /* eSimPulse.app */,
 				E52000000000000000000006 /* eSimPulseWidgetExtension.appex */,
+				E53000000000000000000006 /* eSimPulseiOS.app */,
+				E54000000000000000000006 /* eSimPulseWidgetiOSExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -116,8 +165,18 @@
 				E52000000000000000000011 /* RevenueWidgetView.swift */,
 				E52000000000000000000013 /* Info.plist */,
 				E52000000000000000000014 /* eSimPulseWidget.entitlements */,
+				E54000000000000000000014 /* Widget-iOS.entitlements */,
 			);
 			path = eSimPulseWidget;
+			sourceTree = "<group>";
+		};
+		E53000000000000000000004 /* eSimPulseiOS */ = {
+			isa = PBXGroup;
+			children = (
+				E53000000000000000000010 /* eSimPulseiOSApp.swift */,
+				E53000000000000000000014 /* eSimPulseiOS.entitlements */,
+			);
+			path = eSimPulseiOS;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -164,6 +223,47 @@
 			productReference = E52000000000000000000006 /* eSimPulseWidgetExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		E53000000000000000000005 /* eSimPulseiOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E53000000000000000000008 /* Build configuration list for PBXNativeTarget "eSimPulseiOS" */;
+			buildPhases = (
+				E5300000000000000000000D /* Sources */,
+				E5300000000000000000000E /* Frameworks */,
+				E5300000000000000000000F /* Resources */,
+				E53000000000000000000041 /* Embed App Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				E53000000000000000000042 /* PBXTargetDependency */,
+			);
+			name = eSimPulseiOS;
+			packageProductDependencies = (
+				E53000000000000000000031 /* EsimPulseKit */,
+			);
+			productName = eSimPulseiOS;
+			productReference = E53000000000000000000006 /* eSimPulseiOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+		E54000000000000000000005 /* eSimPulseWidgetiOSExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E54000000000000000000008 /* Build configuration list for PBXNativeTarget "eSimPulseWidgetiOSExtension" */;
+			buildPhases = (
+				E5400000000000000000000D /* Sources */,
+				E5400000000000000000000E /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = eSimPulseWidgetiOSExtension;
+			packageProductDependencies = (
+				E54000000000000000000031 /* EsimPulseKit */,
+			);
+			productName = eSimPulseWidgetiOSExtension;
+			productReference = E54000000000000000000006 /* eSimPulseWidgetiOSExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -178,6 +278,12 @@
 						CreatedOnToolsVersion = 27.0;
 					};
 					E52000000000000000000005 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					E53000000000000000000005 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					E54000000000000000000005 = {
 						CreatedOnToolsVersion = 27.0;
 					};
 				};
@@ -200,12 +306,21 @@
 			targets = (
 				E51000000000000000000005 /* eSimPulse */,
 				E52000000000000000000005 /* eSimPulseWidgetExtension */,
+				E53000000000000000000005 /* eSimPulseiOS */,
+				E54000000000000000000005 /* eSimPulseWidgetiOSExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		E5100000000000000000000F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E5300000000000000000000F /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -236,6 +351,24 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E5300000000000000000000D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E53000000000000000000020 /* eSimPulseiOSApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E5400000000000000000000D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E54000000000000000000022 /* eSimPulseWidgetBundle.swift in Sources */,
+				E54000000000000000000020 /* RevenueProvider.swift in Sources */,
+				E54000000000000000000021 /* RevenueWidgetView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -243,6 +376,11 @@
 			isa = PBXTargetDependency;
 			target = E52000000000000000000005 /* eSimPulseWidgetExtension */;
 			targetProxy = E52000000000000000000043 /* PBXContainerItemProxy */;
+		};
+		E53000000000000000000042 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E54000000000000000000005 /* eSimPulseWidgetiOSExtension */;
+			targetProxy = E53000000000000000000043 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -264,9 +402,7 @@
 					"DEBUG=1",
 					"$(inherited)",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				ONLY_ACTIVE_ARCH = YES;
-				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -283,8 +419,6 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 			};
@@ -311,6 +445,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = io.esimplified.esimpulse;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.9;
 			};
@@ -337,6 +472,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = io.esimplified.esimpulse;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.9;
 			};
@@ -353,7 +489,6 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = eSimPulseWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "eSim Pulse Widget";
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../../../../Frameworks",
@@ -362,6 +497,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = io.esimplified.esimpulse.widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.9;
@@ -379,7 +515,6 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = eSimPulseWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "eSim Pulse Widget";
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../../../../Frameworks",
@@ -388,9 +523,122 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = io.esimplified.esimpulse.widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+		E5300000000000000000000B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS = NO;
+				CODE_SIGN_ENTITLEMENTS = eSimPulseiOS/eSimPulseiOS.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8GVFL9KS7M;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = io.esimplified.esimpulse;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		E5300000000000000000000C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS = NO;
+				CODE_SIGN_ENTITLEMENTS = eSimPulseiOS/eSimPulseiOS.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8GVFL9KS7M;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = io.esimplified.esimpulse;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		E5400000000000000000000B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS = NO;
+				CODE_SIGN_ENTITLEMENTS = "eSimPulseWidget/Widget-iOS.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8GVFL9KS7M;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = eSimPulseWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "eSim Pulse Widget";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = io.esimplified.esimpulse.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		E5400000000000000000000C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS = NO;
+				CODE_SIGN_ENTITLEMENTS = "eSimPulseWidget/Widget-iOS.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8GVFL9KS7M;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = eSimPulseWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "eSim Pulse Widget";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = io.esimplified.esimpulse.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
@@ -424,6 +672,24 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		E53000000000000000000008 /* Build configuration list for PBXNativeTarget "eSimPulseiOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E5300000000000000000000B /* Debug */,
+				E5300000000000000000000C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E54000000000000000000008 /* Build configuration list for PBXNativeTarget "eSimPulseWidgetiOSExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E5400000000000000000000B /* Debug */,
+				E5400000000000000000000C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
@@ -439,6 +705,14 @@
 			productName = EsimPulseKit;
 		};
 		E52000000000000000000031 /* EsimPulseKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = EsimPulseKit;
+		};
+		E53000000000000000000031 /* EsimPulseKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = EsimPulseKit;
+		};
+		E54000000000000000000031 /* EsimPulseKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = EsimPulseKit;
 		};
