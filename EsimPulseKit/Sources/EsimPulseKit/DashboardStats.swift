@@ -61,4 +61,10 @@ public struct DashboardStats: Decodable, Equatable, Sendable {
     public static func decode(from data: Data) throws -> DashboardStats {
         try JSONDecoder().decode(DashboardStats.self, from: data)
     }
+
+    /// Percentage change of today vs yesterday; nil when yesterday is zero.
+    public var deltaPercent: Decimal? {
+        guard revenueYesterday != 0 else { return nil }
+        return (revenueToday - revenueYesterday) / revenueYesterday * 100
+    }
 }

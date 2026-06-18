@@ -40,8 +40,7 @@ public final class DashboardViewModel {
 
     /// Percentage change of today vs yesterday; nil when yesterday is zero.
     public var deltaPercent: Decimal? {
-        guard case let .loaded(stats, _) = state, stats.revenueYesterday != 0 else { return nil }
-        let diff = stats.revenueToday - stats.revenueYesterday
-        return diff / stats.revenueYesterday * 100
+        guard case let .loaded(stats, _) = state else { return nil }
+        return stats.deltaPercent
     }
 }
