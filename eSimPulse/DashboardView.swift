@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 import EsimPulseKit
 
 struct RootView: View {
@@ -7,10 +8,11 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            if model.credentials == nil {
-                SettingsView(model: model)
-            } else if let vm = model.makeViewModel() {
+            if let vm = model.viewModel {
                 DashboardView(viewModel: vm, showSettings: $showSettings)
+                    .id(ObjectIdentifier(vm))
+            } else {
+                SettingsView(model: model)
             }
         }
         .sheet(isPresented: $showSettings) {
@@ -20,7 +22,7 @@ struct RootView: View {
 }
 
 struct DashboardView: View {
-    @State var viewModel: DashboardViewModel
+    let viewModel: DashboardViewModel
     @Binding var showSettings: Bool
     private let symbol = "$"
     private let timer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()

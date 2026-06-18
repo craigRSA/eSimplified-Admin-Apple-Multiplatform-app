@@ -19,20 +19,19 @@ struct eSimPulseApp: App {
 @MainActor
 final class AppModel {
     let store = KeychainCredentialStore()
-    var credentials: Credentials?
+    private(set) var credentials: Credentials?
+    private(set) var viewModel: DashboardViewModel?
 
     init() {
-        credentials = try? store.load()
-    }
-
-    func makeViewModel() -> DashboardViewModel? {
-        guard let credentials else { return nil }
-        return DashboardViewModel(client: LiveStatisticsClient(credentials: credentials))
+        let loaded = try? store.load()
+        credentials = loaded
+        viewModel = loaded.map { DashboardViewModel(client: LiveStatisticsClient(credentials: $0)) }
     }
 
     func save(host: String, token: String) {
         let creds = Credentials(host: host, token: token)
         try? store.save(creds)
         credentials = creds
+        viewModel = DashboardViewModel(client: LiveStatisticsClient(credentials: creds))
     }
 }
