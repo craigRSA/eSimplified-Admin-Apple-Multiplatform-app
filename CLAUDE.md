@@ -36,11 +36,18 @@ EsimPulseKit/   ← local Swift package: ALL testable logic, CLI-testable via `s
   DashboardStats (tolerant decimal decoding)
   StatisticsClient / LiveStatisticsClient / StatsError / DateRange
   DashboardViewModel (@Observable state machine)
-eSimPulse/      ← thin SwiftUI macOS app target (window + views), imports EsimPulseKit
-eSimPulseWidget/← WidgetKit extension target (provider + views), imports EsimPulseKit
+eSimPulse/      ← SwiftUI macOS app target (floating window + views), imports EsimPulseKit
+eSimPulseiOS/   ← SwiftUI iOS app target (settings + today preview), imports EsimPulseKit
+eSimPulseWidget/← WidgetKit sources (provider + views), shared by the macOS and iOS widget targets
 docs/specs/     ← approved designs (app + widget)
 docs/plans/     ← implementation plan (executed task-by-task, TDD)
 ```
+
+Four app/extension targets over one engine: macOS app + macOS widget extension,
+iOS app + iOS widget extension. The two widget extensions compile the **same**
+`eSimPulseWidget/*.swift` sources; they differ only in entitlements
+(`eSimPulseWidget.entitlements` for macOS adds app-sandbox; `Widget-iOS.entitlements`
+is keychain-only). `EsimPulseKit` supports `.macOS(.v14)` and `.iOS(.v17)`.
 
 The split is deliberate: logic lives in the package so it has true unit tests
 runnable from the command line without opening Xcode; the app and widget targets
@@ -84,6 +91,10 @@ xcodebuild -project eSimPulse.xcodeproj -scheme eSimPulse build   # build app + 
 - **Desktop widget (done):** WidgetKit small + medium (medium adds the 7-day
   sparkline), self-updating, shared-Keychain token.
   Design: `docs/specs/2026-06-17-esim-pulse-widget-design.md`.
+- **iPhone app + widget (done, simulator-verified):** iOS app is a settings
+  screen + today preview; the iOS widget reuses the shared widget sources.
+  Builds for the iOS Simulator without signing; running on a physical device
+  needs the iOS targets signed in Xcode (your Apple ID / device registration).
 - **Phase 3:** launch-at-login, configurable refresh interval + currency symbol.
 
 Note: the 7-day sparkline (originally Phase 2) shipped in the widget. Today's
