@@ -28,6 +28,7 @@
 		A300000000000000000002B /* ProfileScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A300000000000000000001B /* ProfileScreen.swift */; };
 		A300000000000000000002C /* SearchScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A300000000000000000001C /* SearchScreen.swift */; };
 		A300000000000000000002D /* AgentApprovalsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A300000000000000000001D /* AgentApprovalsScreen.swift */; };
+		A300000000000000000002E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A300000000000000000001E /* Assets.xcassets */; };
 		A3000000000000000000032 /* EsimplifiedKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3000000000000000000031 /* EsimplifiedKit */; };
 /* End PBXBuildFile section */
 
@@ -83,6 +84,7 @@
 		A300000000000000000001B /* ProfileScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileScreen.swift; sourceTree = "<group>"; };
 		A300000000000000000001C /* SearchScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchScreen.swift; sourceTree = "<group>"; };
 		A300000000000000000001D /* AgentApprovalsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentApprovalsScreen.swift; sourceTree = "<group>"; };
+		A300000000000000000001E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -174,6 +176,7 @@
 				A300000000000000000001B /* ProfileScreen.swift */,
 				A300000000000000000001C /* SearchScreen.swift */,
 				A300000000000000000001D /* AgentApprovalsScreen.swift */,
+				A300000000000000000001E /* Assets.xcassets */,
 			);
 			path = EsimplifiedAdmin;
 			sourceTree = "<group>";
@@ -298,6 +301,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A300000000000000000002E /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -533,6 +537,7 @@
 			baseConfigurationReference = A3000000000000000000015 /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = EsimplifiedAdmin/EsimplifiedAdmin.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -570,6 +575,7 @@
 			baseConfigurationReference = A3000000000000000000015 /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = EsimplifiedAdmin/EsimplifiedAdmin.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
