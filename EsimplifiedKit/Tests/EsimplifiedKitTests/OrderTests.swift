@@ -13,7 +13,9 @@ final class OrderTests: XCTestCase {
                 {
                   "order_uuid": "u1", "order_number": "ORD-1", "order_type": "BUY",
                   "package_name": "5GB Europe", "final_price": "12.34",
-                  "purchase_currency": "USD", "purchase_currency_obj": {"iso":"USD","symbol":"$"},
+                  "final_price_local": "229.50", "discount_code": "SUMMER20",
+                  "purchase_country": {"name": "South Africa"},
+                  "purchase_currency": "R", "purchase_currency_obj": {"iso":"ZAR","symbol":"R"},
                   "purchase_date": "2026-06-19T10:00:00Z", "payment_status": "success",
                   "tenant": "acme", "customer": {"email":"a@x.io","full_name":"Ada Lovelace"}
                 }
@@ -40,12 +42,20 @@ final class OrderTests: XCTestCase {
         let first = page.orders[0]
         XCTAssertEqual(first.orderNumber, "ORD-1")
         XCTAssertEqual(first.packageName, "5GB Europe")
-        XCTAssertEqual(first.priceDisplay, "$12.34")
+        XCTAssertEqual(first.priceDisplay, "R12.34")
+        XCTAssertEqual(first.usdPriceDisplay, "$12.34")
+        XCTAssertEqual(first.localPriceDisplay, "R 229.50")
+        XCTAssertEqual(first.discountCode, "SUMMER20")
+        XCTAssertEqual(first.purchaseCountry, "South Africa")
         XCTAssertEqual(first.paymentStatus, "success")
         XCTAssertEqual(first.customerEmail, "a@x.io")
         XCTAssertEqual(first.customerName, "Ada Lovelace")
         let second = page.orders[1]
         XCTAssertEqual(second.priceDisplay, "EUR 5.00") // no symbol obj → code fallback
+        XCTAssertEqual(second.usdPriceDisplay, "$5.00")
+        XCTAssertNil(second.localPriceDisplay) // no final_price_local → blank
+        XCTAssertNil(second.discountCode)
+        XCTAssertNil(second.purchaseCountry)
         XCTAssertNil(second.customerName)
     }
 

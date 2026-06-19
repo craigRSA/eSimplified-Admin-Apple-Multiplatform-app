@@ -9,8 +9,11 @@ public struct Order: Decodable, Identifiable, Equatable, Sendable {
     public let orderType: String
     public let packageName: String
     public let finalPrice: String
+    public let finalPriceLocal: String
     public let purchaseCurrency: String
     public let currencySymbol: String?
+    public let discountCode: String?
+    public let purchaseCountry: String?
     public let purchaseDate: String
     public let paymentStatus: String
     public let paymentMethod: String
@@ -25,13 +28,17 @@ public struct Order: Decodable, Identifiable, Equatable, Sendable {
         case orderType = "order_type"
         case packageName = "package_name"
         case finalPrice = "final_price"
+        case finalPriceLocal = "final_price_local"
         case purchaseCurrency = "purchase_currency"
         case purchaseCurrencyObj = "purchase_currency_obj"
+        case discountCode = "discount_code"
+        case purchaseCountry = "purchase_country"
         case purchaseDate = "purchase_date"
         case paymentStatus = "payment_status"
         case paymentMethod = "payment_method"
     }
     private enum CurrencyKeys: String, CodingKey { case symbol }
+    private enum CountryKeys: String, CodingKey { case name }
     private struct Cust: Decodable { let email: String?; let full_name: String? }
 
     public init(from decoder: Decoder) throws {
@@ -44,7 +51,9 @@ public struct Order: Decodable, Identifiable, Equatable, Sendable {
         orderType = try str(.orderType)
         packageName = try str(.packageName)
         finalPrice = try str(.finalPrice, "0")
+        finalPriceLocal = try str(.finalPriceLocal)
         purchaseCurrency = try str(.purchaseCurrency)
+        discountCode = try c.decodeIfPresent(String.self, forKey: .discountCode).flatMap { $0.isEmpty ? nil : $0 }
         purchaseDate = try str(.purchaseDate)
         paymentStatus = try str(.paymentStatus)
         paymentMethod = try str(.paymentMethod)
@@ -57,12 +66,28 @@ public struct Order: Decodable, Identifiable, Equatable, Sendable {
         } else {
             currencySymbol = nil
         }
+        // purchase_country is a Country object on the wire; we only need its name.
+        if let country = try? c.nestedContainer(keyedBy: CountryKeys.self, forKey: .purchaseCountry) {
+            purchaseCountry = try country.decodeIfPresent(String.self, forKey: .name)
+        } else {
+            purchaseCountry = nil
+        }
     }
 
     /// e.g. "$12.34" or "USD 12.34" — prefer the currency symbol, fall back to the code.
     public var priceDisplay: String {
         if let symbol = currencySymbol, !symbol.isEmpty { return "\(symbol)\(finalPrice)" }
         return purchaseCurrency.isEmpty ? finalPrice : "\(purchaseCurrency) \(finalPrice)"
+    }
+
+    /// USD price as the web shows it: always `$` + `final_price`.
+    public var usdPriceDisplay: String { "$\(finalPrice)" }
+
+    /// Local-currency price, or nil when the order was billed in USD (web blanks
+    /// the "Price (Local)" column when `purchase_currency` is "US $").
+    public var localPriceDisplay: String? {
+        guard purchaseCurrency != "US $", !purchaseCurrency.isEmpty, !finalPriceLocal.isEmpty else { return nil }
+        return "\(purchaseCurrency) \(finalPriceLocal)"
     }
 }
 

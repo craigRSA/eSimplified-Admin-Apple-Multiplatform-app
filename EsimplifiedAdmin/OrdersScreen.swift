@@ -6,31 +6,41 @@ struct OrdersScreen: View {
     var tenant: String?
 
     @State private var phase: Phase = .loading
+    @State private var orders: [Order] = []
+    @State private var total = 0
     @State private var search = ""
 
-    enum Phase { case loading, loaded([Order]), failed(String) }
+    enum Phase { case loading, loaded, failed(String) }
 
     var body: some View {
         Group {
             switch phase {
-            case .loading:
+            case .loading where orders.isEmpty:
                 ProgressView().controlSize(.large).frame(maxWidth: .infinity, maxHeight: .infinity)
-            case let .failed(message):
+            case let .failed(message) where orders.isEmpty:
                 ContentUnavailableView("Couldn't load orders", systemImage: "exclamationmark.triangle",
                                        description: Text(message))
-            case let .loaded(orders):
+            default:
                 let shown = filtered(orders)
-                if shown.isEmpty {
-                    ContentUnavailableView("No orders", systemImage: "tray")
-                } else {
-                    List(shown) { OrderRow(order: $0) }
+                List {
+                    Section {
+                        ForEach(shown) { OrderRow(order: $0) }
+                    } header: {
+                        OrdersCountHeader(showing: shown.count, total: total, filtering: !search.isEmpty)
+                    }
+                    if shown.isEmpty {
+                        ContentUnavailableView("No matching orders", systemImage: "tray")
+                            .listRowBackground(Color.clear)
+                    }
                 }
+                .listStyle(.plain)
             }
         }
         .navigationTitle("Order History")
-        .searchable(text: $search, prompt: "Order #, customer, package")
+        .searchable(text: $search, prompt: "Package, customer, email, order #")
         .task(id: tenant) { await load() }
         .refreshable { await load() }
+        .autoRefresh { await load() }
     }
 
     private func filtered(_ orders: [Order]) -> [Order] {
@@ -45,11 +55,14 @@ struct OrdersScreen: View {
     }
 
     private func load() async {
+        if orders.isEmpty { phase = .loading }
         do {
             let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
             let path = tenant.map { "/api/orders/\($0)/" } ?? "/api/orders/"
             let page = try await client.get(path, query: ["limit": "100"], as: OrdersPage.self)
-            phase = .loaded(page.orders)
+            orders = page.orders
+            total = page.count
+            phase = .loaded
         } catch let error as APIError {
             phase = .failed(adminErrorMessage(error))
         } catch {
@@ -58,31 +71,84 @@ struct OrdersScreen: View {
     }
 }
 
+private struct OrdersCountHeader: View {
+    let showing: Int
+    let total: Int
+    let filtering: Bool
+    var body: some View {
+        HStack(spacing: 6) {
+            if filtering {
+                Text("\(showing.formatted()) of \(total.formatted())")
+            } else {
+                Text("\(total.formatted())").font(.subheadline.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(.primary)
+                Text(total == 1 ? "order" : "orders")
+            }
+        }
+        .font(.subheadline).foregroundStyle(.secondary)
+        .textCase(nil).padding(.vertical, 2)
+    }
+}
+
 private struct OrderRow: View {
     let order: Order
 
+    /// The web's row colour language, surfaced here on the package name so the
+    /// same at-a-glance signal carries over.
+    private var accent: Color? {
+        if order.paymentStatus.lowercased() == "refunded" { return .red }
+        switch order.paymentMethod {
+        case "complimentary": return .green
+        case "agent_payment": return .purple
+        case "voucher": return .cyan
+        default: break
+        }
+        if order.discountCode != nil && order.paymentStatus.lowercased() == "success" { return .orange }
+        return nil
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(order.orderNumber.isEmpty ? order.packageName : order.orderNumber)
-                    .font(.headline)
-                Spacer()
-                Text(order.priceDisplay).font(.headline.monospacedDigit())
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(order.packageName.isEmpty ? order.orderNumber : order.packageName)
+                    .font(.headline).foregroundStyle(accent ?? .primary).lineLimit(1)
+                Spacer(minLength: 8)
+                VStack(alignment: .trailing, spacing: 1) {
+                    Text(order.usdPriceDisplay).font(.headline.monospacedDigit())
+                    if let local = order.localPriceDisplay {
+                        Text(local).font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                    }
+                }
             }
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 StatusBadge(status: order.paymentStatus)
                 if !order.orderType.isEmpty {
-                    Text(order.orderType).font(.caption2).foregroundStyle(.secondary)
+                    Text(order.orderType)
+                        .font(.caption2.weight(.medium))
+                        .padding(.horizontal, 7).padding(.vertical, 2)
+                        .background(.quaternary, in: Capsule())
                 }
-                Spacer()
-                Text(shortDate(order.purchaseDate)).font(.caption).foregroundStyle(.secondary)
+                if let code = order.discountCode {
+                    Label(code, systemImage: "tag.fill")
+                        .font(.caption2.weight(.medium)).foregroundStyle(.orange)
+                        .labelStyle(.titleAndIcon)
+                }
+                Spacer(minLength: 8)
+                Text(shortDate(order.purchaseDate)).font(.caption2).foregroundStyle(.secondary)
             }
-            if let who = order.customerName ?? order.customerEmail, !who.isEmpty {
-                Text(who).font(.caption).foregroundStyle(.secondary)
+            if let who = subtitle {
+                Text(who).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 5)
     }
+
+    private var subtitle: String? {
+        let who = order.customerName ?? order.customerEmail
+        let parts = [who, order.purchaseCountry, tenantName].compactMap { $0 }.filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+    private var tenantName: String? { order.tenant.isEmpty ? nil : order.tenant }
 }
 
 struct StatusBadge: View {

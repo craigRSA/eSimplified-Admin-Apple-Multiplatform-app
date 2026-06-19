@@ -22,21 +22,26 @@ struct DashboardScreen: View {
                 content(stats)
             }
         }
+        .background(AppBackground())
         .navigationTitle("Overview")
         .task(id: tenant) { await load() }
         .refreshable { await load() }
+        .autoRefresh { await load() }
     }
 
     @ViewBuilder private func content(_ s: AdminDashboardStats) -> some View {
+        GlassEffectContainer(spacing: 16) {
         VStack(alignment: .leading, spacing: 22) {
+            // Signature: today's gross volume
+            HeroCard(today: s.revenueToday, yesterday: s.revenueYesterday,
+                     trend: s.current.revenuePerDate)
+
             // Headline metrics
             MetricGrid(items: [
                 .init("Tenants", s.tenants.formatted(), "building.2", .purple),
                 .init("Customers", Fmt.countCompact(s.customers), "person.2", .orange),
                 .init("Successful orders", Fmt.countCompact(s.successOrders), "checkmark.seal", .green),
                 .init("Revenue (all time)", Fmt.money(s.revenue), "dollarsign.circle", .green),
-                .init("Today", Fmt.money(s.revenueToday), "sun.max", .yellow),
-                .init("Yesterday", Fmt.money(s.revenueYesterday), "clock.arrow.circlepath", .teal),
                 .init("Avg order value", Fmt.money(s.averageOrderValue), "cart", .pink),
                 .init("Best day", Fmt.money(s.bestDay?.revenue ?? 0), "trophy", .yellow),
                 .comparison("This month", Fmt.money(s.revenueCurrentMonth),
@@ -88,6 +93,7 @@ struct DashboardScreen: View {
             }
         }
         .padding(20)
+        }
     }
 
     private func load() async {
@@ -105,6 +111,67 @@ struct DashboardScreen: View {
 }
 
 // MARK: - Building blocks
+
+/// The hero: today's gross volume, the day's delta, and a glanceable sparkline.
+private struct HeroCard: View {
+    let today: Decimal
+    let yesterday: Decimal
+    let trend: [DayRevenue]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("TODAY'S GROSS VOLUME")
+                .font(.caption.weight(.semibold)).tracking(1.0).foregroundStyle(.secondary)
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(Fmt.money(today))
+                    .font(.system(size: 44, weight: .bold, design: .rounded)).monospacedDigit()
+                    .lineLimit(1).minimumScaleFactor(0.5)
+                DeltaPill(delta: AdminDashboardStats.change(today, vs: yesterday))
+            }
+            Text("vs \(Fmt.money(yesterday)) yesterday")
+                .font(.subheadline).foregroundStyle(.secondary)
+            if trend.count > 1 {
+                Sparkline(points: trend.map { dbl($0.revenue) })
+                    .frame(height: 54).padding(.top, 4)
+            }
+        }
+        .padding(22)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassEffect(.regular, in: .rect(cornerRadius: 22))
+    }
+}
+
+private struct DeltaPill: View {
+    let delta: Decimal?
+    var body: some View {
+        if let delta {
+            let up = delta >= 0
+            Label("\(up ? "+" : "")\(delta.formatted(.number.precision(.fractionLength(1))))%",
+                  systemImage: up ? "arrow.up.right" : "arrow.down.right")
+                .font(.subheadline.weight(.semibold).monospacedDigit())
+                .foregroundStyle(up ? .green : .red)
+                .padding(.horizontal, 10).padding(.vertical, 5)
+                .background((up ? Color.green : .red).opacity(0.16), in: Capsule())
+        }
+    }
+}
+
+/// A minimal filled area sparkline — no axes, just the shape of the trend.
+private struct Sparkline: View {
+    let points: [Double]
+    var body: some View {
+        Chart(Array(points.enumerated()), id: \.offset) { i, v in
+            AreaMark(x: .value("i", i), y: .value("v", v))
+                .foregroundStyle(.linearGradient(
+                    colors: [Color.accentColor.opacity(0.35), Color.accentColor.opacity(0.02)],
+                    startPoint: .top, endPoint: .bottom))
+            LineMark(x: .value("i", i), y: .value("v", v))
+                .foregroundStyle(Color.accentColor).lineStyle(.init(lineWidth: 2))
+                .interpolationMethod(.catmullRom)
+        }
+        .chartXAxis(.hidden).chartYAxis(.hidden)
+    }
+}
 
 private struct Card<Content: View>: View {
     let title: String
@@ -147,7 +214,7 @@ private struct MetricGrid: View {
             ForEach(items) { item in
                 VStack(alignment: .leading, spacing: 6) {
                     if let icon = item.icon { Image(systemName: icon).foregroundStyle(item.tint).font(.title3) }
-                    Text(item.value).font(.title3.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.55)
+                    Text(item.value).font(.title3.weight(.semibold).monospacedDigit()).lineLimit(1).minimumScaleFactor(0.55)
                     Text(item.title).font(.caption).foregroundStyle(.secondary)
                     if let delta = item.delta {
                         let up = delta >= 0
