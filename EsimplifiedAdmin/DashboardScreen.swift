@@ -13,37 +13,72 @@ struct DashboardScreen: View {
         ScrollView {
             switch phase {
             case .loading:
-                ProgressView().controlSize(.large).frame(maxWidth: .infinity, minHeight: 300)
+                ProgressView().controlSize(.large).frame(maxWidth: .infinity, minHeight: 320)
             case let .failed(message):
                 ContentUnavailableView("Couldn't load the dashboard", systemImage: "exclamationmark.triangle",
-                                       description: Text(message))
-                    .frame(minHeight: 300)
+                                       description: Text(message)).frame(minHeight: 320)
             case let .loaded(stats):
                 content(stats)
             }
         }
-        .navigationTitle("Dashboard")
+        .navigationTitle("Overview")
         .task { await load() }
         .refreshable { await load() }
     }
 
     @ViewBuilder private func content(_ s: AdminDashboardStats) -> some View {
-        VStack(alignment: .leading, spacing: 24) {
-            HeroRevenue(today: s.revenueToday, deltaPercent: s.deltaPercent)
+        VStack(alignment: .leading, spacing: 22) {
+            // Headline metrics
+            MetricGrid(items: [
+                .init("Tenants", s.tenants.formatted(), "building.2", .purple),
+                .init("Customers", Fmt.countCompact(s.customers), "person.2", .orange),
+                .init("Successful orders", Fmt.countCompact(s.successOrders), "checkmark.seal", .green),
+                .init("Revenue", Fmt.moneyCompact(s.revenue), "dollarsign.circle", .green),
+                .init("This month", Fmt.moneyCompact(s.revenueCurrentMonth), "calendar", .blue),
+                .init("Today", Fmt.moneyCompact(s.revenueToday), "sun.max", .yellow),
+                .init("Avg order value", Fmt.moneyFull(s.averageOrderValue), "cart", .pink),
+                .init("Last month", Fmt.moneyCompact(s.revenueLastMonth), "calendar.badge.clock", .indigo),
+                .init("Yesterday", Fmt.moneyFull(s.revenueYesterday), "clock.arrow.circlepath", .teal),
+            ])
 
-            if !s.revenuePerDate.isEmpty {
-                RevenueTrend(series: s.revenuePerDate)
+            // Month to date vs previous
+            Card(title: "Month to date vs previous") {
+                let cur = s.current, prev = s.comparison
+                MetricGrid(items: [
+                    .comparison("Revenue", Fmt.moneyFull(cur.revenue), AdminDashboardStats.change(cur.revenue, vs: prev.revenue), "Prev: \(Fmt.moneyCompact(prev.revenue))"),
+                    .comparison("Customers", Fmt.countCompact(cur.customers), AdminDashboardStats.change(Decimal(cur.customers), vs: Decimal(prev.customers)), "Prev: \(Fmt.countCompact(prev.customers))"),
+                    .comparison("Avg order value", Fmt.moneyFull(cur.averageOrderValue), AdminDashboardStats.change(cur.averageOrderValue, vs: prev.averageOrderValue), "Prev: \(Fmt.moneyFull(prev.averageOrderValue))"),
+                    .comparison("Orders", Fmt.countCompact(cur.orders), AdminDashboardStats.change(Decimal(cur.orders), vs: Decimal(prev.orders)), "Prev: \(Fmt.countCompact(prev.orders))"),
+                ])
+                if !s.current.revenuePerDate.isEmpty {
+                    ComparisonAreaChart(current: s.current.revenuePerDate, previous: s.comparison.revenuePerDate)
+                        .frame(height: 220)
+                }
             }
 
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 16)], spacing: 16) {
-                StatCard(title: "Total revenue", value: Money.full(s.revenue), icon: "dollarsign.circle", tint: .green)
-                StatCard(title: "This month", value: Money.full(s.revenueCurrentMonth), icon: "calendar", tint: .blue)
-                StatCard(title: "Last month", value: Money.full(s.revenueLastMonth), icon: "calendar.badge.clock", tint: .indigo)
-                StatCard(title: "Yesterday", value: Money.full(s.revenueYesterday), icon: "clock.arrow.circlepath", tint: .teal)
-                StatCard(title: "Success orders", value: s.successOrders.formatted(), icon: "checkmark.seal", tint: .green)
-                StatCard(title: "Customers", value: s.customers.formatted(), icon: "person.2", tint: .orange)
-                StatCard(title: "Tenants", value: s.tenants.formatted(), icon: "building.2", tint: .purple)
-                StatCard(title: "Avg order", value: Money.full(s.averageOrderValue), icon: "cart", tint: .pink)
+            if !s.revenuePerTenant.isEmpty {
+                Card(title: "Revenue per tenant") {
+                    RevenueBarChart(items: Array(s.revenuePerTenant.prefix(8)).map { ($0.tenant, $0.amount) })
+                        .frame(height: 240)
+                }
+            }
+
+            if !s.revenuePerMonth.isEmpty {
+                Card(title: "Revenue per month") {
+                    RevenueBarChart(items: s.revenuePerMonth.map { ($0.month, $0.amount) })
+                        .frame(height: 220)
+                }
+            }
+
+            if !s.current.topPackages.isEmpty || !s.current.topCountries.isEmpty {
+                HStack(alignment: .top, spacing: 16) {
+                    if !s.current.topPackages.isEmpty {
+                        Card(title: "Top packages") { TopList(items: s.current.topPackages) }
+                    }
+                    if !s.current.topCountries.isEmpty {
+                        Card(title: "Top countries") { TopList(items: s.current.topCountries) }
+                    }
+                }
             }
         }
         .padding(20)
@@ -52,98 +87,148 @@ struct DashboardScreen: View {
     private func load() async {
         do {
             let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
-            let stats = try await client.get("/api/statistics/", query: ["date_range": "last_7_days"],
-                                             as: AdminDashboardStats.self)
+            let stats = try await client.get("/api/statistics/", query: [:], as: AdminDashboardStats.self)
             phase = .loaded(stats)
         } catch let error as APIError {
-            phase = .failed(Self.describe(error))
+            phase = .failed(adminErrorMessage(error))
         } catch {
             phase = .failed("Unexpected error.")
         }
     }
-
-    private static func describe(_ error: APIError) -> String {
-        switch error {
-        case .unreachable: "Couldn't reach the server."
-        case .authExpired: "Your session expired — sign in again."
-        case .notFound: "The statistics endpoint wasn't found."
-        case let .server(code): "Server error (\(code))."
-        case let .requestFailed(code, message): message.map { "Server (\(code)): \($0)" } ?? "Request failed (\(code))."
-        case .decoding: "Couldn't read the server response."
-        }
-    }
 }
 
-// MARK: - Pieces
+// MARK: - Building blocks
 
-private struct HeroRevenue: View {
-    let today: Decimal
-    let deltaPercent: Decimal?
-
+private struct Card<Content: View>: View {
+    let title: String
+    @ViewBuilder var content: Content
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Today").font(.subheadline).foregroundStyle(.secondary)
-            Text(Money.full(today))
-                .font(.system(size: 44, weight: .bold, design: .rounded))
-                .lineLimit(1).minimumScaleFactor(0.5)
-            if let delta = deltaPercent {
-                let up = delta >= 0
-                Label("\(delta.formatted(.number.precision(.fractionLength(1))))% vs yesterday",
-                      systemImage: up ? "arrow.up.right" : "arrow.down.right")
-                    .font(.callout.weight(.semibold))
-                    .foregroundStyle(up ? .green : .red)
-            }
+        VStack(alignment: .leading, spacing: 14) {
+            Text(title).font(.headline)
+            content
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(20)
+        .padding(18)
         .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 16))
     }
 }
 
-private struct RevenueTrend: View {
-    let series: [DayRevenue]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Revenue — last \(series.count) days").font(.headline)
-            Chart(series, id: \.date) { day in
-                AreaMark(x: .value("Date", day.date),
-                         y: .value("Revenue", (day.revenue as NSDecimalNumber).doubleValue))
-                    .foregroundStyle(.linearGradient(colors: [Color.accentColor.opacity(0.35), Color.accentColor.opacity(0.02)],
-                                                     startPoint: .top, endPoint: .bottom))
-                LineMark(x: .value("Date", day.date),
-                         y: .value("Revenue", (day.revenue as NSDecimalNumber).doubleValue))
-                    .foregroundStyle(Color.accentColor)
-                    .interpolationMethod(.catmullRom)
-            }
-            .chartXAxis { AxisMarks(values: .automatic(desiredCount: 4)) }
-            .frame(height: 200)
-        }
-        .padding(20)
-        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 16))
-    }
-}
-
-private struct StatCard: View {
+private struct MetricItem: Identifiable {
+    let id = UUID()
     let title: String
     let value: String
-    let icon: String
+    let icon: String?
     let tint: Color
+    let delta: Decimal?
+    let sub: String?
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Image(systemName: icon).foregroundStyle(tint).font(.title3)
-            Text(value).font(.title3.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.6)
-            Text(title).font(.caption).foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 14))
+    init(_ title: String, _ value: String, _ icon: String, _ tint: Color) {
+        self.title = title; self.value = value; self.icon = icon; self.tint = tint; self.delta = nil; self.sub = nil
+    }
+    static func comparison(_ title: String, _ value: String, _ delta: Decimal?, _ sub: String) -> MetricItem {
+        MetricItem(title: title, value: value, delta: delta, sub: sub)
+    }
+    private init(title: String, value: String, delta: Decimal?, sub: String) {
+        self.title = title; self.value = value; self.icon = nil; self.tint = .secondary; self.delta = delta; self.sub = sub
     }
 }
 
-enum Money {
-    static func full(_ d: Decimal) -> String {
+private struct MetricGrid: View {
+    let items: [MetricItem]
+    var body: some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 165), spacing: 14)], spacing: 14) {
+            ForEach(items) { item in
+                VStack(alignment: .leading, spacing: 6) {
+                    if let icon = item.icon { Image(systemName: icon).foregroundStyle(item.tint).font(.title3) }
+                    Text(item.value).font(.title3.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.55)
+                    Text(item.title).font(.caption).foregroundStyle(.secondary)
+                    if let delta = item.delta {
+                        let up = delta >= 0
+                        Text("\(up ? "+" : "")\(delta.formatted(.number.precision(.fractionLength(1))))%")
+                            .font(.caption.weight(.semibold)).foregroundStyle(up ? .green : .red)
+                    }
+                    if let sub = item.sub { Text(sub).font(.caption2).foregroundStyle(.secondary) }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(14)
+                .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 12))
+            }
+        }
+    }
+}
+
+private struct ComparisonAreaChart: View {
+    let current: [DayRevenue]
+    let previous: [DayRevenue]
+
+    var body: some View {
+        Chart {
+            ForEach(Array(current.enumerated()), id: \.offset) { i, day in
+                AreaMark(x: .value("Day", i + 1), y: .value("Revenue", dbl(day.revenue)),
+                         series: .value("Period", "This period"))
+                    .foregroundStyle(.linearGradient(colors: [Color.accentColor.opacity(0.3), Color.accentColor.opacity(0.02)],
+                                                     startPoint: .top, endPoint: .bottom))
+                LineMark(x: .value("Day", i + 1), y: .value("Revenue", dbl(day.revenue)),
+                         series: .value("Period", "This period"))
+                    .foregroundStyle(Color.accentColor).interpolationMethod(.catmullRom)
+            }
+            ForEach(Array(previous.enumerated()), id: \.offset) { i, day in
+                LineMark(x: .value("Day", i + 1), y: .value("Revenue", dbl(day.revenue)),
+                         series: .value("Period", "Previous"))
+                    .foregroundStyle(.gray).interpolationMethod(.catmullRom)
+            }
+        }
+        .chartForegroundStyleScale(["This period": Color.accentColor, "Previous": Color.gray])
+    }
+}
+
+private struct RevenueBarChart: View {
+    let items: [(String, Decimal)]
+    var body: some View {
+        Chart(Array(items.enumerated()), id: \.offset) { _, item in
+            BarMark(x: .value("Label", item.0), y: .value("Revenue", dbl(item.1)))
+                .foregroundStyle(Color.accentColor)
+        }
+        .chartXAxis { AxisMarks { AxisValueLabel(orientation: .verticalReversed) } }
+    }
+}
+
+private struct TopList: View {
+    let items: [LabeledCount]
+    var body: some View {
+        let maxCount = max(items.map(\.count).max() ?? 1, 1)
+        VStack(spacing: 8) {
+            ForEach(items.prefix(5)) { item in
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack {
+                        Text(item.label).font(.caption).lineLimit(1)
+                        Spacer()
+                        Text(item.count.formatted()).font(.caption.monospacedDigit().weight(.semibold))
+                    }
+                    GeometryReader { geo in
+                        Capsule().fill(Color.accentColor.opacity(0.25))
+                            .overlay(alignment: .leading) {
+                                Capsule().fill(Color.accentColor)
+                                    .frame(width: geo.size.width * CGFloat(item.count) / CGFloat(maxCount))
+                            }
+                    }
+                    .frame(height: 5)
+                }
+            }
+        }
+    }
+}
+
+private func dbl(_ d: Decimal) -> Double { (d as NSDecimalNumber).doubleValue }
+
+enum Fmt {
+    static func moneyCompact(_ d: Decimal) -> String {
+        "$" + dbl(d).formatted(.number.notation(.compactName).precision(.fractionLength(1)))
+    }
+    static func moneyFull(_ d: Decimal) -> String {
         "$" + d.formatted(.number.precision(.fractionLength(2)).grouping(.automatic))
+    }
+    static func countCompact(_ n: Int) -> String {
+        n >= 1000 ? Double(n).formatted(.number.notation(.compactName).precision(.fractionLength(1))) : n.formatted()
     }
 }
