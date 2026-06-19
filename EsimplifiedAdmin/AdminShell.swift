@@ -49,6 +49,7 @@ enum AdminSection: String, CaseIterable, Identifiable, Hashable {
 struct AdminShell: View {
     @Bindable var model: AdminAppModel
     @State private var selection: AdminSection?
+    @AppStorage("autoRefreshSeconds") private var autoRefreshSeconds = 0
 
     var body: some View {
         NavigationSplitView {
@@ -56,53 +57,66 @@ struct AdminShell: View {
                 Label(section.title, systemImage: section.systemImage).tag(section)
             }
             .navigationTitle("eSimplified")
-            .safeAreaInset(edge: .top) {
-                if !model.tenants.isEmpty {
-                    Menu {
-                        Button("All Tenants") { model.selectedTenant = nil }
-                        Divider()
-                        ForEach(model.tenants) { tenant in
-                            Button(tenant.name) { model.selectedTenant = tenant }
-                        }
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "building.2").font(.caption)
-                            Text(model.selectedTenant?.name ?? "All Tenants").lineLimit(1)
-                            Spacer()
-                            Image(systemName: "chevron.up.chevron.down").font(.caption2).foregroundStyle(.secondary)
-                        }
-                        .padding(.horizontal, 10).padding(.vertical, 7)
-                        .glassEffect(.regular.interactive(), in: .capsule)
-                    }
-                    .menuStyle(.borderlessButton)
-                    .padding(.horizontal, 10).padding(.top, 8)
-                }
-            }
         } detail: {
-            let scope = model.tenantScope
-            switch selection {
-            case .dashboard:
-                if let session = model.session { DashboardScreen(session: session, tenant: scope) }
-            case .orders:
-                if let session = model.session { OrdersScreen(session: session, tenant: scope) }
-            case .customers:
-                if let session = model.session { CustomersScreen(session: session, tenant: scope) }
-            case .inventory:
-                if let session = model.session { InventoryScreen(session: session) }
-            case .search:
-                if let session = model.session { SearchScreen(session: session, tenant: scope) }
-            case .agentApprovals:
-                if let session = model.session { AgentApprovalsScreen(session: session, tenant: scope) }
-            case .profile:
-                if let session = model.session { ProfileScreen(session: session, onLogout: { model.logout() }) }
-            case .some(let section):
-                PlaceholderDetail(title: section.title)
-            case nil:
-                PlaceholderDetail(title: "Select a section")
-            }
+            detail
+                .toolbar {
+                    ToolbarItemGroup(placement: .primaryAction) {
+                        if !model.tenants.isEmpty { TenantMenu(model: model) }
+                        RefreshIntervalMenu(seconds: $autoRefreshSeconds)
+                    }
+                }
         }
         .task { await model.loadTenants() }
         .onAppear { if selection == nil { selection = model.sections.first } }
+    }
+
+    @ViewBuilder private var detail: some View {
+        let scope = model.tenantScope
+        switch selection {
+        case .dashboard:
+            if let session = model.session { DashboardScreen(session: session, tenant: scope) }
+        case .orders:
+            if let session = model.session { OrdersScreen(session: session, tenant: scope) }
+        case .customers:
+            if let session = model.session { CustomersScreen(session: session, tenant: scope) }
+        case .inventory:
+            if let session = model.session { InventoryScreen(session: session) }
+        case .search:
+            if let session = model.session { SearchScreen(session: session, tenant: scope) }
+        case .agentApprovals:
+            if let session = model.session { AgentApprovalsScreen(session: session, tenant: scope) }
+        case .profile:
+            if let session = model.session { ProfileScreen(session: session, onLogout: { model.logout() }) }
+        case .some(let section):
+            PlaceholderDetail(title: section.title)
+        case nil:
+            PlaceholderDetail(title: "Select a section")
+        }
+    }
+}
+
+/// Tenant scope picker, rendered icon-only so it sits cleanly beside the
+/// auto-refresh control in the toolbar. Filled icon = a specific tenant is
+/// selected; outline = all tenants.
+private struct TenantMenu: View {
+    let model: AdminAppModel
+    var body: some View {
+        Menu {
+            Button { model.selectedTenant = nil } label: {
+                Label("All Tenants", systemImage: model.selectedTenant == nil ? "checkmark" : "building.2")
+            }
+            Divider()
+            ForEach(model.tenants) { tenant in
+                Button { model.selectedTenant = tenant } label: {
+                    Label(tenant.name, systemImage: model.selectedTenant?.id == tenant.id ? "checkmark" : "building.2")
+                }
+            }
+        } label: {
+            Label(model.selectedTenant?.name ?? "All Tenants",
+                  systemImage: model.selectedTenant == nil ? "building.2" : "building.2.fill")
+                .labelStyle(.iconOnly)
+        }
+        .help(model.selectedTenant?.name ?? "All Tenants")
     }
 }
 

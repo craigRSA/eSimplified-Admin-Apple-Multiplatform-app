@@ -102,7 +102,6 @@ private struct AutoRefresh: ViewModifier {
     let action: () async -> Void
     func body(content: Content) -> some View {
         content
-            .toolbar { ToolbarItem(placement: .automatic) { RefreshIntervalMenu(seconds: $seconds) } }
             .task(id: seconds) {
                 guard seconds > 0 else { return }
                 while !Task.isCancelled {
@@ -115,8 +114,8 @@ private struct AutoRefresh: ViewModifier {
 }
 
 extension View {
-    /// Adds the auto-refresh interval menu to the toolbar and runs `action` on
-    /// that cadence (no-op while set to Off).
+    /// Runs `action` on the shared auto-refresh cadence (no-op while set to Off).
+    /// The interval control itself lives in the shell toolbar (`RefreshIntervalMenu`).
     func autoRefresh(_ action: @escaping () async -> Void) -> some View {
         modifier(AutoRefresh(action: action))
     }
