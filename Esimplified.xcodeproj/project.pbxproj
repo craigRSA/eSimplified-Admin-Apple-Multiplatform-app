@@ -7,11 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A1000000000000000000020 /* EsimplifiedApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000010 /* EsimplifiedApp.swift */; };
-		A1000000000000000000021 /* RevenueViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000011 /* RevenueViews.swift */; };
-		A1000000000000000000022 /* MacViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000012 /* MacViews.swift */; };
-		A1000000000000000000023 /* PhoneViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000013 /* PhoneViews.swift */; };
-		A1000000000000000000032 /* EsimplifiedKit in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000031 /* EsimplifiedKit */; };
 		A1000000000000000000040 /* EsimplifiedWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = A2000000000000000000006 /* EsimplifiedWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A2000000000000000000020 /* EsimplifiedWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000010 /* EsimplifiedWidgetBundle.swift */; };
 		A2000000000000000000021 /* RevenueProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000011 /* RevenueProvider.swift */; };
@@ -58,12 +53,6 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		A1000000000000000000006 /* Esimplified.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Esimplified.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		A1000000000000000000010 /* EsimplifiedApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EsimplifiedApp.swift; sourceTree = "<group>"; };
-		A1000000000000000000011 /* RevenueViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevenueViews.swift; sourceTree = "<group>"; };
-		A1000000000000000000012 /* MacViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacViews.swift; sourceTree = "<group>"; };
-		A1000000000000000000013 /* PhoneViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneViews.swift; sourceTree = "<group>"; };
-		A1000000000000000000014 /* Esimplified.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Esimplified.entitlements; sourceTree = "<group>"; };
 		A2000000000000000000006 /* EsimplifiedWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = EsimplifiedWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		A2000000000000000000010 /* EsimplifiedWidgetBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EsimplifiedWidgetBundle.swift; sourceTree = "<group>"; };
 		A2000000000000000000011 /* RevenueProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevenueProvider.swift; sourceTree = "<group>"; };
@@ -90,14 +79,6 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		A100000000000000000000E /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				A1000000000000000000032 /* EsimplifiedKit in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		A200000000000000000000E /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -120,7 +101,6 @@
 		A0000000000000000000002 = {
 			isa = PBXGroup;
 			children = (
-				A0000000000000000000004 /* Esimplified */,
 				A0000000000000000000005 /* EsimplifiedWidget */,
 				A3000000000000000000004 /* EsimplifiedAdmin */,
 				A0000000000000000000003 /* Products */,
@@ -130,23 +110,10 @@
 		A0000000000000000000003 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				A1000000000000000000006 /* Esimplified.app */,
 				A2000000000000000000006 /* EsimplifiedWidget.appex */,
 				A3000000000000000000006 /* EsimplifiedAdmin.app */,
 			);
 			name = Products;
-			sourceTree = "<group>";
-		};
-		A0000000000000000000004 /* Esimplified */ = {
-			isa = PBXGroup;
-			children = (
-				A1000000000000000000010 /* EsimplifiedApp.swift */,
-				A1000000000000000000011 /* RevenueViews.swift */,
-				A1000000000000000000012 /* MacViews.swift */,
-				A1000000000000000000013 /* PhoneViews.swift */,
-				A1000000000000000000014 /* Esimplified.entitlements */,
-			);
-			path = Esimplified;
 			sourceTree = "<group>";
 		};
 		A0000000000000000000005 /* EsimplifiedWidget */ = {
@@ -187,26 +154,6 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		A1000000000000000000005 /* Esimplified */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = A1000000000000000000008 /* Build configuration list for PBXNativeTarget "Esimplified" */;
-			buildPhases = (
-				A100000000000000000000D /* Sources */,
-				A100000000000000000000E /* Frameworks */,
-				A100000000000000000000F /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			name = Esimplified;
-			packageProductDependencies = (
-				A1000000000000000000031 /* EsimplifiedKit */,
-			);
-			productName = Esimplified;
-			productReference = A1000000000000000000006 /* Esimplified.app */;
-			productType = "com.apple.product-type.application";
-		};
 		A2000000000000000000005 /* EsimplifiedWidget */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = A2000000000000000000008 /* Build configuration list for PBXNativeTarget "EsimplifiedWidget" */;
@@ -258,9 +205,6 @@
 				LastSwiftUpdateCheck = 2700;
 				LastUpgradeCheck = 2700;
 				TargetAttributes = {
-					A1000000000000000000005 = {
-						CreatedOnToolsVersion = 27.0;
-					};
 					A2000000000000000000005 = {
 						CreatedOnToolsVersion = 27.0;
 					};
@@ -285,7 +229,6 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				A1000000000000000000005 /* Esimplified */,
 				A2000000000000000000005 /* EsimplifiedWidget */,
 				A3000000000000000000005 /* EsimplifiedAdmin */,
 			);
@@ -293,13 +236,6 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		A100000000000000000000F /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		A300000000000000000000F /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -311,17 +247,6 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		A100000000000000000000D /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				A1000000000000000000020 /* EsimplifiedApp.swift in Sources */,
-				A1000000000000000000021 /* RevenueViews.swift in Sources */,
-				A1000000000000000000022 /* MacViews.swift in Sources */,
-				A1000000000000000000023 /* PhoneViews.swift in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		A200000000000000000000D /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -397,78 +322,6 @@
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
-			};
-			name = Release;
-		};
-		A100000000000000000000B /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS = NO;
-				CODE_SIGN_ENTITLEMENTS = Esimplified/Esimplified.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 8GVFL9KS7M;
-				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = eSimplified;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
-				"INFOPLIST_KEY_NSPrincipalClass[sdk=macosx*]" = NSApplication;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				"INFOPLIST_KEY_UISupportedInterfaceOrientations[sdk=iphoneos*]" = UIInterfaceOrientationPortrait;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../Frameworks",
-				);
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = io.esimplified.glance;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = auto;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
-				SUPPORTS_MACCATALYST = NO;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.9;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
-		};
-		A100000000000000000000C /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS = NO;
-				CODE_SIGN_ENTITLEMENTS = Esimplified/Esimplified.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 8GVFL9KS7M;
-				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = eSimplified;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
-				"INFOPLIST_KEY_NSPrincipalClass[sdk=macosx*]" = NSApplication;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				"INFOPLIST_KEY_UISupportedInterfaceOrientations[sdk=iphoneos*]" = UIInterfaceOrientationPortrait;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../Frameworks",
-				);
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = io.esimplified.glance;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = auto;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
-				SUPPORTS_MACCATALYST = NO;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.9;
-				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
@@ -628,15 +481,6 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		A1000000000000000000008 /* Build configuration list for PBXNativeTarget "Esimplified" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				A100000000000000000000B /* Debug */,
-				A100000000000000000000C /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		A2000000000000000000008 /* Build configuration list for PBXNativeTarget "EsimplifiedWidget" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -665,10 +509,6 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		A1000000000000000000031 /* EsimplifiedKit */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = EsimplifiedKit;
-		};
 		A2000000000000000000031 /* EsimplifiedKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = EsimplifiedKit;
