@@ -77,13 +77,26 @@ public final class LiveAuthClient: AuthClient {
         } catch {
             throw APIError.unreachable
         }
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw APIError.authExpired
+        guard let http = response as? HTTPURLResponse else { throw APIError.unreachable }
+        guard (200...299).contains(http.statusCode) else {
+            throw APIError.requestFailed(status: http.statusCode, serverMessage: Self.serverMessage(from: data))
         }
         guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw APIError.decoding
         }
         return object
+    }
+
+    /// Pull a human-readable message out of an OAuth2/DRF error body
+    /// (`error_description`, `detail`, or `error`); fall back to raw text.
+    private static func serverMessage(from data: Data) -> String? {
+        if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            if let m = object["error_description"] as? String { return m }
+            if let m = object["detail"] as? String { return m }
+            if let m = object["error"] as? String { return m }
+        }
+        let text = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return (text?.isEmpty == false) ? text : nil
     }
 
     private static func makeSession(from json: [String: Any], host: String) throws -> Session {

@@ -71,9 +71,12 @@ struct LoginView: View {
     private static func message(for error: APIError) -> String {
         switch error {
         case .unreachable: "Couldn't reach the server — check the host and your connection."
-        case .authExpired: "Sign-in rejected — check your username and password (and that the app has client credentials)."
+        case let .requestFailed(status, serverMessage):
+            if let serverMessage { "Server (\(status)): \(serverMessage)" }
+            else { "Sign-in rejected (HTTP \(status))." }
+        case .authExpired: "Sign-in rejected (401)."
         case .notFound: "Endpoint not found — check the host."
-        case .server(let code): "Server error (\(code)). Try again."
+        case .server(let code): "Server error (\(code))."
         case .decoding: "Unexpected response from the server."
         }
     }

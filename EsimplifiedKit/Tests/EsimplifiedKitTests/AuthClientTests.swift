@@ -67,12 +67,14 @@ final class AuthClientTests: XCTestCase {
         XCTAssertEqual(LiveAuthClient.formEncode(["grant_type": "password"]), "grant_type=password")
     }
 
-    func test_login_non_2xx_maps_to_authExpired() async {
-        MockURLProtocol.handler = respond("{}", 401)
+    func test_login_failure_surfaces_server_status_and_message() async {
+        MockURLProtocol.handler = respond(#"{"error":"invalid_grant","error_description":"Invalid credentials given."}"#, 400)
         do {
             _ = try await makeClient().login(username: "u", password: "p", host: "https://h.io", trustedDeviceToken: nil)
             XCTFail("expected throw")
-        } catch let e as APIError { XCTAssertEqual(e, .authExpired) }
+        } catch let e as APIError {
+            XCTAssertEqual(e, .requestFailed(status: 400, serverMessage: "Invalid credentials given."))
+        }
         catch { XCTFail("unexpected \(error)") }
     }
 }
