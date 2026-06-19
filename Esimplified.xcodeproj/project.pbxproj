@@ -17,6 +17,11 @@
 		A2000000000000000000021 /* RevenueProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000011 /* RevenueProvider.swift */; };
 		A2000000000000000000022 /* RevenueWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000012 /* RevenueWidgetView.swift */; };
 		A2000000000000000000032 /* EsimplifiedKit in Frameworks */ = {isa = PBXBuildFile; productRef = A2000000000000000000031 /* EsimplifiedKit */; };
+		A3000000000000000000020 /* EsimplifiedAdminApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000010 /* EsimplifiedAdminApp.swift */; };
+		A3000000000000000000021 /* AdminShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000011 /* AdminShell.swift */; };
+		A3000000000000000000022 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000012 /* LoginView.swift */; };
+		A3000000000000000000023 /* TwoFactorSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000013 /* TwoFactorSetupView.swift */; };
+		A3000000000000000000032 /* EsimplifiedKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3000000000000000000031 /* EsimplifiedKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -56,6 +61,12 @@
 		A2000000000000000000012 /* RevenueWidgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevenueWidgetView.swift; sourceTree = "<group>"; };
 		A2000000000000000000013 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A2000000000000000000014 /* EsimplifiedWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = EsimplifiedWidget.entitlements; sourceTree = "<group>"; };
+		A3000000000000000000006 /* EsimplifiedAdmin.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EsimplifiedAdmin.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A3000000000000000000010 /* EsimplifiedAdminApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EsimplifiedAdminApp.swift; sourceTree = "<group>"; };
+		A3000000000000000000011 /* AdminShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminShell.swift; sourceTree = "<group>"; };
+		A3000000000000000000012 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		A3000000000000000000013 /* TwoFactorSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TwoFactorSetupView.swift; sourceTree = "<group>"; };
+		A3000000000000000000014 /* EsimplifiedAdmin.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = EsimplifiedAdmin.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -75,6 +86,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A300000000000000000000E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A3000000000000000000032 /* EsimplifiedKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -83,6 +102,7 @@
 			children = (
 				A0000000000000000000004 /* Esimplified */,
 				A0000000000000000000005 /* EsimplifiedWidget */,
+				A3000000000000000000004 /* EsimplifiedAdmin */,
 				A0000000000000000000003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -92,6 +112,7 @@
 			children = (
 				A1000000000000000000006 /* Esimplified.app */,
 				A2000000000000000000006 /* EsimplifiedWidget.appex */,
+				A3000000000000000000006 /* EsimplifiedAdmin.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -118,6 +139,18 @@
 				A2000000000000000000014 /* EsimplifiedWidget.entitlements */,
 			);
 			path = EsimplifiedWidget;
+			sourceTree = "<group>";
+		};
+		A3000000000000000000004 /* EsimplifiedAdmin */ = {
+			isa = PBXGroup;
+			children = (
+				A3000000000000000000010 /* EsimplifiedAdminApp.swift */,
+				A3000000000000000000011 /* AdminShell.swift */,
+				A3000000000000000000012 /* LoginView.swift */,
+				A3000000000000000000013 /* TwoFactorSetupView.swift */,
+				A3000000000000000000014 /* EsimplifiedAdmin.entitlements */,
+			);
+			path = EsimplifiedAdmin;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -164,6 +197,26 @@
 			productReference = A2000000000000000000006 /* EsimplifiedWidget.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		A3000000000000000000005 /* EsimplifiedAdmin */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A3000000000000000000008 /* Build configuration list for PBXNativeTarget "EsimplifiedAdmin" */;
+			buildPhases = (
+				A300000000000000000000D /* Sources */,
+				A300000000000000000000E /* Frameworks */,
+				A300000000000000000000F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = EsimplifiedAdmin;
+			packageProductDependencies = (
+				A3000000000000000000031 /* EsimplifiedKit */,
+			);
+			productName = EsimplifiedAdmin;
+			productReference = A3000000000000000000006 /* EsimplifiedAdmin.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -178,6 +231,9 @@
 						CreatedOnToolsVersion = 27.0;
 					};
 					A2000000000000000000005 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					A3000000000000000000005 = {
 						CreatedOnToolsVersion = 27.0;
 					};
 				};
@@ -200,12 +256,20 @@
 			targets = (
 				A1000000000000000000005 /* Esimplified */,
 				A2000000000000000000005 /* EsimplifiedWidget */,
+				A3000000000000000000005 /* EsimplifiedAdmin */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		A100000000000000000000F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A300000000000000000000F /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -233,6 +297,17 @@
 				A2000000000000000000020 /* EsimplifiedWidgetBundle.swift in Sources */,
 				A2000000000000000000021 /* RevenueProvider.swift in Sources */,
 				A2000000000000000000022 /* RevenueWidgetView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A300000000000000000000D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A3000000000000000000020 /* EsimplifiedAdminApp.swift in Sources */,
+				A3000000000000000000021 /* AdminShell.swift in Sources */,
+				A3000000000000000000022 /* LoginView.swift in Sources */,
+				A3000000000000000000023 /* TwoFactorSetupView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -421,6 +496,80 @@
 			};
 			name = Release;
 		};
+		A300000000000000000000B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS = NO;
+				CODE_SIGN_ENTITLEMENTS = EsimplifiedAdmin/EsimplifiedAdmin.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8GVFL9KS7M;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "eSimplified Admin";
+				INFOPLIST_KEY_ESPClientID = "";
+				INFOPLIST_KEY_ESPClientSecret = "";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
+				"INFOPLIST_KEY_NSPrincipalClass[sdk=macosx*]" = NSApplication;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = io.esimplified.admin;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A300000000000000000000C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS = NO;
+				CODE_SIGN_ENTITLEMENTS = EsimplifiedAdmin/EsimplifiedAdmin.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8GVFL9KS7M;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "eSimplified Admin";
+				INFOPLIST_KEY_ESPClientID = "";
+				INFOPLIST_KEY_ESPClientSecret = "";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
+				"INFOPLIST_KEY_NSPrincipalClass[sdk=macosx*]" = NSApplication;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = io.esimplified.admin;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -451,6 +600,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		A3000000000000000000008 /* Build configuration list for PBXNativeTarget "EsimplifiedAdmin" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A300000000000000000000B /* Debug */,
+				A300000000000000000000C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
@@ -466,6 +624,10 @@
 			productName = EsimplifiedKit;
 		};
 		A2000000000000000000031 /* EsimplifiedKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = EsimplifiedKit;
+		};
+		A3000000000000000000031 /* EsimplifiedKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = EsimplifiedKit;
 		};
