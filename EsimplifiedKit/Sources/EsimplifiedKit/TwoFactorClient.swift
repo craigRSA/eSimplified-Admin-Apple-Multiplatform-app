@@ -28,25 +28,27 @@ public final class LiveTwoFactorClient: TwoFactorClient {
     }
 
     public func status() async throws -> Bool {
-        let json = try await send("GET", "/2fa/status/", form: nil)
+        let json = try await send("GET", "/2fa/status/", json: nil)
         return (json["totp_enabled"] as? Bool) ?? false
     }
 
     public func beginSetup() async throws -> TOTPSetup {
-        let json = try await send("POST", "/2fa/setup/", form: [:])
+        // Bodyless POST, matching the web app's setup2FA().
+        let json = try await send("POST", "/2fa/setup/", json: nil)
         guard let url = json["otpauth_url"] as? String else { throw APIError.decoding }
         return TOTPSetup(otpauthURL: url, secret: json["secret"] as? String)
     }
 
     public func verify(code: String) async throws {
-        _ = try await send("POST", "/2fa/verify/", form: ["code": code])
+        _ = try await send("POST", "/2fa/verify/", json: ["code": code])
     }
 
     public func disable(code: String) async throws {
-        _ = try await send("POST", "/2fa/disable/", form: ["code": code])
+        _ = try await send("POST", "/2fa/disable/", json: ["code": code])
     }
 
-    private func send(_ method: String, _ path: String, form: [String: String]?) async throws -> [String: Any] {
+    // Endpoints take a JSON body with `{ "code": ... }` (matches the web app).
+    private func send(_ method: String, _ path: String, json: [String: Any]?) async throws -> [String: Any] {
         guard var components = URLComponents(string: host) else { throw APIError.unreachable }
         components.path = path
         guard let url = components.url else { throw APIError.unreachable }
@@ -55,9 +57,9 @@ public final class LiveTwoFactorClient: TwoFactorClient {
         request.httpMethod = method
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        if let form {
-            request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-            request.httpBody = LiveAuthClient.formEncode(form).data(using: .utf8)
+        if let json {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try? JSONSerialization.data(withJSONObject: json)
         }
 
         let data: Data

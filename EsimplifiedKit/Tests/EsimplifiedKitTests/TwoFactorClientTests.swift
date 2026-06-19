@@ -30,42 +30,44 @@ final class TwoFactorClientTests: XCTestCase {
         XCTAssertEqual(setup, TOTPSetup(otpauthURL: "otpauth://totp/e?secret=ABC", secret: "ABC"))
     }
 
-    func test_verify_posts_code_and_succeeds_on_2xx() async throws {
+    func test_verify_posts_json_code_and_succeeds_on_2xx() async throws {
         MockURLProtocol.handler = { req in
             XCTAssertEqual(req.url?.absoluteString, "https://h.io/2fa/verify/")
             XCTAssertEqual(req.httpMethod, "POST")
-            XCTAssertEqual(Self.bodyString(req), "code=123456")
+            XCTAssertEqual(req.value(forHTTPHeaderField: "Content-Type"), "application/json")
+            XCTAssertEqual(Self.bodyJSON(req)?["code"] as? String, "123456")
             return (HTTPURLResponse(url: req.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, Data("{}".utf8))
         }
         try await makeClient().verify(code: "123456")
     }
 
-    func test_disable_posts_code_to_correct_endpoint() async throws {
+    func test_disable_posts_json_code_to_correct_endpoint() async throws {
         MockURLProtocol.handler = { req in
             XCTAssertEqual(req.url?.absoluteString, "https://h.io/2fa/disable/")
             XCTAssertEqual(req.httpMethod, "POST")
-            XCTAssertEqual(Self.bodyString(req), "code=654321")
+            XCTAssertEqual(req.value(forHTTPHeaderField: "Content-Type"), "application/json")
+            XCTAssertEqual(Self.bodyJSON(req)?["code"] as? String, "654321")
             return (HTTPURLResponse(url: req.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, Data("{}".utf8))
         }
         try await makeClient().disable(code: "654321")
     }
 
     /// URLSession may deliver a request body to a URLProtocol via httpBodyStream
-    /// rather than httpBody — read whichever is present.
-    private static func bodyString(_ req: URLRequest) -> String? {
-        if let data = req.httpBody { return String(data: data, encoding: .utf8) }
-        guard let stream = req.httpBodyStream else { return nil }
-        stream.open(); defer { stream.close() }
-        var data = Data()
-        let size = 4096
-        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: size)
-        defer { buffer.deallocate() }
-        while stream.hasBytesAvailable {
-            let read = stream.read(buffer, maxLength: size)
-            if read <= 0 { break }
-            data.append(buffer, count: read)
-        }
-        return String(data: data, encoding: .utf8)
+    /// rather than httpBody — read whichever is present, parsed as JSON.
+    private static func bodyJSON(_ req: URLRequest) -> [String: Any]? {
+        let data: Data?
+        if let b = req.httpBody { data = b }
+        else if let stream = req.httpBodyStream {
+            stream.open(); defer { stream.close() }
+            var acc = Data(); let size = 4096
+            let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: size); defer { buffer.deallocate() }
+            while stream.hasBytesAvailable {
+                let read = stream.read(buffer, maxLength: size); if read <= 0 { break }; acc.append(buffer, count: read)
+            }
+            data = acc
+        } else { data = nil }
+        guard let data else { return nil }
+        return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
     }
 
     func test_verify_throws_authExpired_on_non_2xx() async {
