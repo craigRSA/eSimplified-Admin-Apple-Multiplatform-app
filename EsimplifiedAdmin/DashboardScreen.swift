@@ -7,6 +7,7 @@ struct DashboardScreen: View {
     var tenant: String?
 
     @State private var phase: Phase = .loading
+    @State private var range: DashRange = .monthToDate
 
     enum Phase { case loading, loaded(AdminDashboardStats), failed(String) }
 
@@ -24,7 +25,18 @@ struct DashboardScreen: View {
         }
         .background(AppBackground())
         .navigationTitle("Overview")
-        .task(id: tenant) { await load() }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    Picker("Date range", selection: $range) {
+                        ForEach(DashRange.allCases) { Text($0.label).tag($0) }
+                    }
+                } label: {
+                    Label(range.label, systemImage: "calendar")
+                }
+            }
+        }
+        .task(id: "\(tenant ?? "all")|\(range.rawValue)") { await load() }
         .refreshable { await load() }
         .autoRefresh { await load() }
     }
@@ -34,6 +46,7 @@ struct DashboardScreen: View {
         VStack(alignment: .leading, spacing: 22) {
             // Signature: today's gross volume
             HeroCard(today: s.revenueToday, yesterday: s.revenueYesterday,
+                     hourlyToday: s.revenuePerHourToday, hourlyYesterday: s.revenuePerHourYesterday,
                      trend: s.current.revenuePerDate)
 
             // Headline metrics
@@ -52,8 +65,8 @@ struct DashboardScreen: View {
                             "vs last yr: \(Fmt.money(s.revenueLastYear))"),
             ])
 
-            // Month to date vs previous
-            Card(title: "Month to date vs previous") {
+            // Selected range vs previous comparable period
+            Card(title: "\(range.label) vs previous") {
                 let cur = s.current, prev = s.comparison
                 MetricGrid(items: [
                     .comparison("Revenue", Fmt.money(cur.revenue), AdminDashboardStats.change(cur.revenue, vs: prev.revenue), "Prev: \(Fmt.money(prev.revenue))"),
@@ -100,7 +113,7 @@ struct DashboardScreen: View {
         do {
             let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
             let path = tenant.map { "/api/statistics/\($0)/" } ?? "/api/statistics/"
-            let stats = try await client.get(path, query: [:], as: AdminDashboardStats.self)
+            let stats = try await client.get(path, query: ["date_range": range.rawValue], as: AdminDashboardStats.self)
             phase = .loaded(stats)
         } catch let error as APIError {
             phase = .failed(adminErrorMessage(error))
@@ -112,16 +125,23 @@ struct DashboardScreen: View {
 
 // MARK: - Building blocks
 
-/// The hero: today's gross volume, the day's delta, and a glanceable sparkline.
+/// The hero: today's gross volume, the day's delta, and — when the backend
+/// provides hourly data — the cumulative today-vs-yesterday curve.
 private struct HeroCard: View {
     let today: Decimal
     let yesterday: Decimal
+    let hourlyToday: [HourPoint]
+    let hourlyYesterday: [HourPoint]
     let trend: [DayRevenue]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("TODAY'S GROSS VOLUME")
-                .font(.caption.weight(.semibold)).tracking(1.0).foregroundStyle(.secondary)
+            HStack(alignment: .top) {
+                Text("TODAY'S GROSS VOLUME")
+                    .font(.caption.weight(.semibold)).tracking(1.0).foregroundStyle(.secondary)
+                Spacer()
+                UTCClock()
+            }
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 Text(Fmt.money(today))
                     .font(.system(size: 44, weight: .bold, design: .rounded)).monospacedDigit()
@@ -130,15 +150,82 @@ private struct HeroCard: View {
             }
             Text("vs \(Fmt.money(yesterday)) yesterday")
                 .font(.subheadline).foregroundStyle(.secondary)
-            if trend.count > 1 {
-                Sparkline(points: trend.map { dbl($0.revenue) })
-                    .frame(height: 54).padding(.top, 4)
+
+            if hourlyToday.count > 1 {
+                HourlyComparisonChart(today: hourlyToday, yesterday: hourlyYesterday)
+                    .frame(height: 120).padding(.top, 6)
+            } else if trend.count > 1 {
+                // Fallback until hourly data ships: the recent daily trend, labelled honestly.
+                VStack(alignment: .leading, spacing: 4) {
+                    Sparkline(points: trend.map { dbl($0.revenue) }).frame(height: 54)
+                    Text("DAILY TREND").font(.caption2.weight(.semibold)).tracking(0.6)
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(.top, 4)
             }
         }
         .padding(22)
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassEffect(.regular, in: .rect(cornerRadius: 22))
     }
+}
+
+/// Cumulative gross sales by hour (UTC): today solid, yesterday dashed.
+private struct HourlyComparisonChart: View {
+    let today: [HourPoint]
+    let yesterday: [HourPoint]
+
+    var body: some View {
+        Chart {
+            ForEach(Self.cumulative(yesterday), id: \.hour) { p in
+                LineMark(x: .value("Hour", p.hour), y: .value("Revenue", p.total),
+                         series: .value("Day", "Yesterday"))
+                    .foregroundStyle(.gray)
+                    .lineStyle(StrokeStyle(lineWidth: 2, dash: [4, 3]))
+                    .interpolationMethod(.catmullRom)
+            }
+            ForEach(Self.cumulative(today), id: \.hour) { p in
+                AreaMark(x: .value("Hour", p.hour), y: .value("Revenue", p.total))
+                    .foregroundStyle(.linearGradient(colors: [Color.accentColor.opacity(0.3), Color.accentColor.opacity(0.02)],
+                                                     startPoint: .top, endPoint: .bottom))
+                LineMark(x: .value("Hour", p.hour), y: .value("Revenue", p.total),
+                         series: .value("Day", "Today"))
+                    .foregroundStyle(Color.accentColor)
+                    .lineStyle(StrokeStyle(lineWidth: 2)).interpolationMethod(.catmullRom)
+            }
+        }
+        .chartForegroundStyleScale(["Today": Color.accentColor, "Yesterday": Color.gray])
+        .chartXScale(domain: 0...23)
+        .chartXAxis { AxisMarks(values: [0, 6, 12, 18, 23]) { v in
+            AxisValueLabel { if let h = v.as(Int.self) { Text("\(h)h") } }
+        } }
+        .chartLegend(position: .top, alignment: .leading, spacing: 8)
+    }
+
+    static func cumulative(_ points: [HourPoint]) -> [(hour: Int, total: Double)] {
+        var running = 0.0
+        return points.sorted { $0.hour < $1.hour }.map { p in
+            running += dbl(p.revenue)
+            return (p.hour, running)
+        }
+    }
+}
+
+/// Live UTC clock — the hourly chart's x-axis is in UTC, so this anchors it.
+private struct UTCClock: View {
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { ctx in
+            Label(Self.formatter.string(from: ctx.date), systemImage: "clock")
+                .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                .labelStyle(.titleAndIcon)
+        }
+    }
+    private static let formatter: DateFormatter = {
+        let f = DateFormatter()
+        f.timeZone = TimeZone(identifier: "UTC")
+        f.dateFormat = "HH:mm 'UTC'"
+        return f
+    }()
 }
 
 private struct DeltaPill: View {
@@ -294,6 +381,25 @@ private struct TopList: View {
 }
 
 private func dbl(_ d: Decimal) -> Double { (d as NSDecimalNumber).doubleValue }
+
+/// Dashboard date-range options (sent as `?date_range=`). `year_to_date` is the
+/// new value the backend added alongside the existing ones.
+enum DashRange: String, CaseIterable, Identifiable {
+    case today
+    case last7 = "last_7_days"
+    case monthToDate = "month_to_date"
+    case yearToDate = "year_to_date"
+
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .today: "Today"
+        case .last7: "Last 7 days"
+        case .monthToDate: "Month to date"
+        case .yearToDate: "Year to date"
+        }
+    }
+}
 
 enum Fmt {
     /// One consistent rule: abbreviate at/above $1,000 ($2.3K, $129K, $2.0M);

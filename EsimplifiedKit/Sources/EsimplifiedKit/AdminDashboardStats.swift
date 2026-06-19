@@ -24,6 +24,14 @@ public struct TenantRevenueSlice: Identifiable, Equatable, Sendable {
     public init(tenant: String, amount: Decimal) { self.tenant = tenant; self.amount = amount }
 }
 
+/// A `{ hour, revenue }` point for the intraday today/yesterday series.
+public struct HourPoint: Identifiable, Equatable, Sendable {
+    public var id: Int { hour }
+    public let hour: Int
+    public let revenue: Decimal
+    public init(hour: Int, revenue: Decimal) { self.hour = hour; self.revenue = revenue }
+}
+
 /// A period bucket (`current` = this period, `comparison` = the previous one).
 public struct StatsPeriod: Decodable, Equatable, Sendable {
     public let revenue: Decimal
@@ -83,6 +91,10 @@ public struct AdminDashboardStats: Decodable, Sendable {
     public let revenuePerDate: [DayRevenue]
     public let revenuePerMonth: [MonthRevenue]
     public let revenuePerTenant: [TenantRevenueSlice]
+    /// Per-hour revenue increments (UTC, hour 0→now) for today and yesterday.
+    /// Empty until the backend ships these fields.
+    public let revenuePerHourToday: [HourPoint]
+    public let revenuePerHourYesterday: [HourPoint]
     public let current: StatsPeriod
     public let comparison: StatsPeriod
 
@@ -97,7 +109,10 @@ public struct AdminDashboardStats: Decodable, Sendable {
         case revenuePerDate = "revenue_per_date"
         case revenuePerMonth = "revenue_per_month"
         case revenuePerTenant = "revenue_per_tenant"
+        case revenuePerHourToday = "revenue_per_hour_today"
+        case revenuePerHourYesterday = "revenue_per_hour_yesterday"
     }
+    private struct HourDTO: Decodable { let hour: Int?; let revenue: FlexibleDecimal? }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: K.self)
@@ -120,6 +135,15 @@ public struct AdminDashboardStats: Decodable, Sendable {
         let perTenant = try c.decodeIfPresent([String: FlexibleDecimal].self, forKey: .revenuePerTenant) ?? [:]
         revenuePerTenant = perTenant.map { TenantRevenueSlice(tenant: $0.key, amount: $0.value.value) }
             .sorted { $0.amount > $1.amount }
+
+        func hours(_ key: K) throws -> [HourPoint] {
+            (try c.decodeIfPresent([HourDTO].self, forKey: key) ?? []).compactMap {
+                guard let h = $0.hour else { return nil }
+                return HourPoint(hour: h, revenue: $0.revenue?.value ?? 0)
+            }.sorted { $0.hour < $1.hour }
+        }
+        revenuePerHourToday = try hours(.revenuePerHourToday)
+        revenuePerHourYesterday = try hours(.revenuePerHourYesterday)
 
         current = try c.decodeIfPresent(StatsPeriod.self, forKey: .current) ?? .empty
         comparison = try c.decodeIfPresent(StatsPeriod.self, forKey: .comparison) ?? .empty

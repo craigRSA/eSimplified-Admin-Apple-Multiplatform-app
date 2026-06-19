@@ -2,6 +2,35 @@ import XCTest
 @testable import EsimplifiedKit
 
 final class AdminDashboardStatsTests: XCTestCase {
+    func test_decode_hourly_series_today_and_yesterday() throws {
+        let json = """
+        {
+          "revenue_today": "305.50",
+          "revenue_per_hour_today": [
+            { "hour": 0, "revenue": "120.00" },
+            { "hour": 1, "revenue": 0 },
+            { "hour": 2, "revenue": 185.50 }
+          ],
+          "revenue_per_hour_yesterday": [
+            { "hour": 2, "revenue": "90.00" },
+            { "hour": 0, "revenue": "95.00" }
+          ]
+        }
+        """
+        let stats = try JSONDecoder().decode(AdminDashboardStats.self, from: Data(json.utf8))
+        XCTAssertEqual(stats.revenuePerHourToday.map(\.hour), [0, 1, 2]) // sorted
+        XCTAssertEqual(stats.revenuePerHourToday[2].revenue, Decimal(string: "185.50"))
+        XCTAssertEqual(stats.revenuePerHourYesterday.map(\.hour), [0, 2]) // sorted
+        XCTAssertEqual(stats.revenuePerHourYesterday.first?.revenue, Decimal(string: "95.00"))
+    }
+
+    func test_decode_absent_hourly_is_empty() throws {
+        let stats = try JSONDecoder().decode(AdminDashboardStats.self, from: Data("{}".utf8))
+        XCTAssertTrue(stats.revenuePerHourToday.isEmpty)
+        XCTAssertTrue(stats.revenuePerHourYesterday.isEmpty)
+    }
+
+
     func test_decode_real_shaped_response_mixed_string_and_number_decimals() throws {
         // Mirrors the backend DashboardData shape: top-level money fields, some as
         // DRF strings, plus revenue_per_date.
