@@ -1,6 +1,6 @@
 import SwiftUI
 import WidgetKit
-import EsimPulseKit
+import EsimplifiedKit
 
 struct RevenueWidgetView: View {
     @Environment(\.widgetFamily) private var family

@@ -4,7 +4,7 @@ A native macOS app + **desktop widget** that show **today's consolidated eSimpli
 revenue** at a glance, refreshing automatically. Read-only client of the existing
 eSimplified backend — it makes no writes and requires no backend changes.
 
-Two surfaces over the same engine (`EsimPulseKit`): a floating app window, and a
+Two surfaces over the same engine (`EsimplifiedKit`): a floating app window, and a
 WidgetKit widget (small + medium) addable to the Desktop / Notification Center.
 
 ## What it does
@@ -31,13 +31,13 @@ connection in the app:
 ## Structure
 
 ```
-EsimPulseKit/   ← local Swift package: ALL testable logic, CLI-testable via `swift test`
+EsimplifiedKit/   ← local Swift package: ALL testable logic, CLI-testable via `swift test`
   Credentials / CredentialStore / KeychainCredentialStore
   DashboardStats (tolerant decimal decoding)
   StatisticsClient / LiveStatisticsClient / StatsError / DateRange
   DashboardViewModel (@Observable state machine)
-eSimPulse/      ← SwiftUI macOS app target (floating window + views), imports EsimPulseKit
-eSimPulseiOS/   ← SwiftUI iOS app target (settings + today preview), imports EsimPulseKit
+eSimPulse/      ← SwiftUI macOS app target (floating window + views), imports EsimplifiedKit
+eSimPulseiOS/   ← SwiftUI iOS app target (settings + today preview), imports EsimplifiedKit
 eSimPulseWidget/← WidgetKit sources (provider + views), shared by the macOS and iOS widget targets
 docs/specs/     ← approved designs (app + widget)
 docs/plans/     ← implementation plan (executed task-by-task, TDD)
@@ -47,7 +47,7 @@ Four app/extension targets over one engine: macOS app + macOS widget extension,
 iOS app + iOS widget extension. The two widget extensions compile the **same**
 `eSimPulseWidget/*.swift` sources; they differ only in entitlements
 (`eSimPulseWidget.entitlements` for macOS adds app-sandbox; `Widget-iOS.entitlements`
-is keychain-only). `EsimPulseKit` supports `.macOS(.v14)` and `.iOS(.v17)`.
+is keychain-only). `EsimplifiedKit` supports `.macOS(.v14)` and `.iOS(.v17)`.
 
 The split is deliberate: logic lives in the package so it has true unit tests
 runnable from the command line without opening Xcode; the app and widget targets
@@ -75,8 +75,8 @@ from a shared Keychain access group, and fetches via the same `LiveStatisticsCli
 ## Commands
 
 ```bash
-cd EsimPulseKit && swift test          # run the core unit tests
-cd EsimPulseKit && swift build         # compile the package
+cd EsimplifiedKit && swift test          # run the core unit tests
+cd EsimplifiedKit && swift build         # compile the package
 xcodebuild -project eSimPulse.xcodeproj -scheme eSimPulse build   # build app + embedded widget
 ```
 

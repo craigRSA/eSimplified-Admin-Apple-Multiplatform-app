@@ -1,5 +1,5 @@
 import XCTest
-@testable import EsimPulseKit
+@testable import EsimplifiedKit
 
 @MainActor
 final class DashboardViewModelTests: XCTestCase {

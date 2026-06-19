@@ -1,5 +1,5 @@
 import XCTest
-@testable import EsimPulseKit
+@testable import EsimplifiedKit
 
 private struct Widget: Decodable, Equatable { let id: Int; let name: String }
 

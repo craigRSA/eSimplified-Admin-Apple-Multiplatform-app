@@ -1,6 +1,6 @@
 import SwiftUI
 import Combine
-import EsimPulseKit
+import EsimplifiedKit
 
 struct RootView: View {
     @Bindable var model: AppModel

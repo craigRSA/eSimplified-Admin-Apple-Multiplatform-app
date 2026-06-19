@@ -1,5 +1,5 @@
 import SwiftUI
-import EsimPulseKit
+import EsimplifiedKit
 
 @main
 struct eSimPulseiOSApp: App {

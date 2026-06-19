@@ -2,16 +2,16 @@
 import PackageDescription
 
 let package = Package(
-    name: "EsimPulseKit",
+    name: "EsimplifiedKit",
     platforms: [.macOS(.v14), .iOS(.v17)],
     products: [
-        .library(name: "EsimPulseKit", targets: ["EsimPulseKit"]),
+        .library(name: "EsimplifiedKit", targets: ["EsimplifiedKit"]),
     ],
     targets: [
-        .target(name: "EsimPulseKit"),
+        .target(name: "EsimplifiedKit"),
         .testTarget(
-            name: "EsimPulseKitTests",
-            dependencies: ["EsimPulseKit"],
+            name: "EsimplifiedKitTests",
+            dependencies: ["EsimplifiedKit"],
             resources: [.copy("Fixtures")]
         ),
     ]

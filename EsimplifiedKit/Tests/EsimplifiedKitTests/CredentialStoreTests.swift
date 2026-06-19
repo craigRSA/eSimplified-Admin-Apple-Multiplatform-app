@@ -1,5 +1,5 @@
 import XCTest
-@testable import EsimPulseKit
+@testable import EsimplifiedKit
 
 final class CredentialStoreTests: XCTestCase {
     func test_inMemory_save_then_load_returns_same_credentials() throws {

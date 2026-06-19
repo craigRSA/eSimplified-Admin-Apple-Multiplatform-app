@@ -2,7 +2,7 @@
 
 A native macOS **WidgetKit** widget showing today's consolidated eSimplified
 revenue, addable from the widget gallery to the Desktop / Notification Center.
-Reuses `EsimPulseKit` (credential store, statistics client, decimal model)
+Reuses `EsimplifiedKit` (credential store, statistics client, decimal model)
 wholesale; the existing app becomes the companion/config surface (and the
 required container the widget ships inside).
 
@@ -51,7 +51,7 @@ Currency symbol is hardcoded `$` (configurability remains Phase 3, matching the 
 
 - New target `eSimPulseWidgetExtension` (`com.apple.product-type.app-extension`,
   bundle id `io.esimplified.esimpulse.widget`), embedded into the app via an
-  "Embed App Extensions" copy-files phase + target dependency; links `EsimPulseKit`.
+  "Embed App Extensions" copy-files phase + target dependency; links `EsimplifiedKit`.
 - `eSimPulseWidget/`: `eSimPulseWidgetBundle.swift` (@main `WidgetBundle`),
   `RevenueProvider.swift` (provider + entry + content enum),
   `RevenueWidgetView.swift` (small/medium views + `Sparkline`), `Info.plist`

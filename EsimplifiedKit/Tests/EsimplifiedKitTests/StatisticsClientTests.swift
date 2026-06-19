@@ -1,5 +1,5 @@
 import XCTest
-@testable import EsimPulseKit
+@testable import EsimplifiedKit
 
 final class StatisticsClientTests: XCTestCase {
     private let creds = Credentials(host: "https://admin.example.com", token: "tok-123")

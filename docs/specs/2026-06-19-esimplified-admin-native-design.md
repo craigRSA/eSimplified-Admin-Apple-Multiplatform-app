@@ -2,7 +2,7 @@
 
 A native **SwiftUI multiplatform** app (macOS 14 / iPadOS 17 / iOS 17) that
 reimplements a **curated subset** of the existing Next.js admin front end
-(`~/WebstormProjects/admin_front_end/`), over the shared `EsimPulseKit` engine
+(`~/WebstormProjects/admin_front_end/`), over the shared `EsimplifiedKit` engine
 already built for eSim Pulse. Read-mostly admin client of the existing backend;
 no backend changes.
 
@@ -12,7 +12,7 @@ Login (foundation) + these screens, chosen by the product owner:
 
 | # | Screen | Backend scope (read) | Notes |
 |---|--------|----------------------|-------|
-| 1 | Dashboard | `statistics:read` | Revenue/stats; logic already exists in `EsimPulseKit`. |
+| 1 | Dashboard | `statistics:read` | Revenue/stats; logic already exists in `EsimplifiedKit`. |
 | 2 | Customers | `customer:read` | List + per-customer detail. |
 | 3 | Order History | `order:read` | Searchable/filterable list + detail. |
 | 5 | Search | `search:read` | Global search (tenant-scoped). |
@@ -28,7 +28,7 @@ Translations, White List, Users, Permissions/Groups.
 ## Platform & architecture
 
 - **One SwiftUI multiplatform app target** (`eSimplifiedAdmin`) for macOS, iPadOS,
-  iOS. All non-UI logic lives in the **`EsimPulseKit`** Swift package (already
+  iOS. All non-UI logic lives in the **`EsimplifiedKit`** Swift package (already
   `.macOS(.v14)` + `.iOS(.v17)`), unit-tested from the command line.
 - **Adaptive shell:** `NavigationSplitView` — sidebar of sections on Mac & iPad;
   collapses to a stacked/tab layout on iPhone. One section list, three form
@@ -88,7 +88,7 @@ it as `X-Trusted-Device` on future logins to skip the challenge).
 — a later phase. v1 uses TOTP. If the backend forces a passkey-only account,
 surface a clear message.
 
-## Shared engine additions (`EsimPulseKit`)
+## Shared engine additions (`EsimplifiedKit`)
 
 - **`APIClient`** — generalizes `LiveStatisticsClient`: builds `{host}/<path>`
   requests with `Bearer` auth + `Accept: application/json`, decodes `Decodable`
@@ -138,10 +138,10 @@ plus a SwiftUI screen.
 ## Foundations slice — detail (first plan target)
 
 **Files (engine):**
-- `Sources/EsimPulseKit/APIClient.swift` — `APIClient` protocol + `LiveAPIClient`.
-- `Sources/EsimPulseKit/AuthClient.swift` — `AuthClient` + `Session` + grant /
+- `Sources/EsimplifiedKit/APIClient.swift` — `APIClient` protocol + `LiveAPIClient`.
+- `Sources/EsimplifiedKit/AuthClient.swift` — `AuthClient` + `Session` + grant /
   refresh / 2FA-challenge verify.
-- `Sources/EsimPulseKit/TwoFactorClient.swift` — status / setup / verify / disable.
+- `Sources/EsimplifiedKit/TwoFactorClient.swift` — status / setup / verify / disable.
 - Extend `KeychainCredentialStore` for session + trusted-device-token persistence.
 - Tests: `APIClientTests`, `AuthClientTests` (password grant, refresh, 2FA
   challenge), `TwoFactorClientTests` (all via `MockURLProtocol`), session

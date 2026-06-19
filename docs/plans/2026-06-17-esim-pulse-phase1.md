@@ -4,7 +4,7 @@
 
 **Goal:** A native macOS desktop window that shows today's consolidated eSimplified revenue and the delta vs yesterday, authenticating to the existing `/api/v1/statistics/` endpoint with a stored Bearer token.
 
-**Architecture:** All non-UI logic lives in a local Swift package, `EsimPulseKit`, that is fully unit-testable from the command line via `swift test` (true TDD, no Xcode GUI needed). A thin SwiftUI macOS app target (`eSimPulse.xcodeproj`) imports the package and renders the window. The package exposes three units behind protocols — credential storage, the statistics HTTP client, and an observable view model — each tested in isolation with in-memory fakes.
+**Architecture:** All non-UI logic lives in a local Swift package, `EsimplifiedKit`, that is fully unit-testable from the command line via `swift test` (true TDD, no Xcode GUI needed). A thin SwiftUI macOS app target (`eSimPulse.xcodeproj`) imports the package and renders the window. The package exposes three units behind protocols — credential storage, the statistics HTTP client, and an observable view model — each tested in isolation with in-memory fakes.
 
 **Tech Stack:** Swift 5.9+, SwiftUI, AppKit (for window level), XCTest, Foundation `URLSession`/`Codable`/`Decimal`, macOS Keychain Services. No third-party dependencies.
 
@@ -24,15 +24,15 @@
 
 ```
 ~/xcode/eSimPulse/
-├── EsimPulseKit/                      # local Swift package (testable core)
+├── EsimplifiedKit/                      # local Swift package (testable core)
 │   ├── Package.swift
-│   ├── Sources/EsimPulseKit/
+│   ├── Sources/EsimplifiedKit/
 │   │   ├── Credentials.swift          # Credentials struct + CredentialStore protocol + InMemoryCredentialStore
 │   │   ├── KeychainCredentialStore.swift
 │   │   ├── DashboardStats.swift       # DashboardStats model + JSON decoding (+ FlexibleDecimal)
 │   │   ├── StatisticsClient.swift     # StatisticsClient protocol + LiveStatisticsClient + StatsError + DateRange
 │   │   └── DashboardViewModel.swift   # @Observable view model + DashboardState
-│   └── Tests/EsimPulseKitTests/
+│   └── Tests/EsimplifiedKitTests/
 │       ├── Fixtures/statistics_response.json
 │       ├── CredentialStoreTests.swift
 │       ├── DashboardStatsTests.swift
@@ -51,10 +51,10 @@
 ### Task 1: Package scaffold + credential storage
 
 **Files:**
-- Create: `~/xcode/eSimPulse/EsimPulseKit/Package.swift`
-- Create: `~/xcode/eSimPulse/EsimPulseKit/Sources/EsimPulseKit/Credentials.swift`
-- Create: `~/xcode/eSimPulse/EsimPulseKit/Sources/EsimPulseKit/KeychainCredentialStore.swift`
-- Test: `~/xcode/eSimPulse/EsimPulseKit/Tests/EsimPulseKitTests/CredentialStoreTests.swift`
+- Create: `~/xcode/eSimPulse/EsimplifiedKit/Package.swift`
+- Create: `~/xcode/eSimPulse/EsimplifiedKit/Sources/EsimplifiedKit/Credentials.swift`
+- Create: `~/xcode/eSimPulse/EsimplifiedKit/Sources/EsimplifiedKit/KeychainCredentialStore.swift`
+- Test: `~/xcode/eSimPulse/EsimplifiedKit/Tests/EsimplifiedKitTests/CredentialStoreTests.swift`
 
 **Interfaces:**
 - Produces:
@@ -65,32 +65,32 @@
 
 - [ ] **Step 1: Create the package manifest**
 
-Create `~/xcode/eSimPulse/EsimPulseKit/Package.swift`:
+Create `~/xcode/eSimPulse/EsimplifiedKit/Package.swift`:
 
 ```swift
 // swift-tools-version:5.9
 import PackageDescription
 
 let package = Package(
-    name: "EsimPulseKit",
+    name: "EsimplifiedKit",
     platforms: [.macOS(.v14)],
     products: [
-        .library(name: "EsimPulseKit", targets: ["EsimPulseKit"]),
+        .library(name: "EsimplifiedKit", targets: ["EsimplifiedKit"]),
     ],
     targets: [
-        .target(name: "EsimPulseKit"),
-        .testTarget(name: "EsimPulseKitTests", dependencies: ["EsimPulseKit"]),
+        .target(name: "EsimplifiedKit"),
+        .testTarget(name: "EsimplifiedKitTests", dependencies: ["EsimplifiedKit"]),
     ]
 )
 ```
 
 - [ ] **Step 2: Write the failing test**
 
-Create `Tests/EsimPulseKitTests/CredentialStoreTests.swift`:
+Create `Tests/EsimplifiedKitTests/CredentialStoreTests.swift`:
 
 ```swift
 import XCTest
-@testable import EsimPulseKit
+@testable import EsimplifiedKit
 
 final class CredentialStoreTests: XCTestCase {
     func test_inMemory_save_then_load_returns_same_credentials() throws {
@@ -120,12 +120,12 @@ final class CredentialStoreTests: XCTestCase {
 
 - [ ] **Step 3: Run test to verify it fails**
 
-Run: `cd ~/xcode/eSimPulse/EsimPulseKit && swift test --filter CredentialStoreTests`
+Run: `cd ~/xcode/eSimPulse/EsimplifiedKit && swift test --filter CredentialStoreTests`
 Expected: FAIL — `cannot find 'InMemoryCredentialStore' in scope` (compile error).
 
 - [ ] **Step 4: Implement Credentials + protocol + in-memory fake**
 
-Create `Sources/EsimPulseKit/Credentials.swift`:
+Create `Sources/EsimplifiedKit/Credentials.swift`:
 
 ```swift
 import Foundation
@@ -159,12 +159,12 @@ public final class InMemoryCredentialStore: CredentialStore {
 
 - [ ] **Step 5: Run test to verify it passes**
 
-Run: `cd ~/xcode/eSimPulse/EsimPulseKit && swift test --filter CredentialStoreTests`
+Run: `cd ~/xcode/eSimPulse/EsimplifiedKit && swift test --filter CredentialStoreTests`
 Expected: PASS (3 tests).
 
 - [ ] **Step 6: Implement the real Keychain store**
 
-Create `Sources/EsimPulseKit/KeychainCredentialStore.swift`. The host is stored as the Keychain account; the token is the secret. A fixed service name namespaces the item.
+Create `Sources/EsimplifiedKit/KeychainCredentialStore.swift`. The host is stored as the Keychain account; the token is the secret. A fixed service name namespaces the item.
 
 ```swift
 import Foundation
@@ -233,14 +233,14 @@ public enum KeychainError: Error, Equatable {
 
 - [ ] **Step 7: Run the full package build to confirm both stores compile**
 
-Run: `cd ~/xcode/eSimPulse/EsimPulseKit && swift build`
+Run: `cd ~/xcode/eSimPulse/EsimplifiedKit && swift build`
 Expected: `Build complete!`
 
 - [ ] **Step 8: Commit**
 
 ```bash
-cd ~/xcode/eSimPulse && git add EsimPulseKit && \
-  git commit -m "feat: EsimPulseKit package scaffold + credential storage"
+cd ~/xcode/eSimPulse && git add EsimplifiedKit && \
+  git commit -m "feat: EsimplifiedKit package scaffold + credential storage"
 ```
 
 ---
@@ -248,9 +248,9 @@ cd ~/xcode/eSimPulse && git add EsimPulseKit && \
 ### Task 2: DashboardStats model + JSON decoding
 
 **Files:**
-- Create: `~/xcode/eSimPulse/EsimPulseKit/Sources/EsimPulseKit/DashboardStats.swift`
-- Create: `~/xcode/eSimPulse/EsimPulseKit/Tests/EsimPulseKitTests/Fixtures/statistics_response.json`
-- Test: `~/xcode/eSimPulse/EsimPulseKit/Tests/EsimPulseKitTests/DashboardStatsTests.swift`
+- Create: `~/xcode/eSimPulse/EsimplifiedKit/Sources/EsimplifiedKit/DashboardStats.swift`
+- Create: `~/xcode/eSimPulse/EsimplifiedKit/Tests/EsimplifiedKitTests/Fixtures/statistics_response.json`
+- Test: `~/xcode/eSimPulse/EsimplifiedKit/Tests/EsimplifiedKitTests/DashboardStatsTests.swift`
 
 **Interfaces:**
 - Produces:
@@ -260,7 +260,7 @@ cd ~/xcode/eSimPulse && git add EsimPulseKit && \
 
 - [ ] **Step 1: Add the fixture (real-shaped response, decimals as strings)**
 
-Create `Tests/EsimPulseKitTests/Fixtures/statistics_response.json`:
+Create `Tests/EsimplifiedKitTests/Fixtures/statistics_response.json`:
 
 ```json
 {
@@ -286,19 +286,19 @@ Register the fixtures folder as a resource by changing the test target in
 
 ```swift
 .testTarget(
-    name: "EsimPulseKitTests",
-    dependencies: ["EsimPulseKit"],
+    name: "EsimplifiedKitTests",
+    dependencies: ["EsimplifiedKit"],
     resources: [.copy("Fixtures")]
 ),
 ```
 
 - [ ] **Step 2: Write the failing test**
 
-Create `Tests/EsimPulseKitTests/DashboardStatsTests.swift`:
+Create `Tests/EsimplifiedKitTests/DashboardStatsTests.swift`:
 
 ```swift
 import XCTest
-@testable import EsimPulseKit
+@testable import EsimplifiedKit
 
 final class DashboardStatsTests: XCTestCase {
     private func fixtureData() throws -> Data {
@@ -335,12 +335,12 @@ final class DashboardStatsTests: XCTestCase {
 
 - [ ] **Step 3: Run test to verify it fails**
 
-Run: `cd ~/xcode/eSimPulse/EsimPulseKit && swift test --filter DashboardStatsTests`
+Run: `cd ~/xcode/eSimPulse/EsimplifiedKit && swift test --filter DashboardStatsTests`
 Expected: FAIL — `cannot find 'DashboardStats' in scope`.
 
 - [ ] **Step 4: Implement the model + tolerant decimal decoding**
 
-Create `Sources/EsimPulseKit/DashboardStats.swift`:
+Create `Sources/EsimplifiedKit/DashboardStats.swift`:
 
 ```swift
 import Foundation
@@ -411,13 +411,13 @@ public struct DashboardStats: Decodable, Equatable, Sendable {
 
 - [ ] **Step 5: Run test to verify it passes**
 
-Run: `cd ~/xcode/eSimPulse/EsimPulseKit && swift test --filter DashboardStatsTests`
+Run: `cd ~/xcode/eSimPulse/EsimplifiedKit && swift test --filter DashboardStatsTests`
 Expected: PASS (2 tests).
 
 - [ ] **Step 6: Commit**
 
 ```bash
-cd ~/xcode/eSimPulse && git add EsimPulseKit && \
+cd ~/xcode/eSimPulse && git add EsimplifiedKit && \
   git commit -m "feat: DashboardStats model with tolerant decimal decoding"
 ```
 
@@ -426,9 +426,9 @@ cd ~/xcode/eSimPulse && git add EsimPulseKit && \
 ### Task 3: StatisticsClient (HTTP + error mapping)
 
 **Files:**
-- Create: `~/xcode/eSimPulse/EsimPulseKit/Sources/EsimPulseKit/StatisticsClient.swift`
-- Create: `~/xcode/eSimPulse/EsimPulseKit/Tests/EsimPulseKitTests/MockURLProtocol.swift`
-- Test: `~/xcode/eSimPulse/EsimPulseKit/Tests/EsimPulseKitTests/StatisticsClientTests.swift`
+- Create: `~/xcode/eSimPulse/EsimplifiedKit/Sources/EsimplifiedKit/StatisticsClient.swift`
+- Create: `~/xcode/eSimPulse/EsimplifiedKit/Tests/EsimplifiedKitTests/MockURLProtocol.swift`
+- Test: `~/xcode/eSimPulse/EsimplifiedKit/Tests/EsimplifiedKitTests/StatisticsClientTests.swift`
 
 **Interfaces:**
 - Consumes: `DashboardStats.decode(from:)` (Task 2), `Credentials` (Task 1).
@@ -440,7 +440,7 @@ cd ~/xcode/eSimPulse && git add EsimPulseKit && \
 
 - [ ] **Step 1: Add the URLProtocol mock test helper**
 
-Create `Tests/EsimPulseKitTests/MockURLProtocol.swift`:
+Create `Tests/EsimplifiedKitTests/MockURLProtocol.swift`:
 
 ```swift
 import Foundation
@@ -478,11 +478,11 @@ final class MockURLProtocol: URLProtocol {
 
 - [ ] **Step 2: Write the failing tests**
 
-Create `Tests/EsimPulseKitTests/StatisticsClientTests.swift`:
+Create `Tests/EsimplifiedKitTests/StatisticsClientTests.swift`:
 
 ```swift
 import XCTest
-@testable import EsimPulseKit
+@testable import EsimplifiedKit
 
 final class StatisticsClientTests: XCTestCase {
     private let creds = Credentials(host: "https://admin.example.com", token: "tok-123")
@@ -565,12 +565,12 @@ final class StatisticsClientTests: XCTestCase {
 
 - [ ] **Step 3: Run tests to verify they fail**
 
-Run: `cd ~/xcode/eSimPulse/EsimPulseKit && swift test --filter StatisticsClientTests`
+Run: `cd ~/xcode/eSimPulse/EsimplifiedKit && swift test --filter StatisticsClientTests`
 Expected: FAIL — `cannot find 'LiveStatisticsClient' in scope`.
 
 - [ ] **Step 4: Implement the client**
 
-Create `Sources/EsimPulseKit/StatisticsClient.swift`:
+Create `Sources/EsimplifiedKit/StatisticsClient.swift`:
 
 ```swift
 import Foundation
@@ -639,13 +639,13 @@ public final class LiveStatisticsClient: StatisticsClient {
 
 - [ ] **Step 5: Run tests to verify they pass**
 
-Run: `cd ~/xcode/eSimPulse/EsimPulseKit && swift test --filter StatisticsClientTests`
+Run: `cd ~/xcode/eSimPulse/EsimplifiedKit && swift test --filter StatisticsClientTests`
 Expected: PASS (5 tests).
 
 - [ ] **Step 6: Commit**
 
 ```bash
-cd ~/xcode/eSimPulse && git add EsimPulseKit && \
+cd ~/xcode/eSimPulse && git add EsimplifiedKit && \
   git commit -m "feat: LiveStatisticsClient with URL building and error mapping"
 ```
 
@@ -654,8 +654,8 @@ cd ~/xcode/eSimPulse && git add EsimPulseKit && \
 ### Task 4: DashboardViewModel (state machine)
 
 **Files:**
-- Create: `~/xcode/eSimPulse/EsimPulseKit/Sources/EsimPulseKit/DashboardViewModel.swift`
-- Test: `~/xcode/eSimPulse/EsimPulseKit/Tests/EsimPulseKitTests/DashboardViewModelTests.swift`
+- Create: `~/xcode/eSimPulse/EsimplifiedKit/Sources/EsimplifiedKit/DashboardViewModel.swift`
+- Test: `~/xcode/eSimPulse/EsimplifiedKit/Tests/EsimplifiedKitTests/DashboardViewModelTests.swift`
 
 **Interfaces:**
 - Consumes: `StatisticsClient` (Task 3), `DashboardStats` (Task 2), `StatsError` (Task 3).
@@ -665,11 +665,11 @@ cd ~/xcode/eSimPulse && git add EsimPulseKit && \
 
 - [ ] **Step 1: Write the failing tests**
 
-Create `Tests/EsimPulseKitTests/DashboardViewModelTests.swift`:
+Create `Tests/EsimplifiedKitTests/DashboardViewModelTests.swift`:
 
 ```swift
 import XCTest
-@testable import EsimPulseKit
+@testable import EsimplifiedKit
 
 @MainActor
 final class DashboardViewModelTests: XCTestCase {
@@ -742,12 +742,12 @@ private final class StubClient: StatisticsClient, @unchecked Sendable {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd ~/xcode/eSimPulse/EsimPulseKit && swift test --filter DashboardViewModelTests`
+Run: `cd ~/xcode/eSimPulse/EsimplifiedKit && swift test --filter DashboardViewModelTests`
 Expected: FAIL — `cannot find 'DashboardViewModel' in scope`.
 
 - [ ] **Step 3: Implement the view model**
 
-Create `Sources/EsimPulseKit/DashboardViewModel.swift`:
+Create `Sources/EsimplifiedKit/DashboardViewModel.swift`:
 
 ```swift
 import Foundation
@@ -801,18 +801,18 @@ public final class DashboardViewModel {
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd ~/xcode/eSimPulse/EsimPulseKit && swift test --filter DashboardViewModelTests`
+Run: `cd ~/xcode/eSimPulse/EsimplifiedKit && swift test --filter DashboardViewModelTests`
 Expected: PASS (5 tests).
 
 - [ ] **Step 5: Run the entire package test suite**
 
-Run: `cd ~/xcode/eSimPulse/EsimPulseKit && swift test`
+Run: `cd ~/xcode/eSimPulse/EsimplifiedKit && swift test`
 Expected: PASS — all tests from Tasks 1–4 (15 total) green.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-cd ~/xcode/eSimPulse && git add EsimPulseKit && \
+cd ~/xcode/eSimPulse && git add EsimplifiedKit && \
   git commit -m "feat: DashboardViewModel state machine + delta computation"
 ```
 
@@ -832,18 +832,18 @@ view model are covered indirectly by Task 4).
 - Create: `~/xcode/eSimPulse/eSimPulse/SettingsView.swift`
 
 **Interfaces:**
-- Consumes: `DashboardViewModel`, `DashboardState`, `KeychainCredentialStore`, `Credentials`, `LiveStatisticsClient` from `EsimPulseKit`.
+- Consumes: `DashboardViewModel`, `DashboardState`, `KeychainCredentialStore`, `Credentials`, `LiveStatisticsClient` from `EsimplifiedKit`.
 
 - [ ] **Step 1: Create the Xcode app target**
 
 In Xcode: **File ▸ New ▸ Project ▸ macOS ▸ App**.
 - Product Name: `eSimPulse`
 - Interface: SwiftUI, Language: Swift
-- Save into `~/xcode/eSimPulse` (so the `.xcodeproj` sits beside `EsimPulseKit/` and `docs/`).
+- Save into `~/xcode/eSimPulse` (so the `.xcodeproj` sits beside `EsimplifiedKit/` and `docs/`).
 - Delete the auto-generated `ContentView.swift`.
 
 Then add the local package: **File ▸ Add Package Dependencies ▸ Add Local…** →
-select `~/xcode/eSimPulse/EsimPulseKit`, and add the `EsimPulseKit` library to
+select `~/xcode/eSimPulse/EsimplifiedKit`, and add the `EsimplifiedKit` library to
 the `eSimPulse` target.
 
 - [ ] **Step 2: App entry point with refresh timer**
@@ -852,7 +852,7 @@ Replace the generated `eSimPulseApp.swift` with `~/xcode/eSimPulse/eSimPulse/eSi
 
 ```swift
 import SwiftUI
-import EsimPulseKit
+import EsimplifiedKit
 
 @main
 struct eSimPulseApp: App {
@@ -921,7 +921,7 @@ Create `~/xcode/eSimPulse/eSimPulse/DashboardView.swift`:
 
 ```swift
 import SwiftUI
-import EsimPulseKit
+import EsimplifiedKit
 
 struct RootView: View {
     @Bindable var model: AppModel
@@ -998,7 +998,7 @@ Create `~/xcode/eSimPulse/eSimPulse/SettingsView.swift`:
 
 ```swift
 import SwiftUI
-import EsimPulseKit
+import EsimplifiedKit
 
 struct SettingsView: View {
     @Bindable var model: AppModel

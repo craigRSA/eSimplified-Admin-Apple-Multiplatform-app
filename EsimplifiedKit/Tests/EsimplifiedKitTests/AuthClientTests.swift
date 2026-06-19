@@ -1,5 +1,5 @@
 import XCTest
-@testable import EsimPulseKit
+@testable import EsimplifiedKit
 
 final class AuthClientTests: XCTestCase {
     override func tearDown() { MockURLProtocol.handler = nil; super.tearDown() }

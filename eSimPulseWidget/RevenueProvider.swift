@@ -1,6 +1,6 @@
 import WidgetKit
 import Foundation
-import EsimPulseKit
+import EsimplifiedKit
 
 /// What the widget renders for a given timeline entry.
 enum RevenueContent: Equatable {

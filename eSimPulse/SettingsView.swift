@@ -1,5 +1,5 @@
 import SwiftUI
-import EsimPulseKit
+import EsimplifiedKit
 
 struct SettingsView: View {
     @Bindable var model: AppModel

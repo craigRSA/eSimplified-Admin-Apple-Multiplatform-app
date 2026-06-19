@@ -4,7 +4,7 @@
 
 **Goal:** The auth + shell foundation of the native eSimplified Admin app — a reusable Bearer API client, OAuth2 password-grant login with TOTP 2FA (challenge + enrollment), session storage in the Keychain, and an adaptive (Mac/iPad/iPhone) navigation shell whose sections are gated by token scopes.
 
-**Architecture:** All non-UI logic is added to the existing `EsimPulseKit` Swift package (already `.macOS(.v14)` + `.iOS(.v17)`), unit-tested from the command line with the existing `MockURLProtocol`/`InMemoryCredentialStore` harness. A new SwiftUI multiplatform app target `eSimplifiedAdmin` (added to `eSimPulse.xcodeproj`) holds the adaptive UI and imports `EsimPulseKit`. Spec: `docs/specs/2026-06-19-esimplified-admin-native-design.md`.
+**Architecture:** All non-UI logic is added to the existing `EsimplifiedKit` Swift package (already `.macOS(.v14)` + `.iOS(.v17)`), unit-tested from the command line with the existing `MockURLProtocol`/`InMemoryCredentialStore` harness. A new SwiftUI multiplatform app target `eSimplifiedAdmin` (added to `eSimPulse.xcodeproj`) holds the adaptive UI and imports `EsimplifiedKit`. Spec: `docs/specs/2026-06-19-esimplified-admin-native-design.md`.
 
 **Tech Stack:** Swift 5.9+, SwiftUI, Foundation `URLSession`/`Codable`, CoreImage (`CIQRCodeGenerator`), macOS Keychain Services, XCTest. No third-party dependencies.
 
@@ -24,14 +24,14 @@
 ## File Structure
 
 ```
-EsimPulseKit/Sources/EsimPulseKit/
+EsimplifiedKit/Sources/EsimplifiedKit/
   Session.swift            # Session model + SessionStore protocol + InMemorySessionStore
   KeychainSessionStore.swift  # real Keychain-backed SessionStore (+ trusted-device token)
   APIError.swift           # shared typed error for API + auth clients
   APIClient.swift          # APIClient protocol + LiveAPIClient (Bearer JSON)
   AuthClient.swift         # AuthClient + AuthResult + password grant / refresh / 2FA verify
   TwoFactorClient.swift    # TwoFactorClient + TOTP status/setup/verify/disable
-EsimPulseKit/Tests/EsimPulseKitTests/
+EsimplifiedKit/Tests/EsimplifiedKitTests/
   SessionStoreTests.swift
   APIClientTests.swift
   AuthClientTests.swift
@@ -52,9 +52,9 @@ The split keeps each client focused on one endpoint family; `APIError` is shared
 ### Task 1: Session model + Keychain session storage
 
 **Files:**
-- Create: `EsimPulseKit/Sources/EsimPulseKit/Session.swift`
-- Create: `EsimPulseKit/Sources/EsimPulseKit/KeychainSessionStore.swift`
-- Test: `EsimPulseKit/Tests/EsimPulseKitTests/SessionStoreTests.swift`
+- Create: `EsimplifiedKit/Sources/EsimplifiedKit/Session.swift`
+- Create: `EsimplifiedKit/Sources/EsimplifiedKit/KeychainSessionStore.swift`
+- Test: `EsimplifiedKit/Tests/EsimplifiedKitTests/SessionStoreTests.swift`
 
 **Interfaces:**
 - Produces:
@@ -65,11 +65,11 @@ The split keeps each client focused on one endpoint family; `APIError` is shared
 
 - [ ] **Step 1: Write the failing test**
 
-Create `EsimPulseKit/Tests/EsimPulseKitTests/SessionStoreTests.swift`:
+Create `EsimplifiedKit/Tests/EsimplifiedKitTests/SessionStoreTests.swift`:
 
 ```swift
 import XCTest
-@testable import EsimPulseKit
+@testable import EsimplifiedKit
 
 final class SessionStoreTests: XCTestCase {
     private func sampleSession() -> Session {
@@ -106,12 +106,12 @@ final class SessionStoreTests: XCTestCase {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd ~/xcode/eSimPulse/EsimPulseKit && swift test --filter SessionStoreTests`
+Run: `cd ~/xcode/eSimPulse/EsimplifiedKit && swift test --filter SessionStoreTests`
 Expected: FAIL — `cannot find 'Session'/'InMemorySessionStore' in scope`.
 
 - [ ] **Step 3: Implement Session + protocol + in-memory store**
 
-Create `EsimPulseKit/Sources/EsimPulseKit/Session.swift`:
+Create `EsimplifiedKit/Sources/EsimplifiedKit/Session.swift`:
 
 ```swift
 import Foundation
@@ -164,12 +164,12 @@ public final class InMemorySessionStore: SessionStore {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd ~/xcode/eSimPulse/EsimPulseKit && swift test --filter SessionStoreTests`
+Run: `cd ~/xcode/eSimPulse/EsimplifiedKit && swift test --filter SessionStoreTests`
 Expected: PASS (3 tests).
 
 - [ ] **Step 5: Implement the Keychain-backed store**
 
-Create `EsimPulseKit/Sources/EsimPulseKit/KeychainSessionStore.swift`. Session is JSON-encoded under one generic-password item; trusted-device tokens are stored per-host under a namespaced account.
+Create `EsimplifiedKit/Sources/EsimplifiedKit/KeychainSessionStore.swift`. Session is JSON-encoded under one generic-password item; trusted-device tokens are stored per-host under a namespaced account.
 
 ```swift
 import Foundation
@@ -251,13 +251,13 @@ public final class KeychainSessionStore: SessionStore {
 
 - [ ] **Step 6: Run the full package build + suite**
 
-Run: `cd ~/xcode/eSimPulse/EsimPulseKit && swift build && swift test`
+Run: `cd ~/xcode/eSimPulse/EsimplifiedKit && swift build && swift test`
 Expected: `Build complete!` and all tests pass (prior 15 + 3 new = 18).
 
 - [ ] **Step 7: Commit**
 
 ```bash
-cd ~/xcode/eSimPulse && git add EsimPulseKit && \
+cd ~/xcode/eSimPulse && git add EsimplifiedKit && \
   git commit -m "feat: Session model + Keychain session storage"
 ```
 
@@ -266,9 +266,9 @@ cd ~/xcode/eSimPulse && git add EsimPulseKit && \
 ### Task 2: APIError + generalized Bearer API client
 
 **Files:**
-- Create: `EsimPulseKit/Sources/EsimPulseKit/APIError.swift`
-- Create: `EsimPulseKit/Sources/EsimPulseKit/APIClient.swift`
-- Test: `EsimPulseKit/Tests/EsimPulseKitTests/APIClientTests.swift`
+- Create: `EsimplifiedKit/Sources/EsimplifiedKit/APIError.swift`
+- Create: `EsimplifiedKit/Sources/EsimplifiedKit/APIClient.swift`
+- Test: `EsimplifiedKit/Tests/EsimplifiedKitTests/APIClientTests.swift`
 
 **Interfaces:**
 - Consumes: `MockURLProtocol` (existing test helper).
@@ -279,11 +279,11 @@ cd ~/xcode/eSimPulse && git add EsimPulseKit && \
 
 - [ ] **Step 1: Write the failing tests**
 
-Create `EsimPulseKit/Tests/EsimPulseKitTests/APIClientTests.swift`:
+Create `EsimplifiedKit/Tests/EsimplifiedKitTests/APIClientTests.swift`:
 
 ```swift
 import XCTest
-@testable import EsimPulseKit
+@testable import EsimplifiedKit
 
 private struct Widget: Decodable, Equatable { let id: Int; let name: String }
 
@@ -347,12 +347,12 @@ final class APIClientTests: XCTestCase {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd ~/xcode/eSimPulse/EsimPulseKit && swift test --filter APIClientTests`
+Run: `cd ~/xcode/eSimPulse/EsimplifiedKit && swift test --filter APIClientTests`
 Expected: FAIL — `cannot find type 'LiveAPIClient'/'APIError' in scope`.
 
 - [ ] **Step 3: Implement APIError + LiveAPIClient**
 
-Create `EsimPulseKit/Sources/EsimPulseKit/APIError.swift`:
+Create `EsimplifiedKit/Sources/EsimplifiedKit/APIError.swift`:
 
 ```swift
 import Foundation
@@ -366,7 +366,7 @@ public enum APIError: Error, Equatable, Sendable {
 }
 ```
 
-Create `EsimPulseKit/Sources/EsimPulseKit/APIClient.swift`:
+Create `EsimplifiedKit/Sources/EsimplifiedKit/APIClient.swift`:
 
 ```swift
 import Foundation
@@ -418,13 +418,13 @@ public final class LiveAPIClient: APIClient {
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd ~/xcode/eSimPulse/EsimPulseKit && swift test --filter APIClientTests`
+Run: `cd ~/xcode/eSimPulse/EsimplifiedKit && swift test --filter APIClientTests`
 Expected: PASS (5 tests).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd ~/xcode/eSimPulse && git add EsimPulseKit && \
+cd ~/xcode/eSimPulse && git add EsimplifiedKit && \
   git commit -m "feat: APIError + generalized Bearer APIClient"
 ```
 
@@ -433,8 +433,8 @@ cd ~/xcode/eSimPulse && git add EsimPulseKit && \
 ### Task 3: AuthClient — password grant, refresh, 2FA challenge
 
 **Files:**
-- Create: `EsimPulseKit/Sources/EsimPulseKit/AuthClient.swift`
-- Test: `EsimPulseKit/Tests/EsimPulseKitTests/AuthClientTests.swift`
+- Create: `EsimplifiedKit/Sources/EsimplifiedKit/AuthClient.swift`
+- Test: `EsimplifiedKit/Tests/EsimplifiedKitTests/AuthClientTests.swift`
 
 **Interfaces:**
 - Consumes: `Session` (Task 1), `APIError` (Task 2), `MockURLProtocol`.
@@ -447,11 +447,11 @@ cd ~/xcode/eSimPulse && git add EsimPulseKit && \
 
 - [ ] **Step 1: Write the failing tests**
 
-Create `EsimPulseKit/Tests/EsimPulseKitTests/AuthClientTests.swift`:
+Create `EsimplifiedKit/Tests/EsimplifiedKitTests/AuthClientTests.swift`:
 
 ```swift
 import XCTest
-@testable import EsimPulseKit
+@testable import EsimplifiedKit
 
 final class AuthClientTests: XCTestCase {
     override func tearDown() { MockURLProtocol.handler = nil; super.tearDown() }
@@ -531,12 +531,12 @@ final class AuthClientTests: XCTestCase {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd ~/xcode/eSimPulse/EsimPulseKit && swift test --filter AuthClientTests`
+Run: `cd ~/xcode/eSimPulse/EsimplifiedKit && swift test --filter AuthClientTests`
 Expected: FAIL — `cannot find type 'LiveAuthClient'/'AuthResult' in scope`.
 
 - [ ] **Step 3: Implement AuthClient**
 
-Create `EsimPulseKit/Sources/EsimPulseKit/AuthClient.swift`:
+Create `EsimplifiedKit/Sources/EsimplifiedKit/AuthClient.swift`:
 
 ```swift
 import Foundation
@@ -657,13 +657,13 @@ public final class LiveAuthClient: AuthClient {
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd ~/xcode/eSimPulse/EsimPulseKit && swift test --filter AuthClientTests`
+Run: `cd ~/xcode/eSimPulse/EsimplifiedKit && swift test --filter AuthClientTests`
 Expected: PASS (6 tests), output pristine (no warnings).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd ~/xcode/eSimPulse && git add EsimPulseKit && \
+cd ~/xcode/eSimPulse && git add EsimplifiedKit && \
   git commit -m "feat: AuthClient — password grant, refresh, 2FA challenge"
 ```
 
@@ -672,8 +672,8 @@ cd ~/xcode/eSimPulse && git add EsimPulseKit && \
 ### Task 4: TwoFactorClient — TOTP status / setup / verify / disable
 
 **Files:**
-- Create: `EsimPulseKit/Sources/EsimPulseKit/TwoFactorClient.swift`
-- Test: `EsimPulseKit/Tests/EsimPulseKitTests/TwoFactorClientTests.swift`
+- Create: `EsimplifiedKit/Sources/EsimplifiedKit/TwoFactorClient.swift`
+- Test: `EsimplifiedKit/Tests/EsimplifiedKitTests/TwoFactorClientTests.swift`
 
 **Interfaces:**
 - Consumes: `APIError` (Task 2), `MockURLProtocol`.
@@ -686,11 +686,11 @@ cd ~/xcode/eSimPulse && git add EsimPulseKit && \
 
 - [ ] **Step 1: Write the failing tests**
 
-Create `EsimPulseKit/Tests/EsimPulseKitTests/TwoFactorClientTests.swift`:
+Create `EsimplifiedKit/Tests/EsimplifiedKitTests/TwoFactorClientTests.swift`:
 
 ```swift
 import XCTest
-@testable import EsimPulseKit
+@testable import EsimplifiedKit
 
 final class TwoFactorClientTests: XCTestCase {
     override func tearDown() { MockURLProtocol.handler = nil; super.tearDown() }
@@ -742,12 +742,12 @@ final class TwoFactorClientTests: XCTestCase {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd ~/xcode/eSimPulse/EsimPulseKit && swift test --filter TwoFactorClientTests`
+Run: `cd ~/xcode/eSimPulse/EsimplifiedKit && swift test --filter TwoFactorClientTests`
 Expected: FAIL — `cannot find type 'LiveTwoFactorClient'/'TOTPSetup' in scope`.
 
 - [ ] **Step 3: Implement TwoFactorClient**
 
-Create `EsimPulseKit/Sources/EsimPulseKit/TwoFactorClient.swift`:
+Create `EsimplifiedKit/Sources/EsimplifiedKit/TwoFactorClient.swift`:
 
 ```swift
 import Foundation
@@ -823,13 +823,13 @@ public final class LiveTwoFactorClient: TwoFactorClient {
 
 - [ ] **Step 4: Run tests to verify they pass, then the whole suite**
 
-Run: `cd ~/xcode/eSimPulse/EsimPulseKit && swift test`
+Run: `cd ~/xcode/eSimPulse/EsimplifiedKit && swift test`
 Expected: PASS — all tests (18 prior + 4 new = 22), output pristine.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd ~/xcode/eSimPulse && git add EsimPulseKit && \
+cd ~/xcode/eSimPulse && git add EsimplifiedKit && \
   git commit -m "feat: TwoFactorClient — TOTP status/setup/verify/disable"
 ```
 
@@ -840,7 +840,7 @@ cd ~/xcode/eSimPulse && git add EsimPulseKit && \
 This task creates the `eSimplifiedAdmin` multiplatform app target in `eSimPulse.xcodeproj` and the navigation shell. Verified by build (macOS + iOS Simulator), not unit tests.
 
 **Files:**
-- Modify: `eSimPulse.xcodeproj/project.pbxproj` (add target `eSimplifiedAdmin`, multiplatform: macOS + iOS, linking `EsimPulseKit`; a shared scheme).
+- Modify: `eSimPulse.xcodeproj/project.pbxproj` (add target `eSimplifiedAdmin`, multiplatform: macOS + iOS, linking `EsimplifiedKit`; a shared scheme).
 - Create: `eSimplifiedAdmin/eSimplifiedAdminApp.swift`
 - Create: `eSimplifiedAdmin/AdminShell.swift`
 - Create: `eSimplifiedAdmin/eSimplifiedAdmin.entitlements` (macOS: app-sandbox + network.client)
@@ -851,7 +851,7 @@ This task creates the `eSimplifiedAdmin` multiplatform app target in `eSimPulse.
 
 - [ ] **Step 1: Add the multiplatform app target to the project**
 
-Add a `PBXNativeTarget` `eSimplifiedAdmin` (productType `com.apple.product-type.application`). It must build for both macOS and iOS — set `SDKROOT = auto` and `SUPPORTED_PLATFORMS = "macosx iphoneos iphonesimulator"`, `MACOSX_DEPLOYMENT_TARGET = 14.0`, `IPHONEOS_DEPLOYMENT_TARGET = 17.0`, `TARGETED_DEVICE_FAMILY = "1,2"`, `GENERATE_INFOPLIST_FILE = YES`, `PRODUCT_BUNDLE_IDENTIFIER = io.esimplified.admin`, `SWIFT_VERSION = 5.9`, `DEVELOPMENT_TEAM = 8GVFL9KS7M`, `CODE_SIGN_STYLE = Automatic`, and `CODE_SIGN_ENTITLEMENTS = eSimplifiedAdmin/eSimplifiedAdmin.entitlements` (entitlements apply on macOS; harmless on iOS). Add a `packageProductDependencies` entry on the existing local `EsimPulseKit` package reference, a Sources build phase listing the three Swift files, a Frameworks phase linking `EsimPulseKit`, and a shared scheme `eSimplifiedAdmin.xcscheme` under `xcshareddata/xcschemes/`. Inject client credentials via `INFOPLIST_KEY_` build settings: `INFOPLIST_KEY_ESPClientID` and `INFOPLIST_KEY_ESPClientSecret` (placeholder empty values committed; real values set locally, not in git).
+Add a `PBXNativeTarget` `eSimplifiedAdmin` (productType `com.apple.product-type.application`). It must build for both macOS and iOS — set `SDKROOT = auto` and `SUPPORTED_PLATFORMS = "macosx iphoneos iphonesimulator"`, `MACOSX_DEPLOYMENT_TARGET = 14.0`, `IPHONEOS_DEPLOYMENT_TARGET = 17.0`, `TARGETED_DEVICE_FAMILY = "1,2"`, `GENERATE_INFOPLIST_FILE = YES`, `PRODUCT_BUNDLE_IDENTIFIER = io.esimplified.admin`, `SWIFT_VERSION = 5.9`, `DEVELOPMENT_TEAM = 8GVFL9KS7M`, `CODE_SIGN_STYLE = Automatic`, and `CODE_SIGN_ENTITLEMENTS = eSimplifiedAdmin/eSimplifiedAdmin.entitlements` (entitlements apply on macOS; harmless on iOS). Add a `packageProductDependencies` entry on the existing local `EsimplifiedKit` package reference, a Sources build phase listing the three Swift files, a Frameworks phase linking `EsimplifiedKit`, and a shared scheme `eSimplifiedAdmin.xcscheme` under `xcshareddata/xcschemes/`. Inject client credentials via `INFOPLIST_KEY_` build settings: `INFOPLIST_KEY_ESPClientID` and `INFOPLIST_KEY_ESPClientSecret` (placeholder empty values committed; real values set locally, not in git).
 
 > Follow the existing hand-authored pbxproj conventions in this project (UUID prefixes `E55…` for this target's objects to avoid collisions with E51–E54).
 
@@ -878,7 +878,7 @@ Create `eSimplifiedAdmin/eSimplifiedAdminApp.swift`:
 
 ```swift
 import SwiftUI
-import EsimPulseKit
+import EsimplifiedKit
 
 @main
 struct eSimplifiedAdminApp: App {
@@ -949,7 +949,7 @@ Create `eSimplifiedAdmin/AdminShell.swift`:
 
 ```swift
 import SwiftUI
-import EsimPulseKit
+import EsimplifiedKit
 
 enum AdminSection: String, CaseIterable, Identifiable, Hashable {
     case dashboard, orders, customers, search, inventory, agentOrder, agentApprovals, profile
@@ -1090,7 +1090,7 @@ Replace `eSimplifiedAdmin/LoginView.swift` with:
 
 ```swift
 import SwiftUI
-import EsimPulseKit
+import EsimplifiedKit
 
 struct LoginView: View {
     @Bindable var model: AppModel
@@ -1200,7 +1200,7 @@ Replace `eSimplifiedAdmin/TwoFactorSetupView.swift` with:
 ```swift
 import SwiftUI
 import CoreImage.CIFilterBuiltins
-import EsimPulseKit
+import EsimplifiedKit
 #if os(macOS)
 import AppKit
 #else

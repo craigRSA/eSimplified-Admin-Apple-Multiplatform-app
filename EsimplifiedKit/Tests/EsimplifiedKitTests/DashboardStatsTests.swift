@@ -1,5 +1,5 @@
 import XCTest
-@testable import EsimPulseKit
+@testable import EsimplifiedKit
 
 final class DashboardStatsTests: XCTestCase {
     private func fixtureData() throws -> Data {
