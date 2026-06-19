@@ -40,8 +40,10 @@ public final class LiveAuthClient: AuthClient {
 
     public func verify2FA(host: String, twoFAToken: String, code: String,
                           rememberDevice: Bool) async throws -> (Session, trustedDeviceToken: String?) {
-        let json = try await post(host: host, path: "/auth/token/2fa/", extraHeaders: [:], form: [
-            "2fa_token": twoFAToken, "code": code, "remember_device": rememberDevice ? "true" : "false",
+        // The 2FA endpoint takes a JSON body (not form), no Basic auth — the
+        // two_fa_token is the credential. Field names must match the backend.
+        let json = try await postJSON(host: host, path: "/auth/token/2fa/", body: [
+            "two_fa_token": twoFAToken, "code": code, "remember_device": rememberDevice,
         ])
         return (try Self.makeSession(from: json, host: host), json["trusted_device_token"] as? String)
     }
@@ -69,6 +71,36 @@ public final class LiveAuthClient: AuthClient {
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         for (key, value) in extraHeaders { request.setValue(value, forHTTPHeaderField: key) }
         request.httpBody = Self.formEncode(form).data(using: .utf8)
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch {
+            throw APIError.unreachable
+        }
+        guard let http = response as? HTTPURLResponse else { throw APIError.unreachable }
+        guard (200...299).contains(http.statusCode) else {
+            throw APIError.requestFailed(status: http.statusCode, serverMessage: Self.serverMessage(from: data))
+        }
+        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw APIError.decoding
+        }
+        return object
+    }
+
+    /// JSON POST without client Basic auth — used by the 2FA endpoint, which
+    /// authenticates via the two_fa_token in the body, not the client creds.
+    private func postJSON(host: String, path: String, body: [String: Any]) async throws -> [String: Any] {
+        guard var components = URLComponents(string: host) else { throw APIError.unreachable }
+        components.path = path
+        guard let url = components.url else { throw APIError.unreachable }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
         let data: Data
         let response: URLResponse

@@ -48,11 +48,40 @@ final class AuthClientTests: XCTestCase {
         XCTAssertEqual(captured?.value(forHTTPHeaderField: "X-Trusted-Device"), "td-7")
     }
 
-    func test_verify2FA_returns_session_and_trusted_token() async throws {
-        MockURLProtocol.handler = respond(#"{"access_token":"a2","refresh_token":"r2","expires_in":3600,"scope":"order:read","account_type":"human","trusted_device_token":"td-new"}"#)
+    func test_verify2FA_sends_json_with_correct_fields_and_returns_session() async throws {
+        var captured: URLRequest?
+        MockURLProtocol.handler = { req in
+            captured = req
+            let json = #"{"access_token":"a2","refresh_token":"r2","expires_in":3600,"scope":"order:read","account_type":"human","trusted_device_token":"td-new"}"#
+            return (HTTPURLResponse(url: req.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, Data(json.utf8))
+        }
         let (s, td) = try await makeClient().verify2FA(host: "https://h.io", twoFAToken: "tok", code: "123456", rememberDevice: true)
         XCTAssertEqual(s.accessToken, "a2")
         XCTAssertEqual(td, "td-new")
+        XCTAssertEqual(captured?.url?.absoluteString, "https://h.io/auth/token/2fa/")
+        XCTAssertEqual(captured?.value(forHTTPHeaderField: "Content-Type"), "application/json")
+        // The backend expects a JSON body with these exact field names.
+        let body = try XCTUnwrap(Self.bodyJSON(captured))
+        XCTAssertEqual(body["two_fa_token"] as? String, "tok")
+        XCTAssertEqual(body["code"] as? String, "123456")
+        XCTAssertEqual(body["remember_device"] as? Bool, true)
+    }
+
+    private static func bodyJSON(_ req: URLRequest?) -> [String: Any]? {
+        guard let req else { return nil }
+        let data: Data?
+        if let b = req.httpBody { data = b }
+        else if let stream = req.httpBodyStream {
+            stream.open(); defer { stream.close() }
+            var acc = Data(); let size = 4096
+            let buf = UnsafeMutablePointer<UInt8>.allocate(capacity: size); defer { buf.deallocate() }
+            while stream.hasBytesAvailable {
+                let n = stream.read(buf, maxLength: size); if n <= 0 { break }; acc.append(buf, count: n)
+            }
+            data = acc
+        } else { data = nil }
+        guard let data else { return nil }
+        return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
     }
 
     func test_refresh_returns_new_session() async throws {
