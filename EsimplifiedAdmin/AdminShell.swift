@@ -66,6 +66,10 @@ struct AdminShell: View {
                 if let session = model.session { DashboardScreen(session: session) }
             case .orders:
                 if let session = model.session { OrdersScreen(session: session) }
+            case .customers:
+                if let session = model.session { CustomersScreen(session: session) }
+            case .inventory:
+                if let session = model.session { InventoryScreen(session: session) }
             case .profile:
                 ProfilePlaceholder(model: model, showSetup2FA: $showSetup2FA)
             case .some(let section):

@@ -23,6 +23,8 @@
 		A3000000000000000000023 /* TwoFactorSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000013 /* TwoFactorSetupView.swift */; };
 		A3000000000000000000027 /* DashboardScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000017 /* DashboardScreen.swift */; };
 		A3000000000000000000028 /* OrdersScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000018 /* OrdersScreen.swift */; };
+		A3000000000000000000029 /* CustomersScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000019 /* CustomersScreen.swift */; };
+		A300000000000000000002A /* InventoryScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A300000000000000000001A /* InventoryScreen.swift */; };
 		A3000000000000000000032 /* EsimplifiedKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3000000000000000000031 /* EsimplifiedKit */; };
 /* End PBXBuildFile section */
 
@@ -73,6 +75,8 @@
 		A3000000000000000000016 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A3000000000000000000017 /* DashboardScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardScreen.swift; sourceTree = "<group>"; };
 		A3000000000000000000018 /* OrdersScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrdersScreen.swift; sourceTree = "<group>"; };
+		A3000000000000000000019 /* CustomersScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomersScreen.swift; sourceTree = "<group>"; };
+		A300000000000000000001A /* InventoryScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InventoryScreen.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -159,6 +163,8 @@
 				A3000000000000000000016 /* Info.plist */,
 				A3000000000000000000017 /* DashboardScreen.swift */,
 				A3000000000000000000018 /* OrdersScreen.swift */,
+				A3000000000000000000019 /* CustomersScreen.swift */,
+				A300000000000000000001A /* InventoryScreen.swift */,
 			);
 			path = EsimplifiedAdmin;
 			sourceTree = "<group>";
@@ -320,6 +326,8 @@
 				A3000000000000000000023 /* TwoFactorSetupView.swift in Sources */,
 				A3000000000000000000027 /* DashboardScreen.swift in Sources */,
 				A3000000000000000000028 /* OrdersScreen.swift in Sources */,
+				A3000000000000000000029 /* CustomersScreen.swift in Sources */,
+				A300000000000000000002A /* InventoryScreen.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
