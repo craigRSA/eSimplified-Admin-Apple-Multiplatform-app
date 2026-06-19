@@ -13,6 +13,7 @@ public struct Order: Decodable, Identifiable, Equatable, Sendable {
     public let currencySymbol: String?
     public let purchaseDate: String
     public let paymentStatus: String
+    public let paymentMethod: String
     public let tenant: String
     public let customerEmail: String?
     public let customerName: String?
@@ -28,6 +29,7 @@ public struct Order: Decodable, Identifiable, Equatable, Sendable {
         case purchaseCurrencyObj = "purchase_currency_obj"
         case purchaseDate = "purchase_date"
         case paymentStatus = "payment_status"
+        case paymentMethod = "payment_method"
     }
     private enum CurrencyKeys: String, CodingKey { case symbol }
     private struct Cust: Decodable { let email: String?; let full_name: String? }
@@ -45,6 +47,7 @@ public struct Order: Decodable, Identifiable, Equatable, Sendable {
         purchaseCurrency = try str(.purchaseCurrency)
         purchaseDate = try str(.purchaseDate)
         paymentStatus = try str(.paymentStatus)
+        paymentMethod = try str(.paymentMethod)
         tenant = try str(.tenant)
         let cust = try c.decodeIfPresent(Cust.self, forKey: .customer)
         customerEmail = cust?.email

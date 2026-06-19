@@ -25,6 +25,9 @@
 		A3000000000000000000028 /* OrdersScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000018 /* OrdersScreen.swift */; };
 		A3000000000000000000029 /* CustomersScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000019 /* CustomersScreen.swift */; };
 		A300000000000000000002A /* InventoryScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A300000000000000000001A /* InventoryScreen.swift */; };
+		A300000000000000000002B /* ProfileScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A300000000000000000001B /* ProfileScreen.swift */; };
+		A300000000000000000002C /* SearchScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A300000000000000000001C /* SearchScreen.swift */; };
+		A300000000000000000002D /* AgentApprovalsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A300000000000000000001D /* AgentApprovalsScreen.swift */; };
 		A3000000000000000000032 /* EsimplifiedKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3000000000000000000031 /* EsimplifiedKit */; };
 /* End PBXBuildFile section */
 
@@ -77,6 +80,9 @@
 		A3000000000000000000018 /* OrdersScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrdersScreen.swift; sourceTree = "<group>"; };
 		A3000000000000000000019 /* CustomersScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomersScreen.swift; sourceTree = "<group>"; };
 		A300000000000000000001A /* InventoryScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InventoryScreen.swift; sourceTree = "<group>"; };
+		A300000000000000000001B /* ProfileScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileScreen.swift; sourceTree = "<group>"; };
+		A300000000000000000001C /* SearchScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchScreen.swift; sourceTree = "<group>"; };
+		A300000000000000000001D /* AgentApprovalsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentApprovalsScreen.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -165,6 +171,9 @@
 				A3000000000000000000018 /* OrdersScreen.swift */,
 				A3000000000000000000019 /* CustomersScreen.swift */,
 				A300000000000000000001A /* InventoryScreen.swift */,
+				A300000000000000000001B /* ProfileScreen.swift */,
+				A300000000000000000001C /* SearchScreen.swift */,
+				A300000000000000000001D /* AgentApprovalsScreen.swift */,
 			);
 			path = EsimplifiedAdmin;
 			sourceTree = "<group>";
@@ -328,6 +337,9 @@
 				A3000000000000000000028 /* OrdersScreen.swift in Sources */,
 				A3000000000000000000029 /* CustomersScreen.swift in Sources */,
 				A300000000000000000002A /* InventoryScreen.swift in Sources */,
+				A300000000000000000002B /* ProfileScreen.swift in Sources */,
+				A300000000000000000002C /* SearchScreen.swift in Sources */,
+				A300000000000000000002D /* AgentApprovalsScreen.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
