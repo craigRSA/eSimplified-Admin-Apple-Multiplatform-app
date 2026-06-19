@@ -56,15 +56,26 @@ struct AdminShell: View {
                 Label(section.title, systemImage: section.systemImage).tag(section)
             }
             .navigationTitle("eSimplified")
-            .toolbar {
+            .safeAreaInset(edge: .top) {
                 if !model.tenants.isEmpty {
-                    Picker("Tenant", selection: $model.selectedTenant) {
-                        Text("All Tenants").tag(Tenant?.none)
+                    Menu {
+                        Button("All Tenants") { model.selectedTenant = nil }
+                        Divider()
                         ForEach(model.tenants) { tenant in
-                            Text(tenant.name).tag(Tenant?.some(tenant))
+                            Button(tenant.name) { model.selectedTenant = tenant }
                         }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "building.2").font(.caption)
+                            Text(model.selectedTenant?.name ?? "All Tenants").lineLimit(1)
+                            Spacer()
+                            Image(systemName: "chevron.up.chevron.down").font(.caption2).foregroundStyle(.secondary)
+                        }
+                        .padding(.horizontal, 10).padding(.vertical, 7)
+                        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
                     }
-                    .pickerStyle(.menu)
+                    .menuStyle(.borderlessButton)
+                    .padding(.horizontal, 10).padding(.top, 8)
                 }
             }
         } detail: {
