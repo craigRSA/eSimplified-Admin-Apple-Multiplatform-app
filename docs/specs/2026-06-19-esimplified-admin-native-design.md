@@ -64,9 +64,29 @@ server-side. A native app has no server, so these are **embedded in the build**
 internal, staff-only admin tool. If that is later judged too sensitive, the
 alternative is a thin token-exchange proxy — out of scope here.
 
-**Deferred:** 2FA (`requires_2fa` / `2fa_token`) and WebAuthn/passkeys exist in
-the web app; v1 logs in with username/password only and surfaces a clear message
-if the backend demands 2FA.
+### Two-factor authentication (TOTP) — in v1
+
+The backend supports TOTP 2FA; v1 includes both the login challenge and
+enrollment ("add my 2FA key").
+
+**Login challenge:** if `POST /auth/token/` responds with `requires_2fa` and a
+`2fa_token`, prompt for the 6-digit code, then
+`POST /auth/token/2fa/` with the `2fa_token` + code (+ optional
+`remember_device` → store the returned trusted-device token in Keychain and send
+it as `X-Trusted-Device` on future logins to skip the challenge).
+
+**Enrollment / management** (reached from Profile or a Security screen):
+- `GET /2fa/status/` → `{ totp_enabled }`.
+- `POST /2fa/setup/` → `{ method: "totp", otpauth_url, ... }`. Render
+  `otpauth_url` as a **QR code** (natively via CoreImage `CIQRCodeGenerator` —
+  no third-party dependency) and also show the embedded secret as selectable
+  text, so the user adds it to their authenticator app.
+- `POST /2fa/verify/` with a code → confirm and enable.
+- `POST /2fa/disable/` with a code → turn off.
+
+**Deferred:** WebAuthn/passkeys (`/2fa/verify/` passkey path, `ASAuthorization`)
+— a later phase. v1 uses TOTP. If the backend forces a passkey-only account,
+surface a clear message.
 
 ## Shared engine additions (`EsimPulseKit`)
 
@@ -77,7 +97,12 @@ if the backend demands 2FA.
   `StatisticsClient` becomes a thin caller of `APIClient`.
 - **`AuthClient`** — performs the password grant + refresh against `/auth/token/`,
   returns a `Session { accessToken, refreshToken, expiresAt, scopes,
-  accountType }`.
+  accountType }`. Handles the **2FA login challenge**: surfaces a
+  `requires2FA(token:)` result, and a `verify2FA(token:code:rememberDevice:)`
+  call to `/auth/token/2fa/` that returns a `Session`.
+- **`TwoFactorClient`** — `status()` (`GET /2fa/status/`),
+  `beginSetup()` (`POST /2fa/setup/` → `otpauth_url` + secret),
+  `verify(code:)` (`POST /2fa/verify/`), `disable(code:)` (`POST /2fa/disable/`).
 - **`Session` / token storage** — extend `KeychainCredentialStore` to persist the
   host + access/refresh tokens + expiry + scopes (single Keychain item).
 - **Domain models** (added per screen slice, not all upfront): `Customer`,
@@ -114,21 +139,31 @@ plus a SwiftUI screen.
 
 **Files (engine):**
 - `Sources/EsimPulseKit/APIClient.swift` — `APIClient` protocol + `LiveAPIClient`.
-- `Sources/EsimPulseKit/AuthClient.swift` — `AuthClient` + `Session` + grant/refresh.
-- Extend `KeychainCredentialStore` for session persistence.
-- Tests: `APIClientTests`, `AuthClientTests` (using `MockURLProtocol`), session
+- `Sources/EsimPulseKit/AuthClient.swift` — `AuthClient` + `Session` + grant /
+  refresh / 2FA-challenge verify.
+- `Sources/EsimPulseKit/TwoFactorClient.swift` — status / setup / verify / disable.
+- Extend `KeychainCredentialStore` for session + trusted-device-token persistence.
+- Tests: `APIClientTests`, `AuthClientTests` (password grant, refresh, 2FA
+  challenge), `TwoFactorClientTests` (all via `MockURLProtocol`), session
   round-trip tests with `InMemoryCredentialStore`.
 
 **Files (app target — added to the Xcode project):**
 - `eSimplifiedAdmin/eSimplifiedAdminApp.swift` — `@main`, `AppModel`, `RootView`.
-- `eSimplifiedAdmin/LoginView.swift` — host + username + password form.
+- `eSimplifiedAdmin/LoginView.swift` — host + username + password; on
+  `requires_2fa`, a 6-digit code step + "remember this device" toggle.
+- `eSimplifiedAdmin/TwoFactorSetupView.swift` — enroll TOTP: shows the QR
+  (CoreImage) + secret, then verifies a code to enable; reachable from the shell.
 - `eSimplifiedAdmin/AdminShell.swift` — `NavigationSplitView`, scope-gated sections,
-  placeholder destinations.
+  placeholder destinations, entry point to 2FA setup.
 - iOS + macOS entitlements (network client; sandbox on macOS).
 
 **Acceptance:**
 - Logging in with valid staff credentials stores a session and lands on the
   adaptive shell; the sidebar shows only scope-permitted sections.
+- A 2FA-required account is challenged for a TOTP code and logs in on success;
+  "remember this device" skips the challenge next time.
+- A user can enroll a new TOTP key: scan the QR (or copy the secret) into an
+  authenticator and confirm a code to enable; can disable with a code.
 - Token auto-refreshes; logout clears the Keychain and returns to login.
 - Builds and runs on macOS and the iOS Simulator.
 
