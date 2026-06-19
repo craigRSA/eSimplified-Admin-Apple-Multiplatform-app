@@ -68,6 +68,7 @@
 		A3000000000000000000013 /* TwoFactorSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TwoFactorSetupView.swift; sourceTree = "<group>"; };
 		A3000000000000000000014 /* EsimplifiedAdmin.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = EsimplifiedAdmin.entitlements; sourceTree = "<group>"; };
 		A3000000000000000000015 /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
+		A3000000000000000000016 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -151,6 +152,7 @@
 				A3000000000000000000013 /* TwoFactorSetupView.swift */,
 				A3000000000000000000014 /* EsimplifiedAdmin.entitlements */,
 				A3000000000000000000015 /* Secrets.xcconfig */,
+				A3000000000000000000016 /* Info.plist */,
 			);
 			path = EsimplifiedAdmin;
 			sourceTree = "<group>";
@@ -511,8 +513,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "eSimplified Admin";
-				INFOPLIST_KEY_ESPClientID = "$(ESP_CLIENT_ID)";
-				INFOPLIST_KEY_ESPClientSecret = "$(ESP_CLIENT_SECRET)";
+				INFOPLIST_FILE = EsimplifiedAdmin/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
 				"INFOPLIST_KEY_NSPrincipalClass[sdk=macosx*]" = NSApplication;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -549,8 +550,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "eSimplified Admin";
-				INFOPLIST_KEY_ESPClientID = "$(ESP_CLIENT_ID)";
-				INFOPLIST_KEY_ESPClientSecret = "$(ESP_CLIENT_SECRET)";
+				INFOPLIST_FILE = EsimplifiedAdmin/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
 				"INFOPLIST_KEY_NSPrincipalClass[sdk=macosx*]" = NSApplication;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
