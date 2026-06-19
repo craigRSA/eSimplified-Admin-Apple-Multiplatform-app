@@ -64,6 +64,8 @@ struct AdminShell: View {
             switch selection {
             case .dashboard:
                 if let session = model.session { DashboardScreen(session: session) }
+            case .orders:
+                if let session = model.session { OrdersScreen(session: session) }
             case .profile:
                 ProfilePlaceholder(model: model, showSetup2FA: $showSetup2FA)
             case .some(let section):

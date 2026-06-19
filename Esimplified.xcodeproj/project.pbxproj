@@ -22,6 +22,7 @@
 		A3000000000000000000022 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000012 /* LoginView.swift */; };
 		A3000000000000000000023 /* TwoFactorSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000013 /* TwoFactorSetupView.swift */; };
 		A3000000000000000000027 /* DashboardScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000017 /* DashboardScreen.swift */; };
+		A3000000000000000000028 /* OrdersScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000018 /* OrdersScreen.swift */; };
 		A3000000000000000000032 /* EsimplifiedKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3000000000000000000031 /* EsimplifiedKit */; };
 /* End PBXBuildFile section */
 
@@ -71,6 +72,7 @@
 		A3000000000000000000015 /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
 		A3000000000000000000016 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A3000000000000000000017 /* DashboardScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardScreen.swift; sourceTree = "<group>"; };
+		A3000000000000000000018 /* OrdersScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrdersScreen.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -156,6 +158,7 @@
 				A3000000000000000000015 /* Secrets.xcconfig */,
 				A3000000000000000000016 /* Info.plist */,
 				A3000000000000000000017 /* DashboardScreen.swift */,
+				A3000000000000000000018 /* OrdersScreen.swift */,
 			);
 			path = EsimplifiedAdmin;
 			sourceTree = "<group>";
@@ -316,6 +319,7 @@
 				A3000000000000000000022 /* LoginView.swift in Sources */,
 				A3000000000000000000023 /* TwoFactorSetupView.swift in Sources */,
 				A3000000000000000000027 /* DashboardScreen.swift in Sources */,
+				A3000000000000000000028 /* OrdersScreen.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
