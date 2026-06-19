@@ -14,11 +14,12 @@ struct RevenueEntry: TimelineEntry {
     let content: RevenueContent
 }
 
-/// Drives the widget timeline: reads the Bearer token from the shared Keychain
-/// access group (written by the host app) and fetches the latest stats itself,
-/// so the widget stays current with the app closed.
+/// Drives the widget timeline: reads the Admin app's signed-in session from the
+/// shared Keychain access group, refreshes the OAuth token when it has expired,
+/// and fetches the latest stats itself — so the widget stays current with the
+/// app closed.
 struct RevenueProvider: TimelineProvider {
-    private let store = KeychainCredentialStore()
+    private let store = KeychainSessionStore()
 
     /// Minutes between widget refreshes. WidgetKit treats this as a hint and
     /// may space refreshes further apart under system budget pressure.
@@ -48,21 +49,40 @@ struct RevenueProvider: TimelineProvider {
     }
 
     private func fetchEntry() async -> RevenueEntry {
-        guard let credentials = try? store.load() else {
+        guard var session = try? store.load() else {
             return RevenueEntry(date: Date(), content: .needsAuth)
         }
-        let client = LiveStatisticsClient(credentials: credentials)
+        // The widget runs with the app closed, so refresh an expired token itself.
+        if session.expiresAt <= Date() {
+            guard let auth = authClient(),
+                  let refreshed = try? await auth.refresh(host: session.host,
+                                                          refreshToken: session.refreshToken) else {
+                return RevenueEntry(date: Date(), content: .needsAuth)
+            }
+            try? store.save(refreshed)
+            session = refreshed
+        }
+        let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
         do {
-            let stats = try await client.fetch(dateRange: .last7Days)
+            let stats = try await client.get("/api/statistics/", query: [:], as: AdminDashboardStats.self)
             return RevenueEntry(date: Date(),
                                 content: .revenue(today: stats.revenueToday,
                                                   deltaPercent: stats.deltaPercent,
                                                   series: stats.revenuePerDate))
-        } catch StatsError.authExpired {
+        } catch APIError.authExpired {
             return RevenueEntry(date: Date(), content: .needsAuth)
         } catch {
             return RevenueEntry(date: Date(), content: .unavailable)
         }
+    }
+
+    /// Client credentials injected into the widget's Info.plist (same Secrets
+    /// xcconfig as the app); needed to refresh the OAuth token.
+    private func authClient() -> LiveAuthClient? {
+        let id = (Bundle.main.object(forInfoDictionaryKey: "ESPClientID") as? String) ?? ""
+        let secret = (Bundle.main.object(forInfoDictionaryKey: "ESPClientSecret") as? String) ?? ""
+        guard !id.isEmpty, !secret.isEmpty else { return nil }
+        return LiveAuthClient(clientID: id, clientSecret: secret)
     }
 
     private static let sampleSeries: [DayRevenue] = [

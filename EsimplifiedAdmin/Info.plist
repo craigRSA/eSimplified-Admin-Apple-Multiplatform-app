@@ -6,5 +6,7 @@
 	<string>$(ESP_CLIENT_ID)</string>
 	<key>ESPClientSecret</key>
 	<string>$(ESP_CLIENT_SECRET)</string>
+	<key>ESPHost</key>
+	<string>https://live.esimplified.io</string>
 </dict>
 </plist>

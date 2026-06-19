@@ -4,7 +4,7 @@ import EsimplifiedKit
 struct LoginView: View {
     @Bindable var model: AdminAppModel
 
-    @State private var host = "https://live.esimplified.io"
+    private var host: String { model.host }
     @State private var username = ""
     @State private var password = ""
     @State private var twoFAToken: String?
@@ -47,12 +47,6 @@ struct LoginView: View {
 
     private var credentialsCard: some View {
         VStack(spacing: 14) {
-            field(systemImage: "globe") {
-                TextField("Host", text: $host)
-                    #if os(iOS)
-                    .textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL)
-                    #endif
-            }
             field(systemImage: "person") {
                 TextField("Username", text: $username)
                     #if os(iOS)

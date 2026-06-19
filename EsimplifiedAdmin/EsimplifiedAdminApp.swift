@@ -29,10 +29,16 @@ final class AdminAppModel {
     let clientID: String
     let clientSecret: String
 
+    /// API host, configured at build time (Info.plist `ESPHost`) — never asked
+    /// for in the UI. The root host; the app appends `/api/…` and `/auth/…`.
+    let host: String
+
     init(store: SessionStore = KeychainSessionStore()) {
         self.store = store
         self.clientID = (Bundle.main.object(forInfoDictionaryKey: "ESPClientID") as? String) ?? ""
         self.clientSecret = (Bundle.main.object(forInfoDictionaryKey: "ESPClientSecret") as? String) ?? ""
+        let configured = (Bundle.main.object(forInfoDictionaryKey: "ESPHost") as? String) ?? ""
+        self.host = configured.isEmpty ? "https://live.esimplified.io" : configured
         self.session = try? store.load()
     }
 
