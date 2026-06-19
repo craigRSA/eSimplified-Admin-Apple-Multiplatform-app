@@ -4,7 +4,7 @@
 
 **Goal:** A native macOS desktop window that shows today's consolidated eSimplified revenue and the delta vs yesterday, authenticating to the existing `/api/v1/statistics/` endpoint with a stored Bearer token.
 
-**Architecture:** All non-UI logic lives in a local Swift package, `EsimplifiedKit`, that is fully unit-testable from the command line via `swift test` (true TDD, no Xcode GUI needed). A thin SwiftUI macOS app target (`eSimPulse.xcodeproj`) imports the package and renders the window. The package exposes three units behind protocols — credential storage, the statistics HTTP client, and an observable view model — each tested in isolation with in-memory fakes.
+**Architecture:** All non-UI logic lives in a local Swift package, `EsimplifiedKit`, that is fully unit-testable from the command line via `swift test` (true TDD, no Xcode GUI needed). A thin SwiftUI macOS app target (`Esimplified.xcodeproj`) imports the package and renders the window. The package exposes three units behind protocols — credential storage, the statistics HTTP client, and an observable view model — each tested in isolation with in-memory fakes.
 
 **Tech Stack:** Swift 5.9+, SwiftUI, AppKit (for window level), XCTest, Foundation `URLSession`/`Codable`/`Decimal`, macOS Keychain Services. No third-party dependencies.
 
@@ -825,7 +825,7 @@ building and running, not by unit tests (SwiftUI views over an `@Observable`
 view model are covered indirectly by Task 4).
 
 **Files:**
-- Create: `eSimPulse.xcodeproj` (via Xcode — see Step 1)
+- Create: `Esimplified.xcodeproj` (via Xcode — see Step 1)
 - Create: `~/xcode/eSimPulse/eSimPulse/eSimPulseApp.swift`
 - Create: `~/xcode/eSimPulse/eSimPulse/FloatingWindow.swift`
 - Create: `~/xcode/eSimPulse/eSimPulse/DashboardView.swift`
@@ -1033,7 +1033,7 @@ struct SettingsView: View {
 
 - [ ] **Step 5: Build the app**
 
-Run: `cd ~/xcode/eSimPulse && xcodebuild -project eSimPulse.xcodeproj -scheme eSimPulse -configuration Debug build`
+Run: `cd ~/xcode/eSimPulse && xcodebuild -project Esimplified.xcodeproj -scheme eSimPulse -configuration Debug build`
 Expected: `BUILD SUCCEEDED`.
 
 - [ ] **Step 6: Manual verification (record results)**

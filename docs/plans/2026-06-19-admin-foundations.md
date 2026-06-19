@@ -4,7 +4,7 @@
 
 **Goal:** The auth + shell foundation of the native eSimplified Admin app — a reusable Bearer API client, OAuth2 password-grant login with TOTP 2FA (challenge + enrollment), session storage in the Keychain, and an adaptive (Mac/iPad/iPhone) navigation shell whose sections are gated by token scopes.
 
-**Architecture:** All non-UI logic is added to the existing `EsimplifiedKit` Swift package (already `.macOS(.v14)` + `.iOS(.v17)`), unit-tested from the command line with the existing `MockURLProtocol`/`InMemoryCredentialStore` harness. A new SwiftUI multiplatform app target `eSimplifiedAdmin` (added to `eSimPulse.xcodeproj`) holds the adaptive UI and imports `EsimplifiedKit`. Spec: `docs/specs/2026-06-19-esimplified-admin-native-design.md`.
+**Architecture:** All non-UI logic is added to the existing `EsimplifiedKit` Swift package (already `.macOS(.v14)` + `.iOS(.v17)`), unit-tested from the command line with the existing `MockURLProtocol`/`InMemoryCredentialStore` harness. A new SwiftUI multiplatform app target `eSimplifiedAdmin` (added to `Esimplified.xcodeproj`) holds the adaptive UI and imports `EsimplifiedKit`. Spec: `docs/specs/2026-06-19-esimplified-admin-native-design.md`.
 
 **Tech Stack:** Swift 5.9+, SwiftUI, Foundation `URLSession`/`Codable`, CoreImage (`CIQRCodeGenerator`), macOS Keychain Services, XCTest. No third-party dependencies.
 
@@ -837,10 +837,10 @@ cd ~/xcode/eSimPulse && git add EsimplifiedKit && \
 
 ### Task 5: App target scaffold + AppModel + adaptive shell
 
-This task creates the `eSimplifiedAdmin` multiplatform app target in `eSimPulse.xcodeproj` and the navigation shell. Verified by build (macOS + iOS Simulator), not unit tests.
+This task creates the `eSimplifiedAdmin` multiplatform app target in `Esimplified.xcodeproj` and the navigation shell. Verified by build (macOS + iOS Simulator), not unit tests.
 
 **Files:**
-- Modify: `eSimPulse.xcodeproj/project.pbxproj` (add target `eSimplifiedAdmin`, multiplatform: macOS + iOS, linking `EsimplifiedKit`; a shared scheme).
+- Modify: `Esimplified.xcodeproj/project.pbxproj` (add target `eSimplifiedAdmin`, multiplatform: macOS + iOS, linking `EsimplifiedKit`; a shared scheme).
 - Create: `eSimplifiedAdmin/eSimplifiedAdminApp.swift`
 - Create: `eSimplifiedAdmin/AdminShell.swift`
 - Create: `eSimplifiedAdmin/eSimplifiedAdmin.entitlements` (macOS: app-sandbox + network.client)
@@ -1057,14 +1057,14 @@ private struct ProfilePlaceholder: View {
 
 - [ ] **Step 5: Build for macOS**
 
-Run: `cd ~/xcode/eSimPulse && xcodebuild -project eSimPulse.xcodeproj -scheme eSimplifiedAdmin -configuration Debug -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO build`
+Run: `cd ~/xcode/eSimPulse && xcodebuild -project Esimplified.xcodeproj -scheme eSimplifiedAdmin -configuration Debug -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO build`
 Expected: `BUILD SUCCEEDED`.
 
 > `LoginView` and `TwoFactorSetupView` are referenced here but created in Tasks 6–7. To keep this task independently buildable, also create minimal stubs for them in this task (a `LoginView` with the fields and a `TwoFactorSetupView` that shows "TODO"), then flesh them out in Tasks 6–7. Concretely: in Step 4 add stub files `LoginView.swift` and `TwoFactorSetupView.swift` containing the struct signatures used above (`LoginView(model:)`, `TwoFactorSetupView(host:accessToken:)`) returning a `Text("…")`. Tasks 6–7 replace their bodies.
 
 - [ ] **Step 6: Build for iOS Simulator**
 
-Run: `cd ~/xcode/eSimPulse && xcodebuild -project eSimPulse.xcodeproj -scheme eSimplifiedAdmin -configuration Debug -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build`
+Run: `cd ~/xcode/eSimPulse && xcodebuild -project Esimplified.xcodeproj -scheme eSimplifiedAdmin -configuration Debug -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build`
 Expected: `BUILD SUCCEEDED`.
 
 - [ ] **Step 7: Commit**
@@ -1173,7 +1173,7 @@ struct LoginView: View {
 
 - [ ] **Step 2: Build for macOS**
 
-Run: `cd ~/xcode/eSimPulse && xcodebuild -project eSimPulse.xcodeproj -scheme eSimplifiedAdmin -configuration Debug -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO build`
+Run: `cd ~/xcode/eSimPulse && xcodebuild -project Esimplified.xcodeproj -scheme eSimplifiedAdmin -configuration Debug -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO build`
 Expected: `BUILD SUCCEEDED`.
 
 - [ ] **Step 3: Commit**
@@ -1283,7 +1283,7 @@ struct TwoFactorSetupView: View {
 
 - [ ] **Step 2: Build for macOS and iOS Simulator**
 
-Run: `cd ~/xcode/eSimPulse && xcodebuild -project eSimPulse.xcodeproj -scheme eSimplifiedAdmin -configuration Debug -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO build`
+Run: `cd ~/xcode/eSimPulse && xcodebuild -project Esimplified.xcodeproj -scheme eSimplifiedAdmin -configuration Debug -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO build`
 Then: `... -destination 'generic/platform=iOS Simulator' ...`
 Expected: `BUILD SUCCEEDED` for both.
 

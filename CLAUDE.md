@@ -1,11 +1,18 @@
-# eSim Pulse
+# eSimplified
 
-A native macOS app + **desktop widget** that show **today's consolidated eSimplified
-revenue** at a glance, refreshing automatically. Read-only client of the existing
-eSimplified backend — it makes no writes and requires no backend changes.
+This repo holds two native Apple products over one shared engine (`EsimplifiedKit`):
 
-Two surfaces over the same engine (`EsimplifiedKit`): a floating app window, and a
-WidgetKit widget (small + medium) addable to the Desktop / Notification Center.
+1. **eSimplified** — a glanceable view of **today's consolidated eSimplified
+   revenue** (number + delta vs yesterday + 7-day trend), as a multiplatform app
+   (macOS floating window / iOS screen) plus a WidgetKit widget. Read-only.
+2. **eSimplified Admin** — a native (Mac/iPad/iPhone) reimplementation of a curated
+   subset of the web admin front end (in progress).
+
+Both are read-mostly clients of the existing eSimplified backend — no backend changes.
+
+> Folder/scheme note: the historical names live on in a few places — the git repo
+> directory is still `eSimPulse/` and some older docs/plans say "eSim Pulse". The
+> Xcode project is `Esimplified.xcodeproj`; the glance app/target is `Esimplified`.
 
 ## What it does
 
@@ -36,22 +43,25 @@ EsimplifiedKit/   ← local Swift package: ALL testable logic, CLI-testable via 
   DashboardStats (tolerant decimal decoding)
   StatisticsClient / LiveStatisticsClient / StatsError / DateRange
   DashboardViewModel (@Observable state machine)
-eSimPulse/      ← SwiftUI macOS app target (floating window + views), imports EsimplifiedKit
-eSimPulseiOS/   ← SwiftUI iOS app target (settings + today preview), imports EsimplifiedKit
-eSimPulseWidget/← WidgetKit sources (provider + views), shared by the macOS and iOS widget targets
-docs/specs/     ← approved designs (app + widget)
-docs/plans/     ← implementation plan (executed task-by-task, TDD)
+Esimplified/      ← ONE multiplatform SwiftUI app target (macOS + iPadOS + iOS), imports EsimplifiedKit
+EsimplifiedWidget/← ONE multiplatform WidgetKit extension, embedded in the app
+docs/specs/       ← approved designs (app + widget)
+docs/plans/       ← implementation plans (executed task-by-task, TDD)
 ```
 
-Four app/extension targets over one engine: macOS app + macOS widget extension,
-iOS app + iOS widget extension. The two widget extensions compile the **same**
-`eSimPulseWidget/*.swift` sources; they differ only in entitlements
-(`eSimPulseWidget.entitlements` for macOS adds app-sandbox; `Widget-iOS.entitlements`
-is keychain-only). `EsimplifiedKit` supports `.macOS(.v14)` and `.iOS(.v17)`.
+Two targets over one engine: the **Esimplified** app (Supported Destinations =
+Mac + iPhone + iPad; adaptive UI — `MacViews.swift` floating window on macOS,
+`PhoneViews.swift` on iOS, `RevenueViews.swift` shared) and the **EsimplifiedWidget**
+extension (embedded in the app, same sources on every platform). `EsimplifiedKit`
+supports `.macOS(.v14)` and `.iOS(.v17)`.
 
 The split is deliberate: logic lives in the package so it has true unit tests
 runnable from the command line without opening Xcode; the app and widget targets
 are thin UI shells verified by build + manual run.
+
+> A second product, **eSimplified Admin** (the native admin app), is being built
+> in `EsimplifiedAdmin/` over the same `EsimplifiedKit` engine. Design:
+> `docs/specs/2026-06-19-esimplified-admin-native-design.md`.
 
 The **widget** runs its own `TimelineProvider` (~20-min refresh), reads the token
 from a shared Keychain access group, and fetches via the same `LiveStatisticsClient`
@@ -68,8 +78,9 @@ from a shared Keychain access group, and fetches via the same `LiveStatisticsCli
 - The Bearer token + admin host live in the **macOS Keychain**, never in
   `UserDefaults` or plaintext.
 - App and widget share the token via a shared Keychain access group
-  (`$(AppIdentifierPrefix)io.esimplified.esimpulse.shared`, declared in both
+  (`$(AppIdentifierPrefix)io.esimplified.glance.shared`, declared in both
   targets' entitlements). Both targets are sandboxed with `network.client`.
+  App bundle id `io.esimplified.glance`; widget `io.esimplified.glance.widget`.
 - TDD: write the failing test, see it fail, implement, see it pass, commit.
 
 ## Commands
@@ -77,10 +88,10 @@ from a shared Keychain access group, and fetches via the same `LiveStatisticsCli
 ```bash
 cd EsimplifiedKit && swift test          # run the core unit tests
 cd EsimplifiedKit && swift build         # compile the package
-xcodebuild -project eSimPulse.xcodeproj -scheme eSimPulse build   # build app + embedded widget
+xcodebuild -project Esimplified.xcodeproj -scheme Esimplified build   # build app + embedded widget
 ```
 
-> The widget builds as part of the `eSimPulse` scheme (embedded via an "Embed App
+> The widget builds as part of the `Esimplified` scheme (embedded via an "Embed App
 > Extensions" phase). The shared-Keychain capability requires the build machine to
 > be registered in the signing team's developer account.
 
