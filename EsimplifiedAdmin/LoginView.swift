@@ -61,8 +61,20 @@ struct LoginView: View {
             case let .session(session): finish(session)
             case let .needs2FA(token): twoFAToken = token
             }
+        } catch let e as APIError {
+            self.error = Self.message(for: e)
         } catch {
             self.error = "Sign-in failed. Check your details and try again."
+        }
+    }
+
+    private static func message(for error: APIError) -> String {
+        switch error {
+        case .unreachable: "Couldn't reach the server — check the host and your connection."
+        case .authExpired: "Sign-in rejected — check your username and password (and that the app has client credentials)."
+        case .notFound: "Endpoint not found — check the host."
+        case .server(let code): "Server error (\(code)). Try again."
+        case .decoding: "Unexpected response from the server."
         }
     }
 
@@ -77,6 +89,8 @@ struct LoginView: View {
                 try? model.store.saveTrustedDeviceToken(trusted, host: host)
             }
             finish(session)
+        } catch let e as APIError where e == .unreachable {
+            self.error = "Couldn't reach the server — check your connection."
         } catch {
             self.error = "That code didn't work. Try again."
         }
