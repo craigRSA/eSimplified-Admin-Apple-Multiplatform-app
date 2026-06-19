@@ -16,7 +16,7 @@ struct RevenueWidgetView: View {
                 SmallRevenueView(symbol: symbol, today: today, deltaPercent: deltaPercent)
             }
         case .needsAuth:
-            PlaceholderMessage(icon: "key.fill", text: "Open eSim Pulse to sign in")
+            PlaceholderMessage(icon: "key.fill", text: "Open eSimplified to sign in")
         case .unavailable:
             PlaceholderMessage(icon: "wifi.slash", text: "No data")
         }

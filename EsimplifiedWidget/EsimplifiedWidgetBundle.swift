@@ -2,14 +2,14 @@ import WidgetKit
 import SwiftUI
 
 @main
-struct eSimPulseWidgetBundle: WidgetBundle {
+struct EsimplifiedWidgetBundle: WidgetBundle {
     var body: some Widget {
         RevenueWidget()
     }
 }
 
 struct RevenueWidget: Widget {
-    private let kind = "io.esimplified.esimpulse.RevenueWidget"
+    private let kind = "io.esimplified.glance.RevenueWidget"
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: RevenueProvider()) { entry in
