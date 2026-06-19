@@ -67,6 +67,7 @@
 		A3000000000000000000012 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		A3000000000000000000013 /* TwoFactorSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TwoFactorSetupView.swift; sourceTree = "<group>"; };
 		A3000000000000000000014 /* EsimplifiedAdmin.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = EsimplifiedAdmin.entitlements; sourceTree = "<group>"; };
+		A3000000000000000000015 /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -149,6 +150,7 @@
 				A3000000000000000000012 /* LoginView.swift */,
 				A3000000000000000000013 /* TwoFactorSetupView.swift */,
 				A3000000000000000000014 /* EsimplifiedAdmin.entitlements */,
+				A3000000000000000000015 /* Secrets.xcconfig */,
 			);
 			path = EsimplifiedAdmin;
 			sourceTree = "<group>";
@@ -498,6 +500,7 @@
 		};
 		A300000000000000000000B /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A3000000000000000000015 /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS = NO;
 				CODE_SIGN_ENTITLEMENTS = EsimplifiedAdmin/EsimplifiedAdmin.entitlements;
@@ -508,8 +511,8 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "eSimplified Admin";
-				INFOPLIST_KEY_ESPClientID = "";
-				INFOPLIST_KEY_ESPClientSecret = "";
+				INFOPLIST_KEY_ESPClientID = "$(ESP_CLIENT_ID)";
+				INFOPLIST_KEY_ESPClientSecret = "$(ESP_CLIENT_SECRET)";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
 				"INFOPLIST_KEY_NSPrincipalClass[sdk=macosx*]" = NSApplication;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -535,6 +538,7 @@
 		};
 		A300000000000000000000C /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A3000000000000000000015 /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS = NO;
 				CODE_SIGN_ENTITLEMENTS = EsimplifiedAdmin/EsimplifiedAdmin.entitlements;
@@ -545,8 +549,8 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "eSimplified Admin";
-				INFOPLIST_KEY_ESPClientID = "";
-				INFOPLIST_KEY_ESPClientSecret = "";
+				INFOPLIST_KEY_ESPClientID = "$(ESP_CLIENT_ID)";
+				INFOPLIST_KEY_ESPClientSecret = "$(ESP_CLIENT_SECRET)";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
 				"INFOPLIST_KEY_NSPrincipalClass[sdk=macosx*]" = NSApplication;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

@@ -16,3 +16,6 @@ Package.resolved
 
 # Claude Code personal settings
 .claude/settings.local.json
+
+# Local secrets (xcconfig) — never commit real client credentials
+EsimplifiedAdmin/Secrets.xcconfig
