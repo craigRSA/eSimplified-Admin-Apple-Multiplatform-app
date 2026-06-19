@@ -6,6 +6,7 @@ import EsimplifiedKit
 /// posts to /purchase/webhook/ and is a later slice.)
 struct AgentApprovalsScreen: View {
     let session: Session
+    var tenant: String?
 
     @State private var phase: Phase = .loading
 
@@ -29,14 +30,15 @@ struct AgentApprovalsScreen: View {
             }
         }
         .navigationTitle("Agent Approvals")
-        .task { await load() }
+        .task(id: tenant) { await load() }
         .refreshable { await load() }
     }
 
     private func load() async {
         do {
             let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
-            let page = try await client.get("/api/orders/", query: [:], as: OrdersPage.self)
+            let path = tenant.map { "/api/orders/\($0)/" } ?? "/api/orders/"
+            let page = try await client.get(path, query: ["limit": "200"], as: OrdersPage.self)
             let pending = page.orders.filter {
                 $0.paymentMethod == "agent_payment" && $0.paymentStatus.lowercased() == "pending"
             }

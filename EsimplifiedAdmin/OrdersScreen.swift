@@ -3,6 +3,7 @@ import EsimplifiedKit
 
 struct OrdersScreen: View {
     let session: Session
+    var tenant: String?
 
     @State private var phase: Phase = .loading
     @State private var search = ""
@@ -28,7 +29,7 @@ struct OrdersScreen: View {
         }
         .navigationTitle("Order History")
         .searchable(text: $search, prompt: "Order #, customer, package")
-        .task { await load() }
+        .task(id: tenant) { await load() }
         .refreshable { await load() }
     }
 
@@ -46,7 +47,8 @@ struct OrdersScreen: View {
     private func load() async {
         do {
             let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
-            let page = try await client.get("/api/orders/", query: [:], as: OrdersPage.self)
+            let path = tenant.map { "/api/orders/\($0)/" } ?? "/api/orders/"
+            let page = try await client.get(path, query: ["limit": "100"], as: OrdersPage.self)
             phase = .loaded(page.orders)
         } catch let error as APIError {
             phase = .failed(adminErrorMessage(error))

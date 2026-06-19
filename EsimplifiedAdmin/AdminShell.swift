@@ -7,7 +7,7 @@ enum AdminSection: String, CaseIterable, Identifiable, Hashable {
 
     var title: String {
         switch self {
-        case .dashboard: "Dashboard"
+        case .dashboard: "Overview"
         case .orders: "Order History"
         case .customers: "Customers"
         case .search: "Search"
@@ -56,20 +56,32 @@ struct AdminShell: View {
                 Label(section.title, systemImage: section.systemImage).tag(section)
             }
             .navigationTitle("eSimplified")
+            .toolbar {
+                if !model.tenants.isEmpty {
+                    Picker("Tenant", selection: $model.selectedTenant) {
+                        Text("All Tenants").tag(Tenant?.none)
+                        ForEach(model.tenants) { tenant in
+                            Text(tenant.name).tag(Tenant?.some(tenant))
+                        }
+                    }
+                    .pickerStyle(.menu)
+                }
+            }
         } detail: {
+            let scope = model.tenantScope
             switch selection {
             case .dashboard:
-                if let session = model.session { DashboardScreen(session: session) }
+                if let session = model.session { DashboardScreen(session: session, tenant: scope) }
             case .orders:
-                if let session = model.session { OrdersScreen(session: session) }
+                if let session = model.session { OrdersScreen(session: session, tenant: scope) }
             case .customers:
-                if let session = model.session { CustomersScreen(session: session) }
+                if let session = model.session { CustomersScreen(session: session, tenant: scope) }
             case .inventory:
                 if let session = model.session { InventoryScreen(session: session) }
             case .search:
-                if let session = model.session { SearchScreen(session: session) }
+                if let session = model.session { SearchScreen(session: session, tenant: scope) }
             case .agentApprovals:
-                if let session = model.session { AgentApprovalsScreen(session: session) }
+                if let session = model.session { AgentApprovalsScreen(session: session, tenant: scope) }
             case .profile:
                 if let session = model.session { ProfileScreen(session: session, onLogout: { model.logout() }) }
             case .some(let section):
@@ -78,6 +90,7 @@ struct AdminShell: View {
                 PlaceholderDetail(title: "Select a section")
             }
         }
+        .task { await model.loadTenants() }
         .onAppear { if selection == nil { selection = model.sections.first } }
     }
 }

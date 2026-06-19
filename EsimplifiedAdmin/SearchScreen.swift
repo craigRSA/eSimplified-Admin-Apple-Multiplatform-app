@@ -4,6 +4,7 @@ import EsimplifiedKit
 /// Global search across loaded customers and orders.
 struct SearchScreen: View {
     let session: Session
+    var tenant: String?
 
     @State private var phase: Phase = .loading
     @State private var query = ""
@@ -24,7 +25,7 @@ struct SearchScreen: View {
         }
         .navigationTitle("Search")
         .searchable(text: $query, prompt: "Customers and orders")
-        .task { await load() }
+        .task(id: tenant) { await load() }
         .refreshable { await load() }
     }
 
@@ -76,8 +77,10 @@ struct SearchScreen: View {
     private func load() async {
         do {
             let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
-            async let customers = client.get("/api/customers/", query: [:], as: CustomersPage.self)
-            async let orders = client.get("/api/orders/", query: [:], as: OrdersPage.self)
+            let customersPath = tenant.map { "/api/customers/\($0)/" } ?? "/api/customers/"
+            let ordersPath = tenant.map { "/api/orders/\($0)/" } ?? "/api/orders/"
+            async let customers = client.get(customersPath, query: ["limit": "200"], as: CustomersPage.self)
+            async let orders = client.get(ordersPath, query: ["limit": "200"], as: OrdersPage.self)
             phase = .loaded(customers: try await customers.customers, orders: try await orders.orders)
         } catch let error as APIError {
             phase = .failed(adminErrorMessage(error))

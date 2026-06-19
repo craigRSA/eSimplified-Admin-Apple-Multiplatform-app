@@ -136,4 +136,28 @@ public struct AdminDashboardStats: Decodable, Sendable {
         guard previous != 0 else { return nil }
         return (current - previous) / previous * 100
     }
+
+    /// The single highest-revenue day in the period (best day).
+    public var bestDay: DayRevenue? {
+        let series = current.revenuePerDate.isEmpty ? revenuePerDate : current.revenuePerDate
+        return series.max { $0.revenue < $1.revenue }
+    }
+
+    /// Year (e.g. "2026") of the most recent month present in `revenuePerMonth`.
+    private var latestYear: String? {
+        revenuePerMonth.last?.month.split(separator: "-").first.map(String.init)
+    }
+
+    /// Sum of the current calendar year's monthly revenue (derived from revenue_per_month).
+    public var revenueThisYear: Decimal {
+        guard let year = latestYear else { return 0 }
+        return revenuePerMonth.filter { $0.month.hasPrefix(year) }.reduce(0) { $0 + $1.amount }
+    }
+
+    /// Sum of the previous calendar year's monthly revenue.
+    public var revenueLastYear: Decimal {
+        guard let year = latestYear, let n = Int(year) else { return 0 }
+        let prev = String(n - 1)
+        return revenuePerMonth.filter { $0.month.hasPrefix(prev) }.reduce(0) { $0 + $1.amount }
+    }
 }

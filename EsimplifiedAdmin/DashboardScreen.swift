@@ -4,6 +4,7 @@ import EsimplifiedKit
 
 struct DashboardScreen: View {
     let session: Session
+    var tenant: String?
 
     @State private var phase: Phase = .loading
 
@@ -22,7 +23,7 @@ struct DashboardScreen: View {
             }
         }
         .navigationTitle("Overview")
-        .task { await load() }
+        .task(id: tenant) { await load() }
         .refreshable { await load() }
     }
 
@@ -33,12 +34,17 @@ struct DashboardScreen: View {
                 .init("Tenants", s.tenants.formatted(), "building.2", .purple),
                 .init("Customers", Fmt.countCompact(s.customers), "person.2", .orange),
                 .init("Successful orders", Fmt.countCompact(s.successOrders), "checkmark.seal", .green),
-                .init("Revenue", Fmt.moneyCompact(s.revenue), "dollarsign.circle", .green),
-                .init("This month", Fmt.moneyCompact(s.revenueCurrentMonth), "calendar", .blue),
+                .init("Revenue (all time)", Fmt.moneyCompact(s.revenue), "dollarsign.circle", .green),
                 .init("Today", Fmt.moneyCompact(s.revenueToday), "sun.max", .yellow),
-                .init("Avg order value", Fmt.moneyFull(s.averageOrderValue), "cart", .pink),
-                .init("Last month", Fmt.moneyCompact(s.revenueLastMonth), "calendar.badge.clock", .indigo),
                 .init("Yesterday", Fmt.moneyFull(s.revenueYesterday), "clock.arrow.circlepath", .teal),
+                .init("Avg order value", Fmt.moneyFull(s.averageOrderValue), "cart", .pink),
+                .init("Best day", Fmt.moneyCompact(s.bestDay?.revenue ?? 0), "trophy", .yellow),
+                .comparison("This month", Fmt.moneyCompact(s.revenueCurrentMonth),
+                            AdminDashboardStats.change(s.revenueCurrentMonth, vs: s.revenueLastMonth),
+                            "vs last: \(Fmt.moneyCompact(s.revenueLastMonth))"),
+                .comparison("This year", Fmt.moneyCompact(s.revenueThisYear),
+                            AdminDashboardStats.change(s.revenueThisYear, vs: s.revenueLastYear),
+                            "vs last yr: \(Fmt.moneyCompact(s.revenueLastYear))"),
             ])
 
             // Month to date vs previous
@@ -87,7 +93,8 @@ struct DashboardScreen: View {
     private func load() async {
         do {
             let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
-            let stats = try await client.get("/api/statistics/", query: [:], as: AdminDashboardStats.self)
+            let path = tenant.map { "/api/statistics/\($0)/" } ?? "/api/statistics/"
+            let stats = try await client.get(path, query: [:], as: AdminDashboardStats.self)
             phase = .loaded(stats)
         } catch let error as APIError {
             phase = .failed(adminErrorMessage(error))

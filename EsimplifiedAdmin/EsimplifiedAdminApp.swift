@@ -21,6 +21,10 @@ final class AdminAppModel {
     let store: SessionStore
     private(set) var session: Session?
 
+    /// Tenant scope shared by all screens. `nil` = all tenants.
+    var selectedTenant: Tenant?
+    private(set) var tenants: [Tenant] = []
+
     // Client credentials injected from the build (Info.plist keys), never hardcoded.
     let clientID: String
     let clientSecret: String
@@ -44,6 +48,20 @@ final class AdminAppModel {
     func logout() {
         try? store.clear()
         session = nil
+        tenants = []
+        selectedTenant = nil
+    }
+
+    /// The schema name to scope queries by, or nil for all tenants.
+    var tenantScope: String? { selectedTenant?.schemaName }
+
+    func loadTenants() async {
+        guard let session, tenants.isEmpty else { return }
+        let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
+        if let page = try? await client.get("/api/tenants/", query: ["limit": "1000", "order_by": "name"],
+                                            as: TenantsPage.self) {
+            tenants = page.tenants
+        }
     }
 
     /// Sections allowed by the current token's scopes (Profile always shown).
