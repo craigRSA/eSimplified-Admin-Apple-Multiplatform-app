@@ -32,6 +32,7 @@ struct AgentApprovalsScreen: View {
         .navigationTitle("Agent Approvals")
         .task(id: tenant) { await load() }
         .refreshable { await load() }
+        .autoRefresh { await load() }
     }
 
     private func load() async {

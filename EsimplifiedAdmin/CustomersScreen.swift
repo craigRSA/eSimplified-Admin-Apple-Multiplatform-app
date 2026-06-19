@@ -31,6 +31,7 @@ struct CustomersScreen: View {
         .searchable(text: $search, prompt: "Name, email, phone")
         .task(id: tenant) { await load() }
         .refreshable { await load() }
+        .autoRefresh { await load() }
     }
 
     private func filtered(_ customers: [Customer]) -> [Customer] {

@@ -23,6 +23,7 @@ struct InventoryScreen: View {
         .navigationTitle("Inventory")
         .task { await load() }
         .refreshable { await load() }
+        .autoRefresh { await load() }
     }
 
     @ViewBuilder private func content(_ inv: Inventory) -> some View {
