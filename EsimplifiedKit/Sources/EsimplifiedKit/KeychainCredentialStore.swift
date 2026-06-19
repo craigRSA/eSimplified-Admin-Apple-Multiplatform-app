@@ -2,10 +2,15 @@ import Foundation
 import Security
 
 public final class KeychainCredentialStore: CredentialStore {
-    private let service = "io.esimplified.esimpulse"
+    private let service = "io.esimplified.glance"
     private let account = "bearer"
 
     public init() {}
+
+    // App↔widget token sharing relies on the shared keychain access group declared
+    // in both targets' entitlements (io.esimplified.glance.shared, listed as the sole
+    // group). With a single group in the entitlement, keychain services adds items to
+    // it and searches it without an explicit kSecAttrAccessGroup — so none is set here.
 
     public func save(_ credentials: Credentials) throws {
         try clear()
