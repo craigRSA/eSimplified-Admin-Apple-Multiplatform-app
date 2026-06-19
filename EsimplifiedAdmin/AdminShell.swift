@@ -72,7 +72,7 @@ struct AdminShell: View {
                             Image(systemName: "chevron.up.chevron.down").font(.caption2).foregroundStyle(.secondary)
                         }
                         .padding(.horizontal, 10).padding(.vertical, 7)
-                        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+                        .glassEffect(.regular.interactive(), in: .capsule)
                     }
                     .menuStyle(.borderlessButton)
                     .padding(.horizontal, 10).padding(.top, 8)

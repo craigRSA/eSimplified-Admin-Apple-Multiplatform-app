@@ -34,26 +34,26 @@ struct DashboardScreen: View {
                 .init("Tenants", s.tenants.formatted(), "building.2", .purple),
                 .init("Customers", Fmt.countCompact(s.customers), "person.2", .orange),
                 .init("Successful orders", Fmt.countCompact(s.successOrders), "checkmark.seal", .green),
-                .init("Revenue (all time)", Fmt.moneyCompact(s.revenue), "dollarsign.circle", .green),
-                .init("Today", Fmt.moneyCompact(s.revenueToday), "sun.max", .yellow),
-                .init("Yesterday", Fmt.moneyFull(s.revenueYesterday), "clock.arrow.circlepath", .teal),
-                .init("Avg order value", Fmt.moneyFull(s.averageOrderValue), "cart", .pink),
-                .init("Best day", Fmt.moneyCompact(s.bestDay?.revenue ?? 0), "trophy", .yellow),
-                .comparison("This month", Fmt.moneyCompact(s.revenueCurrentMonth),
+                .init("Revenue (all time)", Fmt.money(s.revenue), "dollarsign.circle", .green),
+                .init("Today", Fmt.money(s.revenueToday), "sun.max", .yellow),
+                .init("Yesterday", Fmt.money(s.revenueYesterday), "clock.arrow.circlepath", .teal),
+                .init("Avg order value", Fmt.money(s.averageOrderValue), "cart", .pink),
+                .init("Best day", Fmt.money(s.bestDay?.revenue ?? 0), "trophy", .yellow),
+                .comparison("This month", Fmt.money(s.revenueCurrentMonth),
                             AdminDashboardStats.change(s.revenueCurrentMonth, vs: s.revenueLastMonth),
-                            "vs last: \(Fmt.moneyCompact(s.revenueLastMonth))"),
-                .comparison("This year", Fmt.moneyCompact(s.revenueThisYear),
+                            "vs last: \(Fmt.money(s.revenueLastMonth))"),
+                .comparison("This year", Fmt.money(s.revenueThisYear),
                             AdminDashboardStats.change(s.revenueThisYear, vs: s.revenueLastYear),
-                            "vs last yr: \(Fmt.moneyCompact(s.revenueLastYear))"),
+                            "vs last yr: \(Fmt.money(s.revenueLastYear))"),
             ])
 
             // Month to date vs previous
             Card(title: "Month to date vs previous") {
                 let cur = s.current, prev = s.comparison
                 MetricGrid(items: [
-                    .comparison("Revenue", Fmt.moneyFull(cur.revenue), AdminDashboardStats.change(cur.revenue, vs: prev.revenue), "Prev: \(Fmt.moneyCompact(prev.revenue))"),
+                    .comparison("Revenue", Fmt.money(cur.revenue), AdminDashboardStats.change(cur.revenue, vs: prev.revenue), "Prev: \(Fmt.money(prev.revenue))"),
                     .comparison("Customers", Fmt.countCompact(cur.customers), AdminDashboardStats.change(Decimal(cur.customers), vs: Decimal(prev.customers)), "Prev: \(Fmt.countCompact(prev.customers))"),
-                    .comparison("Avg order value", Fmt.moneyFull(cur.averageOrderValue), AdminDashboardStats.change(cur.averageOrderValue, vs: prev.averageOrderValue), "Prev: \(Fmt.moneyFull(prev.averageOrderValue))"),
+                    .comparison("Avg order value", Fmt.money(cur.averageOrderValue), AdminDashboardStats.change(cur.averageOrderValue, vs: prev.averageOrderValue), "Prev: \(Fmt.money(prev.averageOrderValue))"),
                     .comparison("Orders", Fmt.countCompact(cur.orders), AdminDashboardStats.change(Decimal(cur.orders), vs: Decimal(prev.orders)), "Prev: \(Fmt.countCompact(prev.orders))"),
                 ])
                 if !s.current.revenuePerDate.isEmpty {
@@ -116,7 +116,7 @@ private struct Card<Content: View>: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(18)
-        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 16))
+        .glassEffect(.regular, in: .rect(cornerRadius: 18))
     }
 }
 
@@ -158,7 +158,7 @@ private struct MetricGrid: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(14)
-                .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 12))
+                .glassEffect(.regular, in: .rect(cornerRadius: 14))
             }
         }
     }
@@ -229,11 +229,14 @@ private struct TopList: View {
 private func dbl(_ d: Decimal) -> Double { (d as NSDecimalNumber).doubleValue }
 
 enum Fmt {
-    static func moneyCompact(_ d: Decimal) -> String {
-        "$" + dbl(d).formatted(.number.notation(.compactName).precision(.fractionLength(1)))
-    }
-    static func moneyFull(_ d: Decimal) -> String {
-        "$" + d.formatted(.number.precision(.fractionLength(2)).grouping(.automatic))
+    /// One consistent rule: abbreviate at/above $1,000 ($2.3K, $129K, $2.0M);
+    /// show exact dollars and cents below ($12.90).
+    static func money(_ d: Decimal) -> String {
+        let v = dbl(d)
+        if abs(v) >= 1000 {
+            return "$" + v.formatted(.number.notation(.compactName).precision(.fractionLength(1)))
+        }
+        return "$" + d.formatted(.number.precision(.fractionLength(2)).grouping(.automatic))
     }
     static func countCompact(_ n: Int) -> String {
         n >= 1000 ? Double(n).formatted(.number.notation(.compactName).precision(.fractionLength(1))) : n.formatted()
