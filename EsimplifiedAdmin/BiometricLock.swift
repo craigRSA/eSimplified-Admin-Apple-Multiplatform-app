@@ -88,8 +88,11 @@ final class AppLockController {
 
     func authenticate() async {
         guard isLocked, !authenticating else { return }
-        // If the device can't evaluate at all, don't trap the user out.
-        guard authenticator.canEvaluate() else { isLocked = false; return }
+        // Fail CLOSED: if the device can't evaluate (e.g. the passcode was removed),
+        // stay locked rather than expose revenue/PII on a finance admin app. The
+        // "Use password instead" button (→ sign out) is the recoverable path, so the
+        // user is never permanently trapped.
+        guard authenticator.canEvaluate() else { return }
         authenticating = true; defer { authenticating = false }
         if await authenticator.evaluate(reason: "Unlock eSimplified Admin") {
             isLocked = false

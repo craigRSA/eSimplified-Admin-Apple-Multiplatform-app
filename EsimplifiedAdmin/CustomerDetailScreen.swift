@@ -63,7 +63,7 @@ struct CustomerDetailScreen: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .background(AppBackground())
-        .reload(on: ref.customerId) { await load() }
+        .reload(on: "\(ref.customerId)|\(ref.iccid ?? "")") { await load() }
         .refreshable { await load() }
         .refreshCommand { Task { await load() } }
         .sheet(item: $sheet) { sheetContent($0) }
@@ -232,6 +232,22 @@ struct CustomerDetailScreen: View {
 
     private func load() async {
         do {
+            // ICCID-only deep link (no linked customer id): load the eSIM directly
+            // rather than GET /api/customers/{tenant}// — that double slash gets a
+            // Django 301 that drops the bearer, surfacing as a misleading
+            // "session expired" instead of the eSIM the user searched for.
+            if ref.customerId.isEmpty {
+                guard let iccid = ref.iccid, !iccid.isEmpty else {
+                    phase = .failed("Couldn't open — no customer or eSIM reference.")
+                    return
+                }
+                customer = nil
+                esims = []
+                phase = .loaded
+                selectedIccid = iccid
+                await loadDetail(iccid)
+                return
+            }
             let q = ["customer__customer_id": ref.customerId, "limit": "10"]
             let cust = try await client.get("/api/customers/\(ref.tenant)/\(ref.customerId)/", query: [:],
                                             as: SingleCustomerResponse.self)

@@ -47,7 +47,7 @@ struct CustomersScreen: View {
                             List(customers) { customer in
                                 // The screen is tenant-gated here, so `tenant` is non-nil.
                                 NavigationLink(value: CustomerRef(tenant: tenant ?? "",
-                                                                  customerId: customer.customerId ?? customer.id)) {
+                                                                  customerId: customer.customerId ?? "")) {
                                     CustomerRow(customer: customer)
                                 }
                             }

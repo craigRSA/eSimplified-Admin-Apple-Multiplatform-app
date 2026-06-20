@@ -72,7 +72,7 @@ struct SearchScreen: View {
             ProgressView().controlSize(.large).frame(maxWidth: .infinity, maxHeight: .infinity)
         case let .customers(list):
             List(list) { c in
-                NavigationLink(value: CustomerRef(tenant: tenant ?? "", customerId: c.customerId ?? c.id)) {
+                NavigationLink(value: CustomerRef(tenant: tenant ?? "", customerId: c.customerId ?? "")) {
                     customerRow(c)
                 }
             }
