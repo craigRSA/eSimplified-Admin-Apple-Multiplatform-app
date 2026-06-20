@@ -49,6 +49,7 @@ enum AdminSection: String, CaseIterable, Identifiable, Hashable {
 struct AdminShell: View {
     @Bindable var model: AdminAppModel
     @AppStorage("autoRefreshSeconds") private var autoRefreshSeconds = 0
+    @State private var refreshState = AutoRefreshState()
 
     var body: some View {
         NavigationSplitView {
@@ -64,13 +65,14 @@ struct AdminShell: View {
                 .toolbar {
                     ToolbarItemGroup(placement: .primaryAction) {
                         if !model.tenants.isEmpty { TenantMenu(model: model) }
-                        RefreshIntervalMenu(seconds: $autoRefreshSeconds)
+                        RefreshIntervalMenu(seconds: $autoRefreshSeconds, state: refreshState)
                     }
                 }
         }
         #if os(macOS)
         .safeAreaInset(edge: .bottom) { StatusBar() }
         #endif
+        .environment(\.autoRefreshState, refreshState)
         .task { await model.loadTenants() }
         .onAppear { if model.selection == nil { model.selection = model.sections.first } }
     }

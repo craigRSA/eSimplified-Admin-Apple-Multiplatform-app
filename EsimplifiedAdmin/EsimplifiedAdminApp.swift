@@ -236,15 +236,11 @@ struct AdminCommands: Commands {
 /// place for the destructive Log Out action.
 struct SettingsView: View {
     @Bindable var model: AdminAppModel
-    @AppStorage("autoRefreshSeconds") private var autoRefreshSeconds = 0
     @State private var confirmLogout = false
 
     var body: some View {
         Form {
             Section("Data") {
-                Picker("Auto-refresh", selection: $autoRefreshSeconds) {
-                    ForEach(RefreshInterval.options, id: \.self) { Text(RefreshInterval.label($0)).tag($0) }
-                }
                 LabeledContent("Host", value: model.host)
             }
             Section("Account") {
