@@ -131,6 +131,8 @@ struct DashboardScreen: View {
             phase = .loaded(stats)
         } catch let error as APIError {
             phase = .failed(adminErrorMessage(error))
+        } catch is CancellationError {
+            // View navigated away mid-load — not a real error.
         } catch {
             phase = .failed("Unexpected error.")
         }

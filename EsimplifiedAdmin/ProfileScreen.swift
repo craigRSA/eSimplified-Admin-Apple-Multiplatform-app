@@ -78,6 +78,8 @@ struct ProfileScreen: View {
         do {
             let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
             me = try await client.get("/api/me/", query: [:], as: MeUser.self)
+        } catch is CancellationError {
+            // View navigated away mid-load — not a real error.
         } catch let e as APIError {
             error = adminErrorMessage(e)
         } catch {

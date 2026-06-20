@@ -84,6 +84,8 @@ struct SearchScreen: View {
             phase = .loaded(customers: try await customers.customers, orders: try await orders.orders)
         } catch let error as APIError {
             phase = .failed(adminErrorMessage(error))
+        } catch is CancellationError {
+            // View navigated away mid-load — not a real error.
         } catch {
             phase = .failed("Unexpected error.")
         }

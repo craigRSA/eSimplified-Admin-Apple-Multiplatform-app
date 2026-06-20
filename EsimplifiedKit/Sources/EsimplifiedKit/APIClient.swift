@@ -34,6 +34,12 @@ public final class LiveAPIClient: APIClient {
         let response: URLResponse
         do {
             (data, response) = try await session.data(for: request)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let urlError as URLError where urlError.code == .cancelled {
+            // The caller's Task was cancelled (e.g. the view went away on
+            // navigation) — that's not a connectivity failure.
+            throw CancellationError()
         } catch {
             throw APIError.unreachable
         }
