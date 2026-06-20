@@ -17,12 +17,40 @@ struct AppBackground: View {
         )
         .overlay(alignment: .top) {
             // A faint accent bloom anchored to the top, where the eye lands first.
+            // Kept low so it reads as a brand tint behind content, not a blue glow on
+            // sparse screens (e.g. the "Pick a tenant" states).
             RadialGradient(
-                colors: [Color.accentColor.opacity(0.16), .clear],
-                center: .top, startRadius: 0, endRadius: 520
+                colors: [Color.accentColor.opacity(0.08), .clear],
+                center: .top, startRadius: 0, endRadius: 460
             )
         }
         .ignoresSafeArea()
+    }
+}
+
+/// A calm, centered empty state — quiet glyph, title, optional message — drawn
+/// straight on the backdrop with no card or tint. Use it where the framing of a
+/// `ContentUnavailableView` would read as a stray coloured box on a near-empty
+/// screen (the tenant/search prompts).
+struct QuietEmptyState: View {
+    let title: String
+    let systemImage: String
+    var message: String?
+    var body: some View {
+        VStack(spacing: Spacing.md) {
+            Image(systemName: systemImage)
+                .font(.system(size: 34, weight: .regular)).foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
+            Text(title).font(.headline)
+            if let message {
+                Text(message).font(.subheadline).foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(Spacing.xl)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(message.map { "\(title). \($0)" } ?? title)
     }
 }
 

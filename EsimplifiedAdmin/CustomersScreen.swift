@@ -18,8 +18,8 @@ struct CustomersScreen: View {
                 if tenant == nil {
                     // The customers list is tenant-scoped (the web doesn't fetch
                     // without one). Prompt instead of hitting the unscoped endpoint.
-                    ContentUnavailableView("Pick a tenant", systemImage: "building.2",
-                                           description: Text("Choose a tenant in the toolbar to view its customers."))
+                    QuietEmptyState(title: "Pick a tenant", systemImage: "building.2",
+                                    message: "Choose a tenant in the toolbar to view its customers.")
                 } else {
                     switch phase {
                     case .loading:

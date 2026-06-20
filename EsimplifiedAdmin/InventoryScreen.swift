@@ -70,18 +70,35 @@ struct InventoryScreen: View {
             }
             .listRowSeparator(.hidden)
             if !inv.imsis.isEmpty {
-                Section("By IMSI") {
+                Section {
+                    // Column key so the three figures aren't a cryptic "X / Y / Z".
+                    HStack(spacing: Spacing.sm) {
+                        Text("IMSI").frame(maxWidth: .infinity, alignment: .leading)
+                        Text("Assigned").frame(maxWidth: .infinity, alignment: .trailing)
+                        Text("Unassigned").frame(maxWidth: .infinity, alignment: .trailing)
+                        Text("Pending").frame(maxWidth: .infinity, alignment: .trailing)
+                    }
+                    .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+                    .listRowSeparator(.hidden)
+                    .accessibilityHidden(true)
+
                     ForEach(inv.imsis) { entry in
-                        HStack {
-                            Text(entry.imsi).font(.body.monospaced())
-                            Spacer()
-                            Text("\(entry.assignedCount) / \(entry.unassignedCount) / \(entry.pendingCount)")
-                                .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                        HStack(spacing: Spacing.sm) {
+                            Text(entry.imsi).font(.callout.monospaced())
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            Text(entry.assignedCount.formatted())
+                                .frame(maxWidth: .infinity, alignment: .trailing)
+                            Text(entry.unassignedCount.formatted())
+                                .frame(maxWidth: .infinity, alignment: .trailing)
+                            Text(entry.pendingCount.formatted())
+                                .frame(maxWidth: .infinity, alignment: .trailing)
+                                .foregroundStyle(entry.pendingCount > 0 ? Color.warning : Color.secondary)
                         }
+                        .font(.callout.monospacedDigit()).foregroundStyle(.secondary)
                         .accessibilityElement(children: .combine)
                         .accessibilityLabel("IMSI \(entry.imsi): \(entry.assignedCount) assigned, \(entry.unassignedCount) unassigned, \(entry.pendingCount) pending")
                     }
-                }
+                } header: { Text("By IMSI") }
             }
         }
         .scrollContentBackground(.hidden)

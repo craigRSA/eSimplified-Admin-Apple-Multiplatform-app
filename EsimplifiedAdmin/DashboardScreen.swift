@@ -84,20 +84,20 @@ struct DashboardScreen: View {
 
             // Headline metrics
             MetricGrid(items: [
-                .init("Tenants", s.tenants.formatted(), "building.2"),
-                .init("Customers", Fmt.countCompact(s.customers), "person.2"),
-                .init("Successful orders", Fmt.countCompact(s.successOrders), "checkmark.seal"),
-                .init("Revenue (all time)", Fmt.money(s.revenue), "dollarsign.circle"),
-                .init("Avg order value", Fmt.money(s.averageOrderValue), "cart"),
-                .init("Best day", Fmt.money(s.bestDay?.revenue ?? 0), "trophy"),
-                .init("Yesterday", Fmt.money(s.revenueYesterday), "calendar"),
+                .init("Tenants", s.tenants.formatted()),
+                .init("Customers", Fmt.countCompact(s.customers)),
+                .init("Successful orders", Fmt.countCompact(s.successOrders)),
+                .init("Revenue (all time)", Fmt.money(s.revenue)),
+                .init("Avg order value", Fmt.money(s.averageOrderValue)),
+                .init("Best day", Fmt.money(s.bestDay?.revenue ?? 0)),
+                .init("Yesterday", Fmt.money(s.revenueYesterday)),
                 .comparison("This month", Fmt.money(s.revenueCurrentMonth),
                             AdminDashboardStats.change(s.revenueCurrentMonth, vs: s.revenueLastMonth),
                             "vs last: \(Fmt.money(s.revenueLastMonth))"),
                 .comparison("This year", Fmt.money(s.revenueThisYear),
                             AdminDashboardStats.change(s.revenueThisYear, vs: s.revenueLastYear),
                             "vs last yr: \(Fmt.money(s.revenueLastYear))"),
-            ])
+            ], columns: 3)
 
             // Selected range vs previous comparable period — the date picker
             // lives on this card because it's what the range controls.
@@ -131,8 +131,7 @@ struct DashboardScreen: View {
 
             if !s.revenuePerMonth.isEmpty {
                 Card(title: "Revenue per month") {
-                    RevenueBarChart(items: s.revenuePerMonth.map { (shortMonth($0.month), $0.amount) },
-                                    desiredLabels: 6)
+                    RevenueBarChart(items: s.revenuePerMonth.map { (shortMonth($0.month), $0.amount) })
                         .frame(height: 220)
                 }
             }
@@ -189,11 +188,10 @@ private struct LoadingSkeleton: View {
             }
             .glassCard(radius: Radius.card, padding: Spacing.xl)
 
-            // Metric grid
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 165), spacing: Spacing.md)], spacing: Spacing.md) {
-                ForEach(0..<6, id: \.self) { _ in
+            // Metric grid — mirrors the 3-wide, icon-free stat grid.
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.md), count: 3), spacing: Spacing.md) {
+                ForEach(0..<9, id: \.self) { _ in
                     VStack(alignment: .leading, spacing: Spacing.sm) {
-                        SkeletonBar(width: 26, height: 22)
                         SkeletonBar(width: 90, height: 20)
                         SkeletonBar(width: 64, height: 12)
                     }
@@ -437,33 +435,37 @@ private struct MetricItem: Identifiable {
     let id = UUID()
     let title: String
     let value: String
-    let icon: String?
     let delta: Decimal?
     let sub: String?
 
-    init(_ title: String, _ value: String, _ icon: String) {
-        self.title = title; self.value = value; self.icon = icon; self.delta = nil; self.sub = nil
+    init(_ title: String, _ value: String) {
+        self.title = title; self.value = value; self.delta = nil; self.sub = nil
     }
     static func comparison(_ title: String, _ value: String, _ delta: Decimal?, _ sub: String) -> MetricItem {
         MetricItem(title: title, value: value, delta: delta, sub: sub)
     }
     private init(title: String, value: String, delta: Decimal?, sub: String) {
-        self.title = title; self.value = value; self.icon = nil; self.delta = delta; self.sub = sub
+        self.title = title; self.value = value; self.delta = delta; self.sub = sub
     }
 }
 
 private struct MetricGrid: View {
     let items: [MetricItem]
+    /// Fixed column count for a balanced grid (e.g. 3 → the 9 top stats fill 3×3 with
+    /// no orphan); nil keeps the responsive adaptive layout.
+    var columns: Int?
+
+    private var gridColumns: [GridItem] {
+        if let columns {
+            return Array(repeating: GridItem(.flexible(), spacing: Spacing.md), count: columns)
+        }
+        return [GridItem(.adaptive(minimum: 165), spacing: Spacing.md)]
+    }
+
     var body: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 165), spacing: Spacing.md)], spacing: Spacing.md) {
+        LazyVGrid(columns: gridColumns, spacing: Spacing.md) {
             ForEach(items) { item in
                 VStack(alignment: .leading, spacing: Spacing.sm) {
-                    // Icons read quietly in .secondary so the figures lead and the
-                    // one accent (the hero) stays special.
-                    if let icon = item.icon {
-                        Image(systemName: icon).foregroundStyle(.secondary).font(.title3)
-                            .accessibilityHidden(true)
-                    }
                     Text(item.value).font(.title3.weight(.semibold).monospacedDigit()).lineLimit(1).minimumScaleFactor(0.55)
                     Text(item.title).font(.caption).foregroundStyle(.secondary)
                     if let delta = item.delta {
@@ -471,7 +473,9 @@ private struct MetricGrid: View {
                     }
                     if let sub = item.sub { Text(sub).font(.caption2).foregroundStyle(.secondary) }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                // maxHeight makes cards in a row share a height, so the grid reads as
+                // even tiles instead of ragged ones.
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .padding(Spacing.md)
                 .glassEffect(.regular, in: .rect(cornerRadius: Radius.chip))
             }
@@ -546,32 +550,39 @@ private struct ComparisonAreaChart: View {
 
 private struct RevenueBarChart: View {
     let items: [(String, Decimal)]
-    /// Cap on x-axis labels — keeps month names from colliding on a phone.
-    var desiredLabels = 8
-    @State private var selected: Int?
+    @State private var selected: String?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
         Chart {
-            ForEach(Array(items.enumerated()), id: \.offset) { i, item in
-                BarMark(x: .value("Index", i), y: .value("Revenue", dbl(item.1)))
-                    .foregroundStyle(Color.accentColor.opacity(selected == nil || selected == i ? 1 : 0.4))
+            ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                // A categorical x gives each bar a full, centered slot (the old index
+                // axis drew thin slivers and clipped the first bar at the edge).
+                BarMark(x: .value("Name", item.0), y: .value("Revenue", dbl(item.1)))
+                    .foregroundStyle(Color.accentColor.opacity(selected == nil || selected == item.0 ? 1 : 0.4))
+                    .annotation(position: .top, spacing: 2) {
+                        // Value on top so short bars stay legible; skipped once there
+                        // are enough bars (the monthly chart) that labels would collide.
+                        if items.count <= 8 {
+                            Text(Fmt.money(item.1)).font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                        }
+                    }
             }
-            if let selected, items.indices.contains(selected) {
-                RuleMark(x: .value("Index", selected))
+            if let selected, let value = items.first(where: { $0.0 == selected })?.1 {
+                RuleMark(x: .value("Name", selected))
                     .foregroundStyle(.clear)
                     .accessibilityHidden(true)
                     .annotation(position: .top, spacing: 0,
                                 overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
-                        ChartTooltip(title: items[selected].0, rows: [("", Fmt.money(items[selected].1), .accentColor)])
+                        ChartTooltip(title: selected, rows: [("", Fmt.money(value), .accentColor)])
                     }
             }
         }
         .chartXSelection(value: $selected)
         .animation(reduceMotion ? nil : .snappy, value: selected)
         .chartXAxis {
-            AxisMarks(values: tickIndices(count: items.count, desired: desiredLabels)) { value in
-                if let i = value.as(Int.self), items.indices.contains(i) {
-                    AxisValueLabel(orientation: .verticalReversed) { Text(items[i].0) }
+            AxisMarks { value in
+                AxisValueLabel(orientation: .verticalReversed) {
+                    if let name = value.as(String.self) { Text(name) }
                 }
             }
         }

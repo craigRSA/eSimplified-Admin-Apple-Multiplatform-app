@@ -62,11 +62,11 @@ struct SearchScreen: View {
         switch phase {
         case .idle:
             if mode == .customer && tenant == nil {
-                ContentUnavailableView("Pick a tenant", systemImage: "building.2",
-                                       description: Text("Choose a tenant in the toolbar to search customers."))
+                QuietEmptyState(title: "Pick a tenant", systemImage: "building.2",
+                                message: "Choose a tenant in the toolbar to search customers.")
             } else {
-                ContentUnavailableView("Search by \(mode.rawValue.lowercased())", systemImage: "magnifyingglass",
-                                       description: Text(mode == .iccid ? "Enter an ICCID." : "Enter a name, email, or phone."))
+                QuietEmptyState(title: "Search by \(mode.rawValue.lowercased())", systemImage: "magnifyingglass",
+                                message: mode == .iccid ? "Enter an ICCID." : "Enter a name, email, or phone.")
             }
         case .loading:
             ProgressView().controlSize(.large).frame(maxWidth: .infinity, maxHeight: .infinity)

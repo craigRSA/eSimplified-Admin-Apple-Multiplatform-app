@@ -1,16 +1,17 @@
 import SwiftUI
 import EsimplifiedKit
 
-/// Agent-payment orders — reuses /api/orders/ with payment_method=agent_payment
-/// (server-side), showing both Pending and Success like the web approvals page,
-/// with the actionable pending ones surfaced first. (Read-only; approving posts
-/// to /purchase/webhook/ and is a later slice.)
+/// Agent-payment orders — reuses /api/orders/ with payment_method=agent_payment.
+/// A status filter (default Requested = the pending ones awaiting approval) keeps
+/// the actionable orders front and centre, with Approved and All a tap away.
+/// (Read-only; approving posts to /purchase/webhook/ and is a later slice.)
 struct AgentApprovalsScreen: View {
     let session: Session
     var tenant: String?
 
     @Environment(\.tokenProvider) private var tokenProvider
     @State private var phase: Phase = .loading
+    @State private var filter: ApprovalFilter = .requested
 
     enum Phase { case loading, loaded([Order]), failed(String) }
 
@@ -36,8 +37,9 @@ struct AgentApprovalsScreen: View {
                 }
             case let .loaded(orders):
                 if orders.isEmpty {
-                    ContentUnavailableView("No agent orders", systemImage: "checkmark.seal",
-                                           description: Text("No agent-payment orders for this tenant."))
+                    ContentUnavailableView(filter == .all ? "No agent orders" : "No \(filter.label.lowercased()) orders",
+                                           systemImage: "checkmark.seal",
+                                           description: Text("No agent-payment orders match this filter."))
                 } else {
                     List(orders) { OrderApprovalRow(order: $0) }
                         .listStyle(.plain)
@@ -51,26 +53,64 @@ struct AgentApprovalsScreen: View {
         .refreshable { await load() }
         .autoRefresh { await load() }
         .refreshCommand { Task { await load() } }
+        .toolbar {
+            ToolbarItem {
+                Menu {
+                    Picker("Show", selection: $filter) {
+                        ForEach(ApprovalFilter.allCases) { Text($0.label).tag($0) }
+                    }
+                    .pickerStyle(.inline)
+                } label: {
+                    Label(filter.label, systemImage: "line.3.horizontal.decrease.circle")
+                }
+            }
+        }
+        .onChange(of: filter) { _, _ in Task { await load() } }
     }
 
     private func load() async {
         do {
             let client = LiveAPIClient(host: session.host, tokenProvider: tokenProvider)
             let path = tenant.map { "/api/orders/\($0)/" } ?? "/api/orders/"
-            let page = try await client.get(path, query: ["limit": "200", "payment_method": "agent_payment"],
-                                            as: OrdersPage.self)
-            // Server already restricts to agent_payment; show Pending and Success
-            // (matches the web), surfacing the actionable pending ones first.
+            var query = ["limit": "200", "payment_method": "agent_payment"]
+            if let status = filter.status { query["payment_status"] = status }
+            let page = try await client.get(path, query: query, as: OrdersPage.self)
             let agent = page.orders.filter { $0.paymentMethod == "agent_payment" }
-            let pendingFirst = agent.filter { $0.paymentStatus.lowercased() == "pending" }
-                + agent.filter { $0.paymentStatus.lowercased() != "pending" }
-            phase = .loaded(pendingFirst)
+            // "All" surfaces the actionable pending ones first; a single-status filter
+            // is already homogeneous, so leave its order alone.
+            let ordered = filter == .all
+                ? agent.filter { $0.paymentStatus.lowercased() == "pending" }
+                    + agent.filter { $0.paymentStatus.lowercased() != "pending" }
+                : agent
+            phase = .loaded(ordered)
         } catch let error as APIError {
             phase = .failed(adminErrorMessage(error))
         } catch is CancellationError {
             // View navigated away mid-load — not a real error.
         } catch {
             phase = .failed("Unexpected error.")
+        }
+    }
+}
+
+/// Status filter for agent approvals. Defaults to Requested — the pending orders
+/// awaiting approval — so the actionable ones lead.
+enum ApprovalFilter: String, CaseIterable, Identifiable {
+    case requested, approved, all
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .requested: "Requested"
+        case .approved: "Approved"
+        case .all: "All"
+        }
+    }
+    /// The `payment_status` query value, or nil to omit the param (= all).
+    var status: String? {
+        switch self {
+        case .requested: "pending"
+        case .approved: "success"
+        case .all: nil
         }
     }
 }
