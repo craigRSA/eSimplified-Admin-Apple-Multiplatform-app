@@ -133,15 +133,21 @@ private struct TenantMenu: View {
 
 #if os(macOS)
 /// Slim bottom status bar — the auto-refresh countdown (when on) and the live UTC
-/// clock. macOS-only: it's hosted in the window's bottom safe-area inset.
+/// clock, centered together with a hairline between them. macOS-only: it's hosted
+/// in the window's bottom safe-area inset.
 private struct StatusBar: View {
+    @AppStorage("autoRefreshSeconds") private var seconds = 0
     var body: some View {
-        HStack(spacing: 8) {
-            RefreshStatus()
-            Spacer()
+        HStack(spacing: 10) {
+            Spacer(minLength: 0)
+            if seconds > 0 {
+                RefreshStatus()
+                Divider().frame(height: 10)
+            }
             UTCClock()
+            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 14).padding(.vertical, 5)
+        .padding(.horizontal, 14).padding(.vertical, 6)
         .background(.bar)
         .overlay(alignment: .top) { Divider() }
     }

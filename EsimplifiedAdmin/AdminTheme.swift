@@ -235,7 +235,7 @@ struct UTCClock: View {
         // detail screen's in-flight load on iPhone.
         TimelineView(.periodic(from: .now, by: 60)) { ctx in
             Label(Self.formatter.string(from: ctx.date), systemImage: "clock")
-                .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
                 .labelStyle(.titleAndIcon)
         }
     }
@@ -373,19 +373,19 @@ struct RefreshStatus: View {
     @State private var now = Date()
     private let ticker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
+    // Always renders its content; the status bar only mounts it when a cadence is
+    // set, so the ticker doesn't run while auto-refresh is Off.
     var body: some View {
-        if seconds > 0 {
-            HStack(spacing: 6) {
-                CountdownRing(remaining: refreshRemaining(seconds: seconds, anchor: anchor, now: now))
-                    .frame(width: 12, height: 12)
-                Text("Auto-refresh \(RefreshInterval.label(seconds))")
-                    .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-            }
-            .onReceive(ticker) { now = $0 }
-            .onChange(of: seconds) { anchor = Date(); now = Date() }
-            .accessibilityElement()
-            .accessibilityLabel("Auto-refresh every \(RefreshInterval.label(seconds))")
+        HStack(spacing: 6) {
+            CountdownRing(remaining: refreshRemaining(seconds: seconds, anchor: anchor, now: now))
+                .frame(width: 11, height: 11)
+            Text("Auto-refresh · \(RefreshInterval.label(seconds))")
+                .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
         }
+        .onReceive(ticker) { now = $0 }
+        .onChange(of: seconds) { anchor = Date(); now = Date() }
+        .accessibilityElement()
+        .accessibilityLabel("Auto-refresh every \(RefreshInterval.label(seconds))")
     }
 }
 #endif
