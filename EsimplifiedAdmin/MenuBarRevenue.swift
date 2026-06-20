@@ -78,6 +78,7 @@ struct MenuBarLabel: View {
 struct MenuBarPanel: View {
     let model: AdminAppModel
     let revenue: MenuBarRevenue
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.md) {
@@ -128,7 +129,11 @@ struct MenuBarPanel: View {
                 Button("Refresh") { Task { await revenue.load(session: model.session, provider: model.sessionManager) } }
                     .accessibilityLabel("Refresh revenue")
                 Spacer()
-                Button("Open") { NSApplication.shared.activate(ignoringOtherApps: true) }
+                Button("Open") {
+                    NSApp.setActivationPolicy(.regular)
+                    openWindow(id: "main")
+                    NSApp.activate(ignoringOtherApps: true)
+                }
                     .accessibilityLabel("Open eSimplified")
                 Button("Quit") { NSApplication.shared.terminate(nil) }
                     .accessibilityLabel("Quit eSimplified")

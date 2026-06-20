@@ -15,9 +15,19 @@ extension EnvironmentValues {
 }
 
 #if os(macOS)
-/// Keeps the app (and its menu-bar item) alive after the last window closes.
+/// Runs the app as a persistent menu-bar app. Closing the last window doesn't quit
+/// it — instead it recedes to a menu-bar-only accessory (the status item stays, the
+/// Dock icon goes, so there's no empty Dock entry). Reopening a window (the menu's
+/// "Open", or relaunch) restores it to a normal Dock app.
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        NSApp.setActivationPolicy(.accessory)
+        return false
+    }
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        NSApp.setActivationPolicy(.regular)
+        return true
+    }
 }
 #endif
 
@@ -30,7 +40,7 @@ struct EsimplifiedAdminApp: App {
     #endif
 
     var body: some Scene {
-        WindowGroup {
+        WindowGroup(id: "main") {
             AdminRootView(model: model)
                 .preferredColorScheme(.dark)
         }
