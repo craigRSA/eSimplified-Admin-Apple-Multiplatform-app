@@ -8,5 +8,16 @@
 	<string>$(ESP_CLIENT_SECRET)</string>
 	<key>ESPHost</key>
 	<string>https://live.esimplified.io</string>
+	<key>INAlternativeAppNames</key>
+	<array>
+		<dict>
+			<key>INAlternativeAppName</key>
+			<string>eSimplified</string>
+		</dict>
+		<dict>
+			<key>INAlternativeAppName</key>
+			<string>eSimplified revenue</string>
+		</dict>
+	</array>
 </dict>
 </plist>

@@ -27,11 +27,12 @@ struct CustomerDetailScreen: View {
     @State private var phase: Phase = .loading
     @State private var esims: [EsimSummary] = []
     @State private var orders: [Order] = []
-    @State private var detail: EsimDetail?
+    @State private var detailPhase: DetailPhase = .idle
     @State private var selectedIccid: String?
     @State private var customer: Customer?
 
     enum Phase { case loading, loaded, failed(String) }
+    enum DetailPhase { case idle, loading, loaded(EsimDetail), failed(String) }
 
     private var client: LiveAPIClient { LiveAPIClient(host: session.host, accessToken: session.accessToken) }
 
@@ -60,11 +61,28 @@ struct CustomerDetailScreen: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 if let customer { ProfileCard(customer: customer) }
-                if let detail { EsimDetailCard(detail: detail) }
+                esimDetailSection
                 esimListCard
                 ordersCard
             }
             .padding(20)
+        }
+    }
+
+    @ViewBuilder private var esimDetailSection: some View {
+        switch detailPhase {
+        case .idle:
+            EmptyView()
+        case .loading:
+            SectionCard(title: "eSIM details") {
+                ProgressView().frame(maxWidth: .infinity).padding(.vertical, 8)
+            }
+        case let .loaded(detail):
+            EsimDetailCard(detail: detail)
+        case let .failed(message):
+            SectionCard(title: "eSIM details") {
+                Text(message).font(.callout).foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -83,7 +101,7 @@ struct CustomerDetailScreen: View {
                             Text(e.iccid).font(.callout.monospaced()).lineLimit(1)
                             Spacer()
                             if let cov = e.coverageName { Text(cov).font(.caption).foregroundStyle(.secondary) }
-                            if e.iccid == (selectedIccid ?? detail?.iccid) {
+                            if e.iccid == (selectedIccid ?? ref.iccid) {
                                 Image(systemName: "checkmark.circle.fill").foregroundStyle(.tint).font(.caption)
                             }
                         }
@@ -151,7 +169,20 @@ struct CustomerDetailScreen: View {
     }
 
     private func loadDetail(_ iccid: String) async {
-        detail = (try? await client.get("/api/esim/\(iccid)/", query: [:], as: EsimDetailResponse.self))?.esim
+        detailPhase = .loading
+        do {
+            let resp = try await client.get("/api/esim/\(iccid)/", query: [:], as: EsimDetailResponse.self)
+            if let e = resp.esim {
+                detailPhase = .loaded(e)
+            } else {
+                detailPhase = .failed("The eSIM response didn't contain detail.")
+            }
+        } catch let error as APIError {
+            detailPhase = .failed(adminErrorMessage(error))
+        } catch is CancellationError {
+        } catch {
+            detailPhase = .failed("Unexpected error loading eSIM detail.")
+        }
     }
 }
 
