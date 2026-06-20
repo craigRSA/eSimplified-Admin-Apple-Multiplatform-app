@@ -192,20 +192,34 @@ private struct HeroCard: View {
 private struct HourlyComparisonChart: View {
     let today: [HourPoint]
     let yesterday: [HourPoint]
+    @State private var selectedX: Int?
 
     var body: some View {
+        let t = Self.points(today)
+        let y = Self.points(yesterday)
         Chart {
-            ForEach(Self.points(yesterday), id: \.x) { p in
+            ForEach(y, id: \.x) { p in
                 LineMark(x: .value("Hour", p.x), y: .value("Sales", p.v),
                          series: .value("Day", "Yesterday"))
                     .foregroundStyle(.gray)
                     .lineStyle(StrokeStyle(lineWidth: 2, dash: [4, 3]))
             }
-            ForEach(Self.points(today), id: \.x) { p in
+            ForEach(t, id: \.x) { p in
                 LineMark(x: .value("Hour", p.x), y: .value("Sales", p.v),
                          series: .value("Day", "Today"))
                     .foregroundStyle(Color.accentColor)
                     .lineStyle(StrokeStyle(lineWidth: 2))
+            }
+            if let selectedX {
+                RuleMark(x: .value("Hour", selectedX))
+                    .foregroundStyle(Color.secondary.opacity(0.25))
+                    .annotation(position: .top, spacing: 0,
+                                overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
+                        ChartTooltip(title: String(format: "%02d:00", min(max(selectedX, 0), 24)), rows: [
+                            ("Today", Fmt.money(Decimal(Self.valueAt(t, selectedX))), .accentColor),
+                            ("Yesterday", Fmt.money(Decimal(Self.valueAt(y, selectedX))), .gray),
+                        ])
+                    }
             }
         }
         .chartForegroundStyleScale(["Today": Color.accentColor, "Yesterday": Color.gray])
@@ -214,6 +228,7 @@ private struct HourlyComparisonChart: View {
             AxisGridLine()
             AxisValueLabel { if let h = v.as(Int.self) { Text(String(format: "%02d:00", h)) } }
         } }
+        .chartXSelection(value: $selectedX)
         .chartLegend(position: .top, alignment: .leading, spacing: 8)
     }
 
@@ -226,6 +241,34 @@ private struct HourlyComparisonChart: View {
             out.append((p.hour + 1, running))
         }
         return out
+    }
+
+    /// Cumulative value at or before the selected hour mark.
+    static func valueAt(_ pts: [(x: Int, v: Double)], _ x: Int) -> Double {
+        pts.last(where: { $0.x <= x })?.v ?? 0
+    }
+}
+
+/// Small floating tooltip shown when a chart point is selected.
+struct ChartTooltip: View {
+    let title: String
+    let rows: [(String, String, Color)]
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title).font(.caption2.weight(.semibold))
+            ForEach(rows, id: \.0) { row in
+                HStack(spacing: 5) {
+                    if !row.0.isEmpty {
+                        Circle().fill(row.2).frame(width: 6, height: 6)
+                        Text(row.0).font(.caption2).foregroundStyle(.secondary)
+                    }
+                    Text(row.1).font(.caption2.monospacedDigit())
+                }
+            }
+        }
+        .padding(7)
+        .background(.regularMaterial, in: .rect(cornerRadius: 7))
+        .shadow(radius: 3, y: 1)
     }
 }
 

@@ -69,7 +69,7 @@ struct AdminShell: View {
         #if os(macOS)
         .safeAreaInset(edge: .bottom) { StatusBar() }
         #endif
-        .task { await model.loadTenants() }
+        .task { await model.refreshSessionIfNeeded(); await model.loadTenants() }
         .onAppear { if selection == nil { selection = model.sections.first } }
     }
 

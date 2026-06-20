@@ -1,10 +1,21 @@
 import SwiftUI
 import EsimplifiedKit
+#if os(macOS)
+import AppKit
+#endif
+
+#if os(macOS)
+/// Keeps the app (and its menu-bar item) alive after the last window closes.
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+}
+#endif
 
 @main
 struct EsimplifiedAdminApp: App {
     @State private var model = AdminAppModel()
     #if os(macOS)
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var menu = MenuBarRevenue()
     #endif
 
@@ -69,6 +80,16 @@ final class AdminAppModel {
     func adopt(_ session: Session) {
         try? store.save(session)
         self.session = session
+    }
+
+    /// Refreshes the OAuth access token when it's expired or about to expire,
+    /// using the refresh token. Updating `session` re-renders the shell, so
+    /// screens (which key their reloads on the token) re-fetch with the new one.
+    func refreshSessionIfNeeded() async {
+        guard let s = session, s.expiresAt.timeIntervalSinceNow < 120 else { return }
+        if let refreshed = try? await authClient().refresh(host: s.host, refreshToken: s.refreshToken) {
+            adopt(refreshed)
+        }
     }
 
     func logout() {
