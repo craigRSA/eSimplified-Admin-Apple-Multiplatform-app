@@ -308,19 +308,15 @@ struct RefreshIntervalMenu: View {
         Menu {
             Button("Refresh now", systemImage: "arrow.clockwise") { refreshAction?() }
                 .disabled(refreshAction == nil)
-            Section("Auto-refresh") {
+            Divider()
+            // A Picker owns its own selection + checkmark and updates reliably inside
+            // a macOS toolbar menu; hand-rolled Buttons did not reflect the choice.
+            Picker("Auto-refresh", selection: $seconds) {
                 ForEach(RefreshInterval.options, id: \.self) { opt in
-                    Button {
-                        seconds = opt
-                    } label: {
-                        if opt == seconds {
-                            Label(RefreshInterval.label(opt), systemImage: "checkmark")
-                        } else {
-                            Text(RefreshInterval.label(opt))
-                        }
-                    }
+                    Text(RefreshInterval.label(opt)).tag(opt)
                 }
             }
+            .pickerStyle(.inline)
         } label: {
             Label(seconds == 0 ? "Auto-refresh" : "Every \(RefreshInterval.label(seconds))",
                   systemImage: seconds == 0 ? "timer" : "timer.circle.fill")
