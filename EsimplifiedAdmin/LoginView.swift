@@ -172,6 +172,7 @@ struct LoginView: View {
         }
         model.adopt(session)
         #if os(iOS)
+        // set synchronously before adopt's async session update mounts AdminShell, so the alert is present on first render
         if !model.biometricEnabled, LAContext().canEvaluatePolicy(.deviceOwnerAuthentication, error: nil) {
             model.offerBiometricEnrollment = true
         }

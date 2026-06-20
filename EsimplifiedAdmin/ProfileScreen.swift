@@ -69,7 +69,7 @@ struct ProfileScreen: View {
 
             #if os(iOS)
             Section("App lock") {
-                let kind = BiometryKind.current
+                let kind = BiometryKind.cached
                 Toggle("Require \(kind.label) to open", isOn: Binding(
                     get: { biometricEnabled },
                     set: { setBiometricEnabled($0) }))

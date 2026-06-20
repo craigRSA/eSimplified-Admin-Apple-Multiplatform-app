@@ -149,8 +149,8 @@ final class AdminAppModel {
     }
 
     #if os(iOS)
-    /// Placeholder replaced by the real controller (wired to `biometricEnabled`) in `init()`.
-    private(set) var lock: AppLockController = AppLockController(isEnabled: { false })
+    /// Set once in `init()` — IUO avoids a throwaway placeholder allocation.
+    private(set) var lock: AppLockController!
     var offerBiometricEnrollment = false
     #endif
 
@@ -188,7 +188,7 @@ struct AdminRootView: View {
             LoginView(model: model)
         } else {
             #if os(iOS)
-            let kind = BiometryKind.current
+            let kind = BiometryKind.cached
             AdminShell(model: model)
                 .environment(\.tokenProvider, model.sessionManager)
                 .modifier(LockContainer(controller: model.lock, onUsePassword: { model.logout() }))

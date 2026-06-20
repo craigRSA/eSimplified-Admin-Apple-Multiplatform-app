@@ -40,7 +40,7 @@ public final class KeychainSessionStore: SessionStore {
     }
 
     public func biometricEnabled() -> Bool {
-        (try? read(account: biometricAccount))??.first == 1
+        (try? read(account: biometricAccount))??.first == 1  // empty/missing/corrupt data → disabled (safe default)
     }
 
     private func write(_ data: Data, account: String) throws {

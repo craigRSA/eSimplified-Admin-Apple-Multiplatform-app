@@ -19,6 +19,8 @@ struct BiometryKind {
         default:       return .init(label: "biometrics", systemImage: "lock")
         }
     }
+    /// Lazily initialised once per process — biometry type never changes at runtime.
+    static let cached: BiometryKind = .current
 }
 
 /// Abstracts LocalAuthentication so the controller is testable and the policy
@@ -102,7 +104,7 @@ struct LockScreen: View {
     var onUsePassword: () -> Void
 
     var body: some View {
-        let kind = BiometryKind.current
+        let kind = BiometryKind.cached
         ZStack {
             AppBackground()
             VStack(spacing: Spacing.lg) {
