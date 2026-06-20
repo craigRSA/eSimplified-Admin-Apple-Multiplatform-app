@@ -185,10 +185,10 @@ private struct HeroCard: View {
     }
 }
 
-/// Sales per hour (UTC), exactly as the backend sends them — today solid,
-/// yesterday dashed. Each hour's value is plotted at the end of that hour
-/// (hour 0 covers 00:00–01:00 → the `1` mark), with a 0 start so a single
-/// hour still draws a line up to its value.
+/// Cumulative sales through the day (UTC) — today solid, yesterday dashed.
+/// Backend sends per-hour increments; we accumulate them into a running total
+/// and plot at the end of each hour (hour 0 → the `1` mark), with a 0 start so
+/// a single hour still draws a line up to its value.
 private struct HourlyComparisonChart: View {
     let today: [HourPoint]
     let yesterday: [HourPoint]
@@ -218,11 +218,13 @@ private struct HourlyComparisonChart: View {
         .chartLegend(position: .top, alignment: .leading, spacing: 8)
     }
 
-    /// Backend values plotted at the end of each hour, prefixed with a 0 origin.
+    /// Running total plotted at the end of each hour, prefixed with a 0 origin.
     static func points(_ src: [HourPoint]) -> [(x: Int, v: Double)] {
         var out: [(x: Int, v: Double)] = [(0, 0)]
+        var running = 0.0
         for p in src.sorted(by: { $0.hour < $1.hour }) {
-            out.append((p.hour + 1, dbl(p.revenue)))
+            running += dbl(p.revenue)
+            out.append((p.hour + 1, running))
         }
         return out
     }

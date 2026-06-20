@@ -83,9 +83,9 @@ private struct DeltaLabel: View {
     }
 }
 
-/// Sales per hour as the backend sends them (same as the app's hero): yesterday
-/// dashed, today solid with a dot so a single early-day value still shows. Each
-/// hour is plotted at its end (hour 0 → the `1` mark), with a 0 start.
+/// Cumulative sales through the day (same as the app's hero): yesterday dashed,
+/// today solid with a dot so a single early-day value still shows. Per-hour
+/// increments are accumulated and plotted at each hour's end, with a 0 start.
 private struct HourlyChart: View {
     let today: [HourPoint]
     let yesterday: [HourPoint]
@@ -112,8 +112,10 @@ private struct HourlyChart: View {
 
     private func points(_ src: [HourPoint]) -> [(x: Int, v: Double)] {
         var out: [(x: Int, v: Double)] = [(0, 0)]
+        var running = 0.0
         for p in src.sorted(by: { $0.hour < $1.hour }) {
-            out.append((p.hour + 1, (p.revenue as NSDecimalNumber).doubleValue))
+            running += (p.revenue as NSDecimalNumber).doubleValue
+            out.append((p.hour + 1, running))
         }
         return out
     }
