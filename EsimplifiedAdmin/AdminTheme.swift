@@ -1,5 +1,4 @@
 import SwiftUI
-import Combine
 
 // MARK: - Backdrop
 
@@ -299,40 +298,16 @@ enum RefreshInterval {
     }
 }
 
-/// Shared auto-refresh clock: the visible screen's refresh loop publishes the next
-/// fire time here so the toolbar can count down to it, and "Refresh now" bumps
-/// `manualTick` to restart the loop (which resets the countdown).
-@Observable final class AutoRefreshState {
-    var nextFireAt: Date?
-    private(set) var manualTick = 0
-    func refreshNow() { manualTick += 1 }
-}
-
-private struct AutoRefreshStateKey: EnvironmentKey {
-    static let defaultValue = AutoRefreshState()
-}
-extension EnvironmentValues {
-    var autoRefreshState: AutoRefreshState {
-        get { self[AutoRefreshStateKey.self] }
-        set { self[AutoRefreshStateKey.self] = newValue }
-    }
-}
-
 /// Toolbar control for auto-refresh: one flat menu — "Refresh now" plus the cadence
-/// choices (checkmark on the active one) — whose label counts down to the next
-/// refresh on the timer glyph while a cadence is set.
+/// choices (checkmark on the active one). The label shows the chosen cadence.
 struct RefreshIntervalMenu: View {
     @Binding var seconds: Int
-    var state: AutoRefreshState
     @FocusedValue(\.refreshAction) private var refreshAction
 
     var body: some View {
         Menu {
-            Button("Refresh now", systemImage: "arrow.clockwise") {
-                refreshAction?()
-                state.refreshNow()
-            }
-            .disabled(refreshAction == nil)
+            Button("Refresh now", systemImage: "arrow.clockwise") { refreshAction?() }
+                .disabled(refreshAction == nil)
             Section("Auto-refresh") {
                 ForEach(RefreshInterval.options, id: \.self) { opt in
                     Button {
@@ -347,59 +322,22 @@ struct RefreshIntervalMenu: View {
                 }
             }
         } label: {
-            label
+            Label(seconds == 0 ? "Auto-refresh" : "Every \(RefreshInterval.label(seconds))",
+                  systemImage: seconds == 0 ? "timer" : "timer.circle.fill")
         }
         .accessibilityLabel("Auto-refresh")
         .accessibilityValue(seconds == 0 ? "Off" : "Every \(RefreshInterval.label(seconds))")
     }
-
-    /// Off → the timer glyph. Active → the glyph plus a live m:ss countdown to the
-    /// next refresh (only ticks per-second while a cadence is set).
-    @ViewBuilder private var label: some View {
-        if seconds > 0 {
-            // Only instantiated while a cadence is set, so its 1 Hz ticker stops at Off.
-            CountdownLabel(seconds: seconds, state: state)
-        } else {
-            Label("Auto-refresh", systemImage: "timer")
-        }
-    }
 }
-
-/// Live m:ss countdown to the next auto-refresh, shown on the toolbar timer glyph.
-///
-/// Driven by a 1 Hz `Timer` publisher, **not** `TimelineView`: a `TimelineView`
-/// schedule does not fire inside a toolbar `Menu` label on macOS (the toolbar
-/// re-renders its label only when an observed value changes), so the countdown
-/// would appear frozen. `onReceive` of a Timer publisher does fire there, and the
-/// `@State` write re-renders the label each second.
-private struct CountdownLabel: View {
-    let seconds: Int
-    let state: AutoRefreshState
-    @State private var now = Date()
-    private let ticker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-
-    var body: some View {
-        let target = state.nextFireAt ?? now.addingTimeInterval(Double(seconds))
-        let remaining = max(0, Int(target.timeIntervalSince(now).rounded(.up)))
-        Label(String(format: "%d:%02d", remaining / 60, remaining % 60),
-              systemImage: "timer.circle.fill")
-            .monospacedDigit()
-            .onReceive(ticker) { now = $0 }
-    }
-}
-
-private struct AutoRefreshTaskID: Equatable { let seconds: Int; let tick: Int }
 
 private struct AutoRefresh: ViewModifier {
     @AppStorage("autoRefreshSeconds") private var seconds = 0
-    @Environment(\.autoRefreshState) private var state
     let action: () async -> Void
     func body(content: Content) -> some View {
         content
-            .task(id: AutoRefreshTaskID(seconds: seconds, tick: state.manualTick)) {
-                guard seconds > 0 else { state.nextFireAt = nil; return }
+            .task(id: seconds) {
+                guard seconds > 0 else { return }
                 while !Task.isCancelled {
-                    state.nextFireAt = Date().addingTimeInterval(Double(seconds))
                     try? await Task.sleep(for: .seconds(Double(seconds)))
                     if Task.isCancelled { break }
                     await action()
@@ -409,8 +347,7 @@ private struct AutoRefresh: ViewModifier {
 }
 
 extension View {
-    /// Runs `action` on the shared auto-refresh cadence (no-op while set to Off),
-    /// publishing the next fire time to `AutoRefreshState` for the toolbar countdown.
+    /// Runs `action` on the shared auto-refresh cadence (no-op while set to Off).
     /// The cadence control lives in the shell toolbar (`RefreshIntervalMenu`).
     func autoRefresh(_ action: @escaping () async -> Void) -> some View {
         modifier(AutoRefresh(action: action))
