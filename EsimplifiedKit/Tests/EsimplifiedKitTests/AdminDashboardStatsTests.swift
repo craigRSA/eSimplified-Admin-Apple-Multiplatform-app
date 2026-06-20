@@ -24,6 +24,36 @@ final class AdminDashboardStatsTests: XCTestCase {
         XCTAssertEqual(stats.revenuePerHourYesterday.first?.revenue, Decimal(string: "95.00"))
     }
 
+    func test_revenueYesterdayThroughHour_cumulative_and_toDateDelta() throws {
+        // Yesterday's hourly buckets, with hour 2 deliberately absent (a gap).
+        let json = """
+        {
+          "revenue_today": "50.00",
+          "revenue_per_hour_yesterday": [
+            { "hour": 0, "revenue": "10.00" },
+            { "hour": 1, "revenue": "20.00" },
+            { "hour": 3, "revenue": "30.00" }
+          ]
+        }
+        """
+        let s = try JSONDecoder().decode(AdminDashboardStats.self, from: Data(json.utf8))
+        // Cumulative sum of buckets with hour <= the given UTC hour (inclusive).
+        XCTAssertEqual(s.revenueYesterdayThroughHour(0), Decimal(string: "10.00"))
+        XCTAssertEqual(s.revenueYesterdayThroughHour(1), Decimal(string: "30.00"))  // 10+20
+        XCTAssertEqual(s.revenueYesterdayThroughHour(2), Decimal(string: "30.00"))  // hour 2 absent → unchanged
+        XCTAssertEqual(s.revenueYesterdayThroughHour(3), Decimal(string: "60.00"))  // +30
+        XCTAssertEqual(s.revenueYesterdayThroughHour(12), Decimal(string: "60.00")) // beyond last → full cumulative
+        // "to date" delta: today 50 vs yesterday-through-hour-1 (30) → +66.67%
+        XCTAssertEqual(s.deltaPercentToDate(currentHour: 1), (Decimal(50) - 30) / 30 * 100)
+    }
+
+    func test_toDate_nilWhenNoYesterdayHourly() throws {
+        // No hourly series → the caller must fall back to the full-day comparison.
+        let s = try JSONDecoder().decode(AdminDashboardStats.self, from: Data(#"{ "revenue_today": "50.00" }"#.utf8))
+        XCTAssertNil(s.revenueYesterdayThroughHour(10))
+        XCTAssertNil(s.deltaPercentToDate(currentHour: 10))
+    }
+
     func test_decode_absent_hourly_is_empty() throws {
         let stats = try JSONDecoder().decode(AdminDashboardStats.self, from: Data("{}".utf8))
         XCTAssertTrue(stats.revenuePerHourToday.isEmpty)

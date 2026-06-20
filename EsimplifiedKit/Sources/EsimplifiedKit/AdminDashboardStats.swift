@@ -161,6 +161,24 @@ public struct AdminDashboardStats: Decodable, Sendable {
         return (current - previous) / previous * 100
     }
 
+    /// Yesterday's cumulative revenue through the given UTC hour (inclusive), summed
+    /// from the hourly series — i.e. "yesterday to date" for a same-time-of-day
+    /// comparison. nil when there's no yesterday hourly data (so callers fall back to
+    /// the full-day figure rather than comparing today-so-far against a whole day).
+    public func revenueYesterdayThroughHour(_ hour: Int) -> Decimal? {
+        guard !revenuePerHourYesterday.isEmpty else { return nil }
+        return revenuePerHourYesterday
+            .filter { $0.hour <= hour }
+            .reduce(Decimal(0)) { $0 + $1.revenue }
+    }
+
+    /// Percentage change of today-so-far vs yesterday through the same UTC hour
+    /// ("to date"); nil when there's no hourly data or yesterday-to-date is zero.
+    public func deltaPercentToDate(currentHour: Int) -> Decimal? {
+        guard let base = revenueYesterdayThroughHour(currentHour) else { return nil }
+        return Self.change(revenueToday, vs: base)
+    }
+
     /// The single highest-revenue day in the period (best day).
     public var bestDay: DayRevenue? {
         let series = current.revenuePerDate.isEmpty ? revenuePerDate : current.revenuePerDate

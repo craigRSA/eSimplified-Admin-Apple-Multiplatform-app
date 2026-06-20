@@ -78,6 +78,7 @@ struct DashboardScreen: View {
         VStack(alignment: .leading, spacing: Spacing.xl) {
             // Signature: today's gross volume
             HeroCard(today: s.revenueToday, yesterday: s.revenueYesterday,
+                     yesterdayToDate: s.revenueYesterdayThroughHour(utcHourNow()),
                      hourlyToday: s.revenuePerHourToday, hourlyYesterday: s.revenuePerHourYesterday,
                      trend: s.current.revenuePerDate)
 
@@ -89,6 +90,7 @@ struct DashboardScreen: View {
                 .init("Revenue (all time)", Fmt.money(s.revenue), "dollarsign.circle"),
                 .init("Avg order value", Fmt.money(s.averageOrderValue), "cart"),
                 .init("Best day", Fmt.money(s.bestDay?.revenue ?? 0), "trophy"),
+                .init("Yesterday", Fmt.money(s.revenueYesterday), "calendar"),
                 .comparison("This month", Fmt.money(s.revenueCurrentMonth),
                             AdminDashboardStats.change(s.revenueCurrentMonth, vs: s.revenueLastMonth),
                             "vs last: \(Fmt.money(s.revenueLastMonth))"),
@@ -207,6 +209,14 @@ private struct LoadingSkeleton: View {
     }
 }
 
+/// Current hour (0–23) in UTC — the dashboard's time basis (matches the UTC status
+/// clock and the UTC hourly series), so "to date" lines up with `revenue_per_hour_*`.
+private func utcHourNow() -> Int {
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = TimeZone(identifier: "UTC") ?? .gmt
+    return cal.component(.hour, from: Date())
+}
+
 // MARK: - Building blocks
 
 /// The hero: today's gross volume, the day's delta, and — when the backend
@@ -214,9 +224,20 @@ private struct LoadingSkeleton: View {
 private struct HeroCard: View {
     let today: Decimal
     let yesterday: Decimal
+    /// Yesterday's revenue through the current point in the day (UTC); nil pre-hourly.
+    let yesterdayToDate: Decimal?
     let hourlyToday: [HourPoint]
     let hourlyYesterday: [HourPoint]
     let trend: [DayRevenue]
+
+    /// Compare today-so-far against yesterday "to date" (same point in the day) when
+    /// hourly data exists; otherwise the full prior day — the pre-hourly fallback.
+    private var comparisonBase: Decimal { yesterdayToDate ?? yesterday }
+    private var deltaCaption: String {
+        yesterdayToDate != nil
+            ? "vs \(Fmt.money(comparisonBase)) at this time yesterday"
+            : "vs \(Fmt.money(yesterday)) yesterday"
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.md) {
@@ -228,9 +249,9 @@ private struct HeroCard: View {
                     .contentTransition(.numericText())
                     .lineLimit(1).minimumScaleFactor(0.5)
                     .accessibilityLabel("Today's gross volume: \(Fmt.money(today))")
-                TrendDelta(percent: AdminDashboardStats.change(today, vs: yesterday), pill: true)
+                TrendDelta(percent: AdminDashboardStats.change(today, vs: comparisonBase), pill: true)
             }
-            Text("vs \(Fmt.money(yesterday)) yesterday")
+            Text(deltaCaption)
                 .font(.subheadline).foregroundStyle(.secondary)
 
             if hourlyToday.count > 1 || hourlyYesterday.count > 1 {
