@@ -23,15 +23,21 @@ struct OrdersScreen: View {
             Group {
                 switch phase {
                 case .loading where orders.isEmpty:
-                    ProgressView().controlSize(.large).frame(maxWidth: .infinity, maxHeight: .infinity)
+                    OrdersLoadingPlaceholder()
                 case let .failed(message) where orders.isEmpty:
-                    ContentUnavailableView("Couldn't load orders", systemImage: "exclamationmark.triangle",
-                                           description: Text(message))
+                    ContentUnavailableView {
+                        Label("Couldn't load orders", systemImage: "exclamationmark.triangle")
+                    } description: {
+                        Text(message)
+                    } actions: {
+                        Button("Try Again") { Task { await load() } }
+                            .buttonStyle(.glassProminent)
+                    }
                 default:
                     VStack(spacing: 0) {
                         OrdersCountHeader(showing: orders.count, total: total, filtering: !search.isEmpty)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 16).padding(.vertical, 8)
+                            .padding(.horizontal, Spacing.lg).padding(.vertical, Spacing.sm)
                         Divider()
                         if orders.isEmpty {
                             ContentUnavailableView("No matching orders", systemImage: "tray")
@@ -47,12 +53,15 @@ struct OrdersScreen: View {
                                 }
                             }
                             .listStyle(.plain)
+                            .scrollContentBackground(.hidden)
                         }
                     }
                 }
             }
             .navigationTitle("Order History")
             .navigationDestination(for: CustomerRef.self) { CustomerDetailScreen(session: session, ref: $0) }
+            .background(AppBackground())
+            .refreshCommand { Task { await load() } }
         }
         .searchable(text: $search, prompt: "Package, customer, email, order #")
         .onChange(of: search) { _, _ in debouncedSearch() }
@@ -128,40 +137,139 @@ func orderAccent(_ order: Order) -> Color? {
     return nil
 }
 
+/// A non-color signal for the order's category. Colour alone (`orderAccent`) is
+/// invisible to color-blind users and VoiceOver, so we pair the tint with a glyph
+/// + word: Refunded / Agent / Voucher / Comp / Promo. Returns nil for plain
+/// card-paid orders (no badge needed).
+struct OrderCategory {
+    let word: String
+    let glyph: String
+    let color: Color
+
+    init?(_ order: Order) {
+        if order.paymentStatus.lowercased() == "refunded" {
+            self = OrderCategory(word: "Refunded", glyph: "arrow.uturn.backward", color: .red); return
+        }
+        switch order.paymentMethod {
+        case "complimentary": self = OrderCategory(word: "Comp", glyph: "gift.fill", color: .green); return
+        case "agent_payment": self = OrderCategory(word: "Agent", glyph: "person.fill", color: .purple); return
+        case "voucher": self = OrderCategory(word: "Voucher", glyph: "ticket.fill", color: .cyan); return
+        default: break
+        }
+        if order.discountCode != nil && order.paymentStatus.lowercased() == "success" {
+            self = OrderCategory(word: "Promo", glyph: "tag.fill", color: .orange); return
+        }
+        return nil
+    }
+
+    private init(word: String, glyph: String, color: Color) {
+        self.word = word; self.glyph = glyph; self.color = color
+    }
+}
+
+/// The category Badge with a VoiceOver label — the non-color reinforcement for
+/// `orderAccent`, used in both the iPhone row and the Mac table.
+private struct OrderCategoryBadge: View {
+    let order: Order
+    var body: some View {
+        if let cat = OrderCategory(order) {
+            Badge(text: cat.word, color: cat.color, systemImage: cat.glyph)
+                .accessibilityElement()
+                .accessibilityLabel("Category: \(cat.word)")
+        }
+    }
+}
+
+/// Skeleton placeholder shown while the first page loads — keeps layout stable
+/// instead of a centred spinner that jumps when content arrives.
+private struct OrdersLoadingPlaceholder: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.lg) {
+            ForEach(0..<8, id: \.self) { _ in
+                VStack(alignment: .leading, spacing: Spacing.sm) {
+                    HStack {
+                        SkeletonBar(width: 180, height: 16)
+                        Spacer()
+                        SkeletonBar(width: 60, height: 16)
+                    }
+                    SkeletonBar(width: 240, height: 11)
+                }
+            }
+            Spacer()
+        }
+        .padding(Spacing.lg)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .accessibilityElement()
+        .accessibilityLabel("Loading orders")
+    }
+}
+
+/// Cross-platform clipboard copy for the table's context menu.
+private func copyToClipboard(_ string: String) {
+    #if os(macOS)
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString(string, forType: .string)
+    #else
+    UIPasteboard.general.string = string
+    #endif
+}
+
 /// Columnar table for Mac/iPad — mirrors the web's Order History columns.
 /// The whole row is clickable (selection → `onOpen`), like a native table.
+/// Columns are click-to-sort; sorting is client-side over the loaded page.
 private struct OrdersTable: View {
     let orders: [Order]
     var onOpen: (CustomerRef) -> Void
     @State private var selectedID: Order.ID?
+    @State private var sortOrder: [KeyPathComparator<Order>] = [
+        KeyPathComparator(\Order.purchaseDate, order: .reverse)
+    ]
+
+    /// The loaded page, re-sorted by the active column. Search/pagination are
+    /// unchanged — this only reorders the rows already on screen.
+    private var shown: [Order] { orders.sorted(using: sortOrder) }
 
     var body: some View {
-        Table(orders, selection: $selectedID) {
-            TableColumn("Tenant") { o in
+        Table(shown, selection: $selectedID, sortOrder: $sortOrder) {
+            TableColumn("Tenant", value: \.tenant) { o in
                 Text(o.tenant).foregroundStyle(orderAccent(o) ?? .primary)
             }
-            TableColumn("Package") { o in
-                Text(o.packageName).foregroundStyle(orderAccent(o) ?? .primary).lineLimit(1)
+            TableColumn("Package", value: \.packageName) { o in
+                HStack(spacing: Spacing.sm) {
+                    Text(o.packageName).foregroundStyle(orderAccent(o) ?? .primary).lineLimit(1)
+                    OrderCategoryBadge(order: o)
+                }
             }
             TableColumn("Customer") { o in customerCell(o) }
             TableColumn("Purchased In") { o in
                 Text(o.purchaseCountry ?? "—").foregroundStyle(.secondary)
             }
-            TableColumn("Type") { o in Text(o.orderType).foregroundStyle(.secondary) }
-            TableColumn("Price") { o in Text(o.usdPriceDisplay).monospacedDigit() }
+            TableColumn("Type", value: \.orderType) { o in Text(o.orderType).foregroundStyle(.secondary) }
+            TableColumn("Price", value: \.finalPrice) { o in Text(o.usdPriceDisplay).monospacedDigit() }
             TableColumn("Local") { o in
                 Text(o.localPriceDisplay ?? "").font(.callout.monospacedDigit()).foregroundStyle(.secondary)
             }
             TableColumn("Discount") { o in
                 if let code = o.discountCode { Text(code).foregroundStyle(.orange) } else { Text("") }
             }
-            TableColumn("Status") { o in StatusBadge(status: o.paymentStatus) }
-            TableColumn("Date") { o in
+            TableColumn("Status", value: \.paymentStatus) { o in StatusBadge(status: o.paymentStatus) }
+            TableColumn("Date", value: \.purchaseDate) { o in
                 Text(shortDate(o.purchaseDate)).font(.callout).foregroundStyle(.secondary).lineLimit(1)
             }
         }
+        .contextMenu(forSelectionType: Order.ID.self) { ids in
+            if let id = ids.first, let o = shown.first(where: { $0.id == id }) {
+                if let ref = o.customerRef {
+                    Button("Open Customer", systemImage: "person.crop.circle") { onOpen(ref) }
+                }
+                if let iccid = o.iccid, !iccid.isEmpty {
+                    Button("Copy ICCID", systemImage: "doc.on.doc") { copyToClipboard(iccid) }
+                }
+                Button("Copy order number", systemImage: "number") { copyToClipboard(o.orderNumber) }
+            }
+        }
         .onChange(of: selectedID) { _, id in
-            guard let id, let o = orders.first(where: { $0.id == id }), let ref = o.customerRef else { return }
+            guard let id, let o = shown.first(where: { $0.id == id }), let ref = o.customerRef else { return }
             onOpen(ref)
             selectedID = nil
         }
@@ -181,13 +289,14 @@ private struct OrderRow: View {
     let order: Order
 
     private var accent: Color? { orderAccent(order) }
+    private var title: String { order.packageName.isEmpty ? order.orderNumber : order.packageName }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: Spacing.xs) {
             HStack(alignment: .firstTextBaseline) {
-                Text(order.packageName.isEmpty ? order.orderNumber : order.packageName)
+                Text(title)
                     .font(.headline).foregroundStyle(accent ?? .primary).lineLimit(1)
-                Spacer(minLength: 8)
+                Spacer(minLength: Spacing.sm)
                 VStack(alignment: .trailing, spacing: 1) {
                     Text(order.usdPriceDisplay).font(.headline.monospacedDigit())
                     if let local = order.localPriceDisplay {
@@ -195,27 +304,36 @@ private struct OrderRow: View {
                     }
                 }
             }
-            HStack(spacing: 6) {
+            HStack(spacing: Spacing.sm) {
                 StatusBadge(status: order.paymentStatus)
+                OrderCategoryBadge(order: order)
                 if !order.orderType.isEmpty {
-                    Text(order.orderType)
-                        .font(.caption2.weight(.medium))
-                        .padding(.horizontal, 7).padding(.vertical, 2)
-                        .background(.quaternary, in: Capsule())
+                    Badge(text: order.orderType)
                 }
                 if let code = order.discountCode {
-                    Label(code, systemImage: "tag.fill")
-                        .font(.caption2.weight(.medium)).foregroundStyle(.orange)
-                        .labelStyle(.titleAndIcon)
+                    Badge(text: code, color: .orange, systemImage: "tag.fill")
                 }
-                Spacer(minLength: 8)
+                Spacer(minLength: Spacing.sm)
                 Text(shortDate(order.purchaseDate)).font(.caption2).foregroundStyle(.secondary)
             }
             if let who = subtitle {
                 Text(who).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
         }
-        .padding(.vertical, 5)
+        .padding(.vertical, Spacing.xs)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityLabel)
+    }
+
+    /// One spoken summary for the whole row, in reading order: what was bought,
+    /// its status + category, the USD price, when, and for whom.
+    private var accessibilityLabel: String {
+        var parts: [String] = [title, "Status \(order.paymentStatus.capitalized)"]
+        if let cat = OrderCategory(order) { parts.append(cat.word) }
+        parts.append("\(order.usdPriceDisplay) USD")
+        parts.append(shortDate(order.purchaseDate))
+        if let who = subtitle { parts.append(who) }
+        return parts.joined(separator: ", ")
     }
 
     private var subtitle: String? {

@@ -20,13 +20,13 @@ struct SearchScreen: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 12) {
+            VStack(spacing: Spacing.md) {
                 Picker("Search by", selection: $mode) {
                     ForEach(Mode.allCases) { Text($0.rawValue).tag($0) }
                 }
                 .pickerStyle(.segmented)
 
-                HStack {
+                HStack(spacing: Spacing.sm) {
                     TextField(promptText, text: $term)
                         .textFieldStyle(.roundedBorder)
                         #if os(iOS)
@@ -40,7 +40,8 @@ struct SearchScreen: View {
 
                 resultArea
             }
-            .padding(16)
+            .padding(Spacing.lg)
+            .background(AppBackground())
             .navigationTitle("Search")
             .navigationDestination(for: CustomerRef.self) { CustomerDetailScreen(session: session, ref: $0) }
             .onChange(of: mode) { _, _ in phase = .idle; term = "" }
@@ -93,24 +94,28 @@ struct SearchScreen: View {
     }
 
     private func customerRow(_ c: Customer) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: Spacing.xs / 2) {
             Text(c.displayName).font(.headline)
             if let e = c.email, e != c.displayName { Text(e).font(.caption).foregroundStyle(.secondary) }
             if let p = c.phoneNumber, !p.isEmpty { Text(p).font(.caption).foregroundStyle(.secondary) }
         }
-        .padding(.vertical, 3)
+        .padding(.vertical, Spacing.xs)
+        .accessibilityElement(children: .combine)
     }
 
     private func esimRow(_ e: EsimSummary, _ esimTenant: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: Spacing.xs / 2) {
             Text(e.iccid).font(.headline.monospaced()).lineLimit(1)
             if let who = e.customer?.displayName { Text(who).font(.subheadline) }
-            HStack(spacing: 8) {
-                if let cov = e.coverageName { Label(cov, systemImage: "globe").font(.caption) }
+            HStack(spacing: Spacing.sm) {
+                if let cov = e.coverageName {
+                    Label(cov, systemImage: "globe").font(.caption).foregroundStyle(.secondary)
+                }
                 if !esimTenant.isEmpty { Text(esimTenant).font(.caption).foregroundStyle(.secondary) }
             }
         }
-        .padding(.vertical, 3)
+        .padding(.vertical, Spacing.xs)
+        .accessibilityElement(children: .combine)
     }
 
     private func run() async {

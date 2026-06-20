@@ -13,46 +13,71 @@ struct CustomersScreen: View {
     enum Phase { case loading, loaded([Customer]), failed(String) }
 
     var body: some View {
-        Group {
-            if tenant == nil {
-                // The customers list is tenant-scoped (the web doesn't fetch
-                // without one). Prompt instead of hitting the unscoped endpoint.
-                ContentUnavailableView("Pick a tenant", systemImage: "building.2",
-                                       description: Text("Choose a tenant in the toolbar to view its customers."))
-            } else {
-                switch phase {
-                case .loading:
-                    ProgressView().controlSize(.large).frame(maxWidth: .infinity, maxHeight: .infinity)
-                case let .failed(message):
-                    ContentUnavailableView("Couldn't load customers", systemImage: "exclamationmark.triangle",
-                                           description: Text(message))
-                case let .loaded(customers):
-                    if customers.isEmpty {
-                        ContentUnavailableView("No customers", systemImage: "person.2.slash")
-                    } else {
-                        List(customers) { CustomerRow(customer: $0) }
+        NavigationStack {
+            Group {
+                if tenant == nil {
+                    // The customers list is tenant-scoped (the web doesn't fetch
+                    // without one). Prompt instead of hitting the unscoped endpoint.
+                    ContentUnavailableView("Pick a tenant", systemImage: "building.2",
+                                           description: Text("Choose a tenant in the toolbar to view its customers."))
+                } else {
+                    switch phase {
+                    case .loading:
+                        List {
+                            ForEach(0..<8, id: \.self) { _ in
+                                CustomerRowSkeleton().listRowSeparator(.hidden)
+                            }
+                        }
+                        .listStyle(.plain)
+                        .scrollContentBackground(.hidden)
+                    case let .failed(message):
+                        ContentUnavailableView {
+                            Label("Couldn't load customers", systemImage: "exclamationmark.triangle")
+                        } description: {
+                            Text(message)
+                        } actions: {
+                            Button("Try Again") { Task { await load() } }
+                                .buttonStyle(.glassProminent)
+                        }
+                    case let .loaded(customers):
+                        if customers.isEmpty {
+                            ContentUnavailableView("No customers", systemImage: "person.2.slash")
+                        } else {
+                            List(customers) { customer in
+                                // The screen is tenant-gated here, so `tenant` is non-nil.
+                                NavigationLink(value: CustomerRef(tenant: tenant ?? "",
+                                                                  customerId: customer.customerId ?? customer.id)) {
+                                    CustomerRow(customer: customer)
+                                }
+                            }
+                            .listStyle(.plain)
+                            .scrollContentBackground(.hidden)
+                        }
                     }
                 }
             }
-        }
-        .navigationTitle("Customers")
-        .searchable(text: $search, prompt: "Name, email, phone")
-        .onChange(of: search) { _, _ in debouncedSearch() }
-        .toolbar {
-            ToolbarItem {
-                Menu {
-                    Picker("Show", selection: $activeFilter) {
-                        ForEach(CustomerFilter.allCases) { Text($0.label).tag($0) }
+            .background(AppBackground())
+            .navigationDestination(for: CustomerRef.self) { CustomerDetailScreen(session: session, ref: $0) }
+            .navigationTitle("Customers")
+            .searchable(text: $search, prompt: "Name, email, phone")
+            .onChange(of: search) { _, _ in debouncedSearch() }
+            .toolbar {
+                ToolbarItem {
+                    Menu {
+                        Picker("Show", selection: $activeFilter) {
+                            ForEach(CustomerFilter.allCases) { Text($0.label).tag($0) }
+                        }
+                    } label: {
+                        Label(activeFilter.label, systemImage: "line.3.horizontal.decrease.circle")
                     }
-                } label: {
-                    Label(activeFilter.label, systemImage: "line.3.horizontal.decrease.circle")
                 }
             }
+            .onChange(of: activeFilter) { _, _ in Task { await load() } }
+            .reload(on: tenant) { await load() }
+            .refreshable { await load() }
+            .autoRefresh { await load() }
+            .refreshCommand { Task { await load() } }
         }
-        .onChange(of: activeFilter) { _, _ in Task { await load() } }
-        .reload(on: tenant) { await load() }
-        .refreshable { await load() }
-        .autoRefresh { await load() }
     }
 
     /// Debounce keystrokes, then reload from the server (the web searches
@@ -116,7 +141,7 @@ private struct CustomerRow: View {
     let customer: Customer
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: Spacing.xs) {
             HStack {
                 Text(customer.displayName).font(.headline)
                 Spacer()
@@ -129,6 +154,19 @@ private struct CustomerRow: View {
                 Text(phone).font(.caption).foregroundStyle(.secondary)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, Spacing.xs)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(customer.displayName), \(customer.isActive ? "active" : "inactive")")
+    }
+}
+
+/// Redacted placeholder row so the list doesn't pop in from a blank spinner.
+private struct CustomerRowSkeleton: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            SkeletonBar(width: 180, height: 16)
+            SkeletonBar(width: 120, height: 12)
+        }
+        .padding(.vertical, Spacing.xs)
     }
 }
