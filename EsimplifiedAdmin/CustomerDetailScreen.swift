@@ -103,7 +103,7 @@ struct CustomerDetailScreen: View {
         do {
             let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
             let q = ["customer__customer_id": ref.customerId, "limit": "10"]
-            let cust = try await client.get("/api/customers/\(ref.tenant)/\(ref.customerId)", query: [:],
+            let cust = try await client.get("/api/customers/\(ref.tenant)/\(ref.customerId)/", query: [:],
                                             as: SingleCustomerResponse.self)
             let esims = (try? await client.get("/api/esims/\(ref.tenant)/", query: q, as: AssignedEsimsPage.self))?.esims ?? []
             let orders = (try? await client.get("/api/orders/\(ref.tenant)/", query: q, as: OrdersPage.self))?.orders ?? []

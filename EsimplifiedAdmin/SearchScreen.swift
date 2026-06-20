@@ -119,7 +119,7 @@ struct SearchScreen: View {
         do {
             let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
             if mode == .iccid {
-                let resp = try await client.get("/api/esim/\(t)", query: ["search": "true"], as: EsimSearchResponse.self)
+                let resp = try await client.get("/api/esim/\(t)/", query: ["search": "true"], as: EsimSearchResponse.self)
                 if let e = resp.esim, !e.iccid.isEmpty {
                     phase = .esim(e, resp.tenant ?? tenant ?? "")
                 } else {

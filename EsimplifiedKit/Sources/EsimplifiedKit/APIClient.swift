@@ -49,6 +49,8 @@ public final class LiveAPIClient: APIClient {
         case 200...299:
             do { return try JSONDecoder().decode(T.self, from: data) }
             catch { throw APIError.decoding }
+        case 401:
+            throw APIError.authExpired
         case 404:
             throw APIError.notFound
         default:
