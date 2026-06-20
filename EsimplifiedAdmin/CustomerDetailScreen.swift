@@ -45,8 +45,14 @@ struct CustomerDetailScreen: View {
             case .loading:
                 ProgressView().controlSize(.large).frame(maxWidth: .infinity, maxHeight: .infinity)
             case let .failed(message):
-                ContentUnavailableView("Couldn't load customer", systemImage: "exclamationmark.triangle",
-                                       description: Text(message))
+                ContentUnavailableView {
+                    Label("Couldn't load customer", systemImage: "exclamationmark.triangle")
+                } description: {
+                    Text(message)
+                } actions: {
+                    Button("Try Again") { Task { await load() } }
+                        .buttonStyle(.glassProminent)
+                }
             case .loaded:
                 content
             }
@@ -58,6 +64,7 @@ struct CustomerDetailScreen: View {
         .background(AppBackground())
         .reload(on: ref.customerId) { await load() }
         .refreshable { await load() }
+        .refreshCommand { Task { await load() } }
         .sheet(item: $sheet) { sheetContent($0) }
     }
 
@@ -81,27 +88,27 @@ struct CustomerDetailScreen: View {
     @ViewBuilder private var content: some View {
         ScrollView {
             if hSize == .compact {
-                VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: Spacing.lg) {
                     if let customer { ProfileCard(customer: customer) }
                     esimDetailSection
                     esimListCard
                     ordersCard
                 }
-                .padding(20)
+                .padding(Spacing.xl)
             } else {
-                HStack(alignment: .top, spacing: 18) {
-                    VStack(alignment: .leading, spacing: 18) {
+                HStack(alignment: .top, spacing: Spacing.lg) {
+                    VStack(alignment: .leading, spacing: Spacing.lg) {
                         if let customer { ProfileCard(customer: customer) }
                         esimListCard
                         ordersCard
                     }
                     .frame(maxWidth: .infinity, alignment: .top)
-                    VStack(alignment: .leading, spacing: 18) {
+                    VStack(alignment: .leading, spacing: Spacing.lg) {
                         esimDetailSection
                     }
                     .frame(maxWidth: .infinity, alignment: .top)
                 }
-                .padding(20)
+                .padding(Spacing.xl)
             }
         }
     }
@@ -109,17 +116,29 @@ struct CustomerDetailScreen: View {
     @ViewBuilder private var esimDetailSection: some View {
         switch detailPhase {
         case .idle:
-            EmptyView()
+            ContentUnavailableView("Select an eSIM", systemImage: "simcard",
+                                   description: Text("Choose an eSIM from the list to see its eUICC, data usage, location, package, and sessions."))
+                .frame(maxWidth: .infinity)
+                .glassCard()
         case .loading:
             SectionCard(title: "eSIM details") {
-                ProgressView().frame(maxWidth: .infinity).padding(.vertical, 8)
+                ProgressView().frame(maxWidth: .infinity).padding(.vertical, Spacing.sm)
             }
         case let .loaded(detail):
             EsimDetailCard(detail: detail) { sheet = $0 }
         case let .failed(message):
-            SectionCard(title: "eSIM details") {
-                Text(message).font(.callout).foregroundStyle(.secondary)
+            ContentUnavailableView {
+                Label("Couldn't load eSIM", systemImage: "exclamationmark.triangle")
+            } description: {
+                Text(message)
+            } actions: {
+                if let iccid = selectedIccid ?? ref.iccid ?? esims.first?.iccid {
+                    Button("Try Again") { Task { await loadDetail(iccid) } }
+                        .buttonStyle(.glassProminent)
+                }
             }
+            .frame(maxWidth: .infinity)
+            .glassCard()
         }
     }
 
@@ -129,23 +148,30 @@ struct CustomerDetailScreen: View {
                 Text("No eSIMs assigned.").font(.callout).foregroundStyle(.secondary)
             } else {
                 ForEach(esims) { e in
+                    let isSelected = e.iccid == (selectedIccid ?? ref.iccid)
                     Button {
                         selectedIccid = e.iccid
                         Task { await loadDetail(e.iccid) }
                     } label: {
                         HStack {
                             Image(systemName: "simcard").foregroundStyle(.secondary)
+                                .accessibilityHidden(true)
                             Text(e.iccid).font(.callout.monospaced()).lineLimit(1)
                             Spacer()
                             if let cov = e.coverageName { Text(cov).font(.caption).foregroundStyle(.secondary) }
-                            if e.iccid == (selectedIccid ?? ref.iccid) {
+                            if isSelected {
                                 Image(systemName: "checkmark.circle.fill").foregroundStyle(.tint).font(.caption)
+                                    .accessibilityHidden(true)
                             }
                         }
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .padding(.vertical, 3)
+                    .padding(.vertical, Spacing.xs)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("eSIM \(e.iccid)\(e.coverageName.map { ", \($0)" } ?? "")")
+                    .accessibilityHint("Shows this eSIM's details")
+                    .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
                 }
             }
         }
@@ -154,16 +180,17 @@ struct CustomerDetailScreen: View {
     private var ordersCard: some View {
         SectionCard(title: "Recent orders (\(orders.count))") {
             if let ordersError {
-                Text(ordersError).font(.callout).foregroundStyle(.orange)
+                Label(ordersError, systemImage: "exclamationmark.triangle")
+                    .font(.callout).foregroundStyle(.warning)
             } else if orders.isEmpty {
                 Text("No orders.").font(.callout).foregroundStyle(.secondary)
             } else {
                 ForEach(orders) { o in
-                    VStack(alignment: .leading, spacing: 3) {
+                    VStack(alignment: .leading, spacing: Spacing.xs) {
                         HStack(alignment: .firstTextBaseline) {
                             Text(o.packageName.isEmpty ? o.orderNumber : o.packageName)
                                 .font(.subheadline.weight(.medium)).lineLimit(1)
-                            Spacer(minLength: 8)
+                            Spacer(minLength: Spacing.sm)
                             VStack(alignment: .trailing, spacing: 0) {
                                 Text(o.usdPriceDisplay).font(.subheadline.monospacedDigit())
                                 if let local = o.localPriceDisplay {
@@ -171,21 +198,35 @@ struct CustomerDetailScreen: View {
                                 }
                             }
                         }
-                        HStack(spacing: 6) {
+                        HStack(spacing: Spacing.xs + 2) {
                             StatusBadge(status: o.paymentStatus)
                             if !o.orderType.isEmpty { Text(o.orderType).font(.caption2).foregroundStyle(.secondary) }
                             if let code = o.discountCode {
-                                Label(code, systemImage: "tag.fill").font(.caption2).foregroundStyle(.orange)
+                                Label(code, systemImage: "tag.fill").font(.caption2).foregroundStyle(.warning)
                             }
                             Spacer()
                             Text(shortDate(o.purchaseDate)).font(.caption2).foregroundStyle(.secondary)
                         }
                     }
-                    .padding(.vertical, 3)
+                    .padding(.vertical, Spacing.xs)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(orderA11yLabel(o))
                     if o.id != orders.last?.id { Divider() }
                 }
             }
         }
+    }
+
+    /// One spoken sentence for an order row, so VoiceOver reads it as a unit
+    /// rather than five disjoint fragments.
+    private func orderA11yLabel(_ o: Order) -> String {
+        var parts = [o.packageName.isEmpty ? o.orderNumber : o.packageName,
+                     o.usdPriceDisplay,
+                     "Status: \(o.paymentStatus.capitalized)"]
+        if !o.orderType.isEmpty { parts.append(o.orderType) }
+        if let code = o.discountCode { parts.append("Discount \(code)") }
+        parts.append(shortDate(o.purchaseDate))
+        return parts.joined(separator: ", ")
     }
 
     private func load() async {
@@ -244,12 +285,12 @@ private struct EsimDetailCard: View {
     var onView: (EsimDetailSheet) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: Spacing.lg) {
             header
             if !euiccItems.isEmpty {
                 LazyVGrid(columns: [GridItem(.flexible(), alignment: .topLeading),
                                     GridItem(.flexible(), alignment: .topLeading)],
-                          alignment: .leading, spacing: 12) {
+                          alignment: .leading, spacing: Spacing.md) {
                     ForEach(euiccItems, id: \.0) { LabeledValue(label: $0.0, value: $0.1) }
                 }
             }
@@ -271,9 +312,14 @@ private struct EsimDetailCard: View {
         Button(title) { onView(sheet) }.font(.caption).buttonStyle(.borderless)
     }
 
+    /// A sub-section eyebrow with an optional "View all" affordance. Matches the
+    /// eyebrow register of `SectionHeader` so the type system reads as one family.
     private func sectionHeader(_ title: String, view: EsimDetailSheet?) -> some View {
-        HStack {
-            Text(title).font(.caption2.weight(.semibold)).tracking(0.6).foregroundStyle(.tertiary)
+        HStack(alignment: .firstTextBaseline) {
+            Text(title.uppercased())
+                .font(.caption2.weight(.semibold)).tracking(0.8)
+                .foregroundStyle(.secondary)
+                .accessibilityAddTraits(.isHeader)
             Spacer()
             if let view { viewButton("View all", view) }
         }
@@ -281,18 +327,23 @@ private struct EsimDetailCard: View {
 
     private var header: some View {
         HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: Spacing.xs) {
                 Text(detail.coverageName.map { "\($0) eSIM" } ?? "eSIM Details").font(.headline)
                 Text(detail.iccid).font(.caption.monospaced()).foregroundStyle(.tint).textSelection(.enabled)
+                    .accessibilityLabel("ICCID \(detail.iccid)")
                 if let name = detail.esimName, !name.isEmpty {
                     Text(name).font(.caption).foregroundStyle(.secondary)
                 }
             }
             Spacer()
-            VStack(alignment: .trailing, spacing: 4) {
-                if let st = detail.euicc?.state { Badge(text: st.capitalized, color: stateColor(st)) }
+            VStack(alignment: .trailing, spacing: Spacing.xs) {
+                if let st = detail.euicc?.state {
+                    Badge(text: st.capitalized, color: stateColor(st), systemImage: stateGlyph(st))
+                        .accessibilityLabel("eUICC state: \(st.capitalized)")
+                }
                 Badge(text: detail.autoTopUp ? "Auto Top-Up On" : "Auto Top-Up Off",
-                      color: detail.autoTopUp ? .blue : .secondary)
+                      color: detail.autoTopUp ? .blue : .secondary,
+                      systemImage: detail.autoTopUp ? "arrow.triangle.2.circlepath" : "pause.circle")
             }
         }
     }
@@ -324,31 +375,38 @@ private struct EsimDetailCard: View {
             return f.isFinite ? min(max(f, 0), 1) : 1
         }()
         let unlimited = !(total.isFinite && total > 0)
-        VStack(alignment: .leading, spacing: 6) {
+        let usageText = unlimited ? "Unlimited" : "\(fmtGB(remaining)) of \(fmtGB(total)) left"
+        VStack(alignment: .leading, spacing: Spacing.xs + 2) {
             HStack {
                 Text("DATA").font(.caption2.weight(.semibold)).tracking(0.6).foregroundStyle(.tertiary)
                 Spacer()
-                Text(unlimited ? "Unlimited" : "\(fmtGB(remaining)) of \(fmtGB(total)) left")
+                Text(usageText)
                     .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
             }
             ProgressView(value: fraction).tint(.accentColor)
+                .accessibilityLabel("Data remaining")
+                .accessibilityValue(usageText)
         }
+        .accessibilityElement(children: .combine)
     }
 
     @ViewBuilder private func locationBlock(_ loc: EsimLocation?) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: Spacing.xs) {
             sectionHeader("LAST LOCATION", view: .locations(detail.iccid))
             if let loc {
-                HStack {
-                    Text(loc.countryName ?? "—").font(.callout)
-                    Spacer()
-                    if let op = loc.operator {
-                        Text(op).font(.caption.weight(.medium)).foregroundStyle(loc.dataAllowed ? .green : .red)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack {
+                        Text(loc.countryName ?? "—").font(.callout)
+                        Spacer()
+                        if let op = loc.operator {
+                            OperatorAllowance(operatorName: op, dataAllowed: loc.dataAllowed)
+                        }
+                    }
+                    if let when = epochDate(loc.dateEpoch) {
+                        Text("\(when) UTC").font(.caption2).foregroundStyle(.secondary)
                     }
                 }
-                if let when = epochDate(loc.dateEpoch) {
-                    Text("\(when) UTC").font(.caption2).foregroundStyle(.secondary)
-                }
+                .accessibilityElement(children: .combine)
             } else {
                 Text("No location data.").font(.caption).foregroundStyle(.secondary)
             }
@@ -356,13 +414,16 @@ private struct EsimDetailCard: View {
     }
 
     @ViewBuilder private func packageBlock(_ pkg: EsimPackage?) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: Spacing.xs) {
             sectionHeader("ACTIVE PACKAGE", view: detail.packages.isEmpty ? nil : .packages(detail.packages))
             if let pkg {
-                Text(pkg.displayName).font(.callout)
-                if !pkg.supportedCountries.isEmpty {
-                    Text("\(pkg.supportedCountries.count) countries").font(.caption2).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(pkg.displayName).font(.callout)
+                    if !pkg.supportedCountries.isEmpty {
+                        Text("\(pkg.supportedCountries.count) countries").font(.caption2).foregroundStyle(.secondary)
+                    }
                 }
+                .accessibilityElement(children: .combine)
             } else {
                 Text("No active package.").font(.caption).foregroundStyle(.secondary)
             }
@@ -370,7 +431,7 @@ private struct EsimDetailCard: View {
     }
 
     @ViewBuilder private func sessionBlock(_ s: OpenDataSession?) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: Spacing.xs) {
             sectionHeader("OPEN DATA SESSION", view: .sessions(detail.iccid))
             if let s {
                 HStack {
@@ -382,6 +443,7 @@ private struct EsimDetailCard: View {
                     // usage_kb is fed to a byte-based formatter to match the web exactly.
                     if let kb = s.usageKb { Text(fmtBytes(kb)).font(.caption.monospacedDigit()).foregroundStyle(.secondary) }
                 }
+                .accessibilityElement(children: .combine)
             } else {
                 Text("No open sessions.").font(.caption).foregroundStyle(.secondary)
             }
@@ -411,27 +473,41 @@ private struct LocationsSheet: View {
     let iccid: String
     @State private var rows: [EsimLocation] = []
     @State private var loading = true
+    @State private var error: String?
     var body: some View {
-        listOrEmpty(loading: loading, count: rows.count, empty: "No location history.") {
+        listOrEmpty(loading: loading, count: rows.count, empty: "No location history.",
+                    error: error, retry: { Task { await load() } }) {
             ForEach(rows) { loc in
                 VStack(alignment: .leading, spacing: 2) {
                     HStack {
                         Text(loc.countryName ?? "—").font(.body)
                         Spacer()
                         if let op = loc.operator {
-                            Text(op).font(.caption).foregroundStyle(loc.dataAllowed ? .green : .red)
+                            OperatorAllowance(operatorName: op, dataAllowed: loc.dataAllowed, font: .caption)
                         }
                     }
                     if let when = epochDate(loc.dateEpoch) { Text("\(when) UTC").font(.caption).foregroundStyle(.secondary) }
                 }
+                .accessibilityElement(children: .combine)
             }
         }
         .navigationTitle("Locations")
-        .task {
-            let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
-            rows = (try? await client.get("/api/esim/\(iccid)/location/", query: ["limit": "100"], as: EsimLocationList.self))?.results ?? []
-            loading = false
+        .reload(on: iccid) { await load() }
+    }
+
+    private func load() async {
+        loading = true; error = nil
+        let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
+        do {
+            rows = try await client.get("/api/esim/\(iccid)/location/", query: ["limit": "100"], as: EsimLocationList.self).results
+        } catch is CancellationError {
+            return
+        } catch let e as APIError {
+            error = adminErrorMessage(e)
+        } catch {
+            self.error = "Couldn't load location history."
         }
+        loading = false
     }
 }
 
@@ -440,8 +516,10 @@ private struct SessionsSheet: View {
     let iccid: String
     @State private var rows: [EsimSession] = []
     @State private var loading = true
+    @State private var error: String?
     var body: some View {
-        listOrEmpty(loading: loading, count: rows.count, empty: "No sessions.") {
+        listOrEmpty(loading: loading, count: rows.count, empty: "No sessions.",
+                    error: error, retry: { Task { await load() } }) {
             ForEach(rows) { s in
                 VStack(alignment: .leading, spacing: 2) {
                     HStack {
@@ -458,14 +536,26 @@ private struct SessionsSheet: View {
                         Text("Closed \(when) UTC").font(.caption2).foregroundStyle(.secondary)
                     }
                 }
+                .accessibilityElement(children: .combine)
             }
         }
         .navigationTitle("Sessions")
-        .task {
-            let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
-            rows = (try? await client.get("/api/esim/\(iccid)/cdr/", query: ["limit": "100"], as: EsimSessionList.self))?.results ?? []
-            loading = false
+        .reload(on: iccid) { await load() }
+    }
+
+    private func load() async {
+        loading = true; error = nil
+        let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
+        do {
+            rows = try await client.get("/api/esim/\(iccid)/cdr/", query: ["limit": "100"], as: EsimSessionList.self).results
+        } catch is CancellationError {
+            return
+        } catch let e as APIError {
+            error = adminErrorMessage(e)
+        } catch {
+            self.error = "Couldn't load sessions."
         }
+        loading = false
     }
 }
 
@@ -480,12 +570,13 @@ private struct PackagesSheet: View {
                         Spacer()
                         if let s = pkg.status { StatusBadge(status: s) }
                     }
-                    HStack(spacing: 8) {
+                    HStack(spacing: Spacing.sm) {
                         // Allowance is already part of displayName; show countries + created date here.
                         if !pkg.supportedCountries.isEmpty { Text("\(pkg.supportedCountries.count) countries").font(.caption2).foregroundStyle(.secondary) }
                         if let when = epochDate(pkg.dateCreatedEpoch) { Text(when).font(.caption2).foregroundStyle(.secondary) }
                     }
                 }
+                .accessibilityElement(children: .combine)
             }
         }
         .navigationTitle("Packages")
@@ -502,14 +593,15 @@ private struct WhitelistSheet: View {
                         Text(w.country ?? "—").font(.body)
                         Spacer()
                         if let op = w.operator {
-                            Text(op).font(.caption).foregroundStyle(w.dataAllowed ? .green : .red)
+                            OperatorAllowance(operatorName: op, dataAllowed: w.dataAllowed, font: .caption)
                         }
                     }
-                    HStack(spacing: 8) {
+                    HStack(spacing: Spacing.sm) {
                         if let n = w.whitelistName { Text(n).font(.caption2).foregroundStyle(.secondary) }
                         if let bc = w.bestConnectivity { Text(bc).font(.caption2).foregroundStyle(.tertiary) }
                     }
                 }
+                .accessibilityElement(children: .combine)
             }
         }
         .navigationTitle("Whitelist")
@@ -518,8 +610,17 @@ private struct WhitelistSheet: View {
 
 @ViewBuilder
 private func listOrEmpty<Content: View>(loading: Bool, count: Int, empty: String,
+                                        error: String? = nil, retry: (() -> Void)? = nil,
                                         @ViewBuilder content: () -> Content) -> some View {
-    if loading {
+    if let error {
+        ContentUnavailableView {
+            Label("Couldn't load", systemImage: "exclamationmark.triangle")
+        } description: {
+            Text(error)
+        } actions: {
+            if let retry { Button("Try Again", action: retry).buttonStyle(.glassProminent) }
+        }
+    } else if loading {
         ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
     } else if count == 0 {
         ContentUnavailableView(empty, systemImage: "tray")
@@ -538,6 +639,8 @@ private struct LabeledValue: View {
                 .lineLimit(2).minimumScaleFactor(0.7)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(label): \(value)")
     }
 }
 
@@ -569,26 +672,65 @@ private func fmtBytes(_ bytes: Double?) -> String {
 }
 
 /// Colour an eUICC state badge by meaning — the web shows no colour, but a flat
-/// green badge wrongly implies "all good" for ERROR/DISABLED states.
+/// green badge wrongly implies "all good" for ERROR/DISABLED states. Anchored to
+/// the design system's `StatusStyle` for the states it knows, with eUICC-specific
+/// nuance on top (DISABLED/DELETED read as a warning, UNKNOWN as a problem).
 private func stateColor(_ state: String) -> Color {
     switch state.uppercased() {
-    case "RELEASED", "ENABLED", "INSTALLED": return .green
-    case "DISABLED", "DELETED": return .orange
-    case "ERROR", "UNKNOWN": return .red
-    default: return .secondary
+    case "DISABLED", "DELETED": return .warning
+    case "UNKNOWN": return .negative
+    default:
+        let c = StatusStyle.color(state)
+        return c == .secondary ? .secondary : c
+    }
+}
+
+/// A glyph that carries the eUICC state's meaning without relying on colour, so
+/// the badge is legible to colour-blind users and VoiceOver alike.
+private func stateGlyph(_ state: String) -> String {
+    switch state.uppercased() {
+    case "RELEASED", "ENABLED", "INSTALLED": return "checkmark.circle"
+    case "DISABLED", "DELETED": return "pause.circle"
+    case "ERROR", "UNKNOWN": return "exclamationmark.triangle"
+    default: return "questionmark.circle"
+    }
+}
+
+/// Shows a roaming operator and whether data is allowed on it. Meaning rides on
+/// a glyph + spoken label (allowed/blocked), with colour as reinforcement only —
+/// never the sole signal. Reused by the location, locations-history, and
+/// whitelist rows so allowed/blocked reads identically everywhere.
+private struct OperatorAllowance: View {
+    let operatorName: String
+    let dataAllowed: Bool
+    var font: Font = .caption.weight(.medium)
+    var body: some View {
+        Label {
+            Text(operatorName)
+        } icon: {
+            Image(systemName: dataAllowed ? "checkmark.circle" : "xmark.circle")
+        }
+        .labelStyle(.titleAndIcon)
+        .font(font)
+        .foregroundStyle(dataAllowed ? Color.positive : Color.negative)
+        .accessibilityElement()
+        .accessibilityLabel("\(operatorName), \(dataAllowed ? "Data allowed" : "Data blocked")")
     }
 }
 
 private struct ProfileCard: View {
     let customer: Customer
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Spacing.md) {
             Text(customer.displayName).font(.title2.weight(.semibold))
-            HStack(spacing: 8) {
-                Badge(text: customer.isActive ? "Active" : "Disabled", color: customer.isActive ? .green : .red)
+            HStack(spacing: Spacing.sm) {
+                Badge(text: customer.isActive ? "Active" : "Disabled",
+                      color: customer.isActive ? .positive : .negative,
+                      systemImage: customer.isActive ? "checkmark.circle" : "xmark.circle")
                 if customer.email != nil {
                     Badge(text: customer.emailVerified ? "Email verified" : "Email not verified",
-                          color: customer.emailVerified ? .green : .orange)
+                          color: customer.emailVerified ? .positive : .warning,
+                          systemImage: customer.emailVerified ? "checkmark.seal" : "exclamationmark.circle")
                 }
             }
             if let email = customer.email { Field("Email", email) }
@@ -602,10 +744,11 @@ private struct ProfileCard: View {
 
 private struct SectionCard<Content: View>: View {
     let title: String
+    var eyebrow: String?
     @ViewBuilder var content: Content
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title).font(.headline)
+        VStack(alignment: .leading, spacing: Spacing.md) {
+            SectionHeader(title, eyebrow: eyebrow)
             content
         }
         .glassCard()
@@ -619,10 +762,12 @@ private struct Field: View {
     var body: some View {
         HStack(alignment: .top) {
             Text(label).font(.caption).foregroundStyle(.secondary)
-            Spacer(minLength: 12)
+            Spacer(minLength: Spacing.md)
             Text(value).font(.callout.monospaced()).multilineTextAlignment(.trailing)
                 .textSelection(.enabled).lineLimit(2)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(label): \(value)")
     }
 }
 
