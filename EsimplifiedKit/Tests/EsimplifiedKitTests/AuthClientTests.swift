@@ -90,6 +90,38 @@ final class AuthClientTests: XCTestCase {
         XCTAssertEqual(s.accessToken, "a3")
     }
 
+    func test_refresh_omits_basic_auth_and_sends_client_creds_in_body() async throws {
+        // OAuth2 confidential-client refresh: no Basic header; creds in the form
+        // body (mirrors the web client). Login keeps Basic — verified separately.
+        var captured: URLRequest?
+        MockURLProtocol.handler = { req in
+            captured = req
+            let json = #"{"access_token":"a3","refresh_token":"r3","expires_in":3600,"scope":"order:read","account_type":"human"}"#
+            return (HTTPURLResponse(url: req.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, Data(json.utf8))
+        }
+        _ = try await makeClient().refresh(host: "https://h.io", refreshToken: "r2")
+        XCTAssertEqual(captured?.url?.absoluteString, "https://h.io/auth/token/")
+        XCTAssertNil(captured?.value(forHTTPHeaderField: "Authorization"))
+        let body = try XCTUnwrap(String(data: XCTUnwrap(Self.bodyData(captured)), encoding: .utf8))
+        XCTAssertTrue(body.contains("grant_type=refresh_token"), body)
+        XCTAssertTrue(body.contains("refresh_token=r2"), body)
+        XCTAssertTrue(body.contains("client_id=cid"), body)
+        XCTAssertTrue(body.contains("client_secret=csec"), body)
+    }
+
+    private static func bodyData(_ req: URLRequest?) -> Data? {
+        guard let req else { return nil }
+        if let b = req.httpBody { return b }
+        guard let stream = req.httpBodyStream else { return nil }
+        stream.open(); defer { stream.close() }
+        var acc = Data(); let size = 4096
+        let buf = UnsafeMutablePointer<UInt8>.allocate(capacity: size); defer { buf.deallocate() }
+        while stream.hasBytesAvailable {
+            let n = stream.read(buf, maxLength: size); if n <= 0 { break }; acc.append(buf, count: n)
+        }
+        return acc
+    }
+
     func test_formEncode_percent_encodes_special_characters() {
         // %, @, space, and + must all be encoded so credentials survive intact.
         XCTAssertEqual(LiveAuthClient.formEncode(["a": "x%y@z d+e"]), "a=x%25y%40z%20d%2Be")

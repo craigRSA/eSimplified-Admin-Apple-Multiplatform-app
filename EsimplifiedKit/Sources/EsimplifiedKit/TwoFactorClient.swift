@@ -28,23 +28,25 @@ public final class LiveTwoFactorClient: TwoFactorClient {
     }
 
     public func status() async throws -> Bool {
-        let json = try await send("GET", "/2fa/status/", json: nil)
-        return (json["totp_enabled"] as? Bool) ?? false
+        let json = try await send("GET", "/api/2fa/status/", json: nil)
+        // `enabled` is the guaranteed field; `totp_enabled` is preferred but
+        // optional (mirrors the web fallback chain in two-factor-card.tsx).
+        return (json["totp_enabled"] as? Bool) ?? (json["enabled"] as? Bool) ?? false
     }
 
     public func beginSetup() async throws -> TOTPSetup {
         // Bodyless POST, matching the web app's setup2FA().
-        let json = try await send("POST", "/2fa/setup/", json: nil)
+        let json = try await send("POST", "/api/2fa/setup/", json: nil)
         guard let url = json["otpauth_url"] as? String else { throw APIError.decoding }
         return TOTPSetup(otpauthURL: url, secret: json["secret"] as? String)
     }
 
     public func verify(code: String) async throws {
-        _ = try await send("POST", "/2fa/verify/", json: ["code": code])
+        _ = try await send("POST", "/api/2fa/verify/", json: ["code": code])
     }
 
     public func disable(code: String) async throws {
-        _ = try await send("POST", "/2fa/disable/", json: ["code": code])
+        _ = try await send("POST", "/api/2fa/disable/", json: ["code": code])
     }
 
     // Endpoints take a JSON body with `{ "code": ... }` (matches the web app).
@@ -69,8 +71,21 @@ public final class LiveTwoFactorClient: TwoFactorClient {
         } catch {
             throw APIError.unreachable
         }
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+        guard let http = response as? HTTPURLResponse else { throw APIError.unreachable }
+        switch http.statusCode {
+        case 200...299:
+            break
+        case 401:
             throw APIError.authExpired
+        case 404:
+            throw APIError.notFound
+        default:
+            // A wrong code (400), permission (403), or 5xx must surface the real
+            // status + server reason — not masquerade as an expired session.
+            let body = String(data: data, encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let message = (body?.isEmpty == false) ? String(body!.prefix(300)) : nil
+            throw APIError.requestFailed(status: http.statusCode, serverMessage: message)
         }
         return (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
     }

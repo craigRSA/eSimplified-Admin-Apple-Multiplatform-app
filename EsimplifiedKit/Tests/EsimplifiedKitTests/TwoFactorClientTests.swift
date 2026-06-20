@@ -10,7 +10,7 @@ final class TwoFactorClientTests: XCTestCase {
 
     func test_status_reads_totp_enabled() async throws {
         MockURLProtocol.handler = { req in
-            XCTAssertEqual(req.url?.absoluteString, "https://h.io/2fa/status/")
+            XCTAssertEqual(req.url?.absoluteString, "https://h.io/api/2fa/status/")
             XCTAssertEqual(req.value(forHTTPHeaderField: "Authorization"), "Bearer tok")
             return (HTTPURLResponse(url: req.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!,
                     Data(#"{"totp_enabled":true}"#.utf8))
@@ -22,7 +22,7 @@ final class TwoFactorClientTests: XCTestCase {
     func test_beginSetup_returns_otpauth_url_and_secret() async throws {
         MockURLProtocol.handler = { req in
             XCTAssertEqual(req.httpMethod, "POST")
-            XCTAssertEqual(req.url?.absoluteString, "https://h.io/2fa/setup/")
+            XCTAssertEqual(req.url?.absoluteString, "https://h.io/api/2fa/setup/")
             return (HTTPURLResponse(url: req.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!,
                     Data(#"{"method":"totp","otpauth_url":"otpauth://totp/e?secret=ABC","secret":"ABC"}"#.utf8))
         }
@@ -32,7 +32,7 @@ final class TwoFactorClientTests: XCTestCase {
 
     func test_verify_posts_json_code_and_succeeds_on_2xx() async throws {
         MockURLProtocol.handler = { req in
-            XCTAssertEqual(req.url?.absoluteString, "https://h.io/2fa/verify/")
+            XCTAssertEqual(req.url?.absoluteString, "https://h.io/api/2fa/verify/")
             XCTAssertEqual(req.httpMethod, "POST")
             XCTAssertEqual(req.value(forHTTPHeaderField: "Content-Type"), "application/json")
             XCTAssertEqual(Self.bodyJSON(req)?["code"] as? String, "123456")
@@ -43,7 +43,7 @@ final class TwoFactorClientTests: XCTestCase {
 
     func test_disable_posts_json_code_to_correct_endpoint() async throws {
         MockURLProtocol.handler = { req in
-            XCTAssertEqual(req.url?.absoluteString, "https://h.io/2fa/disable/")
+            XCTAssertEqual(req.url?.absoluteString, "https://h.io/api/2fa/disable/")
             XCTAssertEqual(req.httpMethod, "POST")
             XCTAssertEqual(req.value(forHTTPHeaderField: "Content-Type"), "application/json")
             XCTAssertEqual(Self.bodyJSON(req)?["code"] as? String, "654321")
@@ -70,9 +70,25 @@ final class TwoFactorClientTests: XCTestCase {
         return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
     }
 
-    func test_verify_throws_authExpired_on_non_2xx() async {
+    func test_verify_surfaces_real_status_on_non_2xx() async {
+        // A wrong code (400) must surface the real status + server reason, not
+        // a false "session expired".
         MockURLProtocol.handler = { req in
-            (HTTPURLResponse(url: req.url!, statusCode: 400, httpVersion: nil, headerFields: nil)!, Data("{}".utf8))
+            (HTTPURLResponse(url: req.url!, statusCode: 400, httpVersion: nil, headerFields: nil)!,
+             Data(#"{"detail":"invalid code"}"#.utf8))
+        }
+        do { try await makeClient().verify(code: "000000"); XCTFail("expected throw") }
+        catch let APIError.requestFailed(status, message) {
+            XCTAssertEqual(status, 400)
+            XCTAssertEqual(message, #"{"detail":"invalid code"}"#)
+        }
+        catch { XCTFail("unexpected \(error)") }
+    }
+
+    func test_verify_throws_authExpired_on_401() async {
+        // Only a true 401 signals an expired session.
+        MockURLProtocol.handler = { req in
+            (HTTPURLResponse(url: req.url!, statusCode: 401, httpVersion: nil, headerFields: nil)!, Data("{}".utf8))
         }
         do { try await makeClient().verify(code: "000000"); XCTFail("expected throw") }
         catch let e as APIError { XCTAssertEqual(e, .authExpired) }

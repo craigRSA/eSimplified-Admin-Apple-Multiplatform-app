@@ -49,24 +49,30 @@ public final class LiveAuthClient: AuthClient {
     }
 
     public func refresh(host: String, refreshToken: String) async throws -> Session {
+        // OAuth2 refresh for a confidential client mirrors the web client: NO
+        // Basic auth header; the client_id/client_secret travel in the form body.
+        // (Login, by contrast, keeps Basic auth and omits body creds.)
         let json = try await post(host: host, path: "/auth/token/", extraHeaders: [:], form: [
             "grant_type": "refresh_token", "refresh_token": refreshToken,
-        ])
+            "client_id": clientID, "client_secret": clientSecret,
+        ], useBasicAuth: false)
         return try Self.makeSession(from: json, host: host)
     }
 
     // MARK: - helpers
 
     private func post(host: String, path: String, extraHeaders: [String: String],
-                      form: [String: String]) async throws -> [String: Any] {
+                      form: [String: String], useBasicAuth: Bool = true) async throws -> [String: Any] {
         guard var components = URLComponents(string: host) else { throw APIError.unreachable }
         components.path = path
         guard let url = components.url else { throw APIError.unreachable }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        let creds = Data("\(clientID):\(clientSecret)".utf8).base64EncodedString()
-        request.setValue("Basic \(creds)", forHTTPHeaderField: "Authorization")
+        if useBasicAuth {
+            let creds = Data("\(clientID):\(clientSecret)".utf8).base64EncodedString()
+            request.setValue("Basic \(creds)", forHTTPHeaderField: "Authorization")
+        }
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         for (key, value) in extraHeaders { request.setValue(value, forHTTPHeaderField: key) }
