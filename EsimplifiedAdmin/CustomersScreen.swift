@@ -8,6 +8,7 @@ struct CustomersScreen: View {
     @State private var phase: Phase = .loading
     @State private var search = ""
     @State private var searchTask: Task<Void, Never>?
+    @State private var activeFilter: CustomerFilter = .active
 
     enum Phase { case loading, loaded([Customer]), failed(String) }
 
@@ -30,6 +31,18 @@ struct CustomersScreen: View {
         .navigationTitle("Customers")
         .searchable(text: $search, prompt: "Name, email, phone")
         .onChange(of: search) { _, _ in debouncedSearch() }
+        .toolbar {
+            ToolbarItem {
+                Menu {
+                    Picker("Show", selection: $activeFilter) {
+                        ForEach(CustomerFilter.allCases) { Text($0.label).tag($0) }
+                    }
+                } label: {
+                    Label(activeFilter.label, systemImage: "line.3.horizontal.decrease.circle")
+                }
+            }
+        }
+        .onChange(of: activeFilter) { _, _ in Task { await load() } }
         .reload(on: tenant) { await load() }
         .refreshable { await load() }
         .autoRefresh { await load() }
@@ -50,8 +63,10 @@ struct CustomersScreen: View {
         do {
             let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
             let path = tenant.map { "/api/customers/\($0)/" } ?? "/api/customers/"
-            // Match the web default: active-only (no all/inactive toggle in the app).
-            var query = ["limit": "500", "is_active": "true"]
+            // Default is Active (matches the web server-side default); the toolbar
+            // filter can switch to Inactive or All (which omits is_active).
+            var query = ["limit": "500"]
+            if let v = activeFilter.queryValue { query["is_active"] = v }
             let term = search.trimmingCharacters(in: .whitespaces)
             if !term.isEmpty { query["search"] = term }
             let page = try await client.get(path, query: query, as: CustomersPage.self)
@@ -62,6 +77,28 @@ struct CustomersScreen: View {
             // View navigated away mid-load — not a real error.
         } catch {
             phase = .failed("Unexpected error.")
+        }
+    }
+}
+
+/// Active / Inactive / All filter for the customers list. Default Active mirrors
+/// the web's server-side default (is_active=true); All omits the param.
+enum CustomerFilter: String, CaseIterable, Identifiable {
+    case active, inactive, all
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .active: "Active"
+        case .inactive: "Inactive"
+        case .all: "All"
+        }
+    }
+    /// The `is_active` query value, or nil to omit the param (= all).
+    var queryValue: String? {
+        switch self {
+        case .active: "true"
+        case .inactive: "false"
+        case .all: nil
         }
     }
 }

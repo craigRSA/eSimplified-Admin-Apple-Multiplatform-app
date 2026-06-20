@@ -364,7 +364,8 @@ private struct EsimDetailCard: View {
                         Text(when).font(.caption2).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    if let kb = s.usageKb { Text(fmtKB(kb)).font(.caption.monospacedDigit()).foregroundStyle(.secondary) }
+                    // usage_kb is fed to a byte-based formatter to match the web exactly.
+                    if let kb = s.usageKb { Text(fmtBytes(kb)).font(.caption.monospacedDigit()).foregroundStyle(.secondary) }
                 }
             } else {
                 Text("No open sessions.").font(.caption).foregroundStyle(.secondary)
@@ -537,12 +538,6 @@ private func fmtGB(_ gb: Double) -> String {
     guard gb.isFinite else { return "—" }
     if gb < 0 { return "Unlimited" }   // negative allowance = unlimited (matches the web)
     return gb >= 1 ? String(format: "%.1fGB", gb) : String(format: "%.0fMB", gb * 1024)
-}
-
-private func fmtKB(_ kb: Double) -> String {
-    if kb >= 1_048_576 { return String(format: "%.2fGB", kb / 1_048_576) }
-    if kb >= 1024 { return String(format: "%.1fMB", kb / 1024) }
-    return String(format: "%.0fKB", kb)
 }
 
 /// Human-readable byte count, mirroring the web `format_bytes` (scales B→TB at
