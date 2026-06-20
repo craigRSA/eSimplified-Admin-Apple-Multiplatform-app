@@ -6,6 +6,9 @@ public struct Customer: Decodable, Identifiable, Sendable {
     public let customerId: String?
     public let email: String?
     public let fullName: String?
+    public let firstName: String?
+    public let lastName: String?
+    public let externalReference: String?
     public let phoneNumber: String?
     public let isActive: Bool
     public let emailVerified: Bool
@@ -14,6 +17,9 @@ public struct Customer: Decodable, Identifiable, Sendable {
     private enum K: String, CodingKey {
         case email, created
         case fullName = "full_name"
+        case firstName = "first_name"
+        case lastName = "last_name"
+        case externalReference = "external_reference"
         case phoneNumber = "phone_number"
         case isActive = "is_active"
         case emailVerified = "email_verified"
@@ -24,16 +30,26 @@ public struct Customer: Decodable, Identifiable, Sendable {
         let c = try decoder.container(keyedBy: K.self)
         email = try c.decodeIfPresent(String.self, forKey: .email)
         fullName = try c.decodeIfPresent(String.self, forKey: .fullName)
+        firstName = try c.decodeIfPresent(String.self, forKey: .firstName)
+        lastName = try c.decodeIfPresent(String.self, forKey: .lastName)
+        externalReference = try c.decodeIfPresent(String.self, forKey: .externalReference)
         phoneNumber = try c.decodeIfPresent(String.self, forKey: .phoneNumber)
-        isActive = try c.decodeIfPresent(Bool.self, forKey: .isActive) ?? true
+        // Match the web: an absent/false is_active reads as Inactive/Disabled
+        // (the web detail uses `is_active ?? false`).
+        isActive = try c.decodeIfPresent(Bool.self, forKey: .isActive) ?? false
         emailVerified = try c.decodeIfPresent(Bool.self, forKey: .emailVerified) ?? false
         created = try c.decodeIfPresent(String.self, forKey: .created)
         customerId = try c.decodeIfPresent(String.self, forKey: .customerId)
         id = customerId ?? email ?? UUID().uuidString
     }
 
+    /// Display name mirroring the web's CustomerName / detail-header fallbacks:
+    /// full_name → first + last → external_reference → email.
     public var displayName: String {
-        if let fullName, !fullName.isEmpty { return fullName }
+        if let fullName, !fullName.trimmingCharacters(in: .whitespaces).isEmpty { return fullName }
+        let names = [firstName, lastName].compactMap { $0 }.filter { !$0.isEmpty }
+        if !names.isEmpty { return names.joined(separator: " ") }
+        if let externalReference, !externalReference.isEmpty { return externalReference }
         return email ?? "—"
     }
 }
