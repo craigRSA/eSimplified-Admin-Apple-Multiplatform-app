@@ -30,11 +30,14 @@ public protocol SessionStore {
     func clear() throws
     func saveTrustedDeviceToken(_ token: String, host: String) throws
     func trustedDeviceToken(host: String) throws -> String?
+    func setBiometricEnabled(_ enabled: Bool) throws
+    func biometricEnabled() -> Bool
 }
 
 public final class InMemorySessionStore: SessionStore {
     private var session: Session?
     private var trusted: [String: String] = [:]
+    private var biometric = false
 
     public init() {}
 
@@ -43,4 +46,6 @@ public final class InMemorySessionStore: SessionStore {
     public func clear() throws { session = nil }
     public func saveTrustedDeviceToken(_ token: String, host: String) throws { trusted[host] = token }
     public func trustedDeviceToken(host: String) throws -> String? { trusted[host] }
+    public func setBiometricEnabled(_ enabled: Bool) throws { biometric = enabled }
+    public func biometricEnabled() -> Bool { biometric }
 }

@@ -4,6 +4,7 @@ import Security
 public final class KeychainSessionStore: SessionStore {
     private let service = "io.esimplified.admin"
     private let sessionAccount = "session"
+    private let biometricAccount = "biometric-enabled"
 
     public init() {}
 
@@ -34,6 +35,14 @@ public final class KeychainSessionStore: SessionStore {
 
     private func trustedAccount(_ host: String) -> String { "trusted::\(host)" }
 
+    public func setBiometricEnabled(_ enabled: Bool) throws {
+        try write(Data([enabled ? 1 : 0]), account: biometricAccount)
+    }
+
+    public func biometricEnabled() -> Bool {
+        (try? read(account: biometricAccount))??.first == 1
+    }
+
     private func write(_ data: Data, account: String) throws {
         try delete(account: account)
         let query: [String: Any] = [
@@ -41,6 +50,7 @@ public final class KeychainSessionStore: SessionStore {
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
             kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
         ]
         let status = SecItemAdd(query as CFDictionary, nil)
         guard status == errSecSuccess else { throw KeychainError.unhandled(status) }

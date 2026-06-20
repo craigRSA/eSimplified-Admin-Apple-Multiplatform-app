@@ -36,4 +36,13 @@ final class SessionStoreTests: XCTestCase {
         XCTAssertEqual(try store.trustedDeviceToken(host: "https://a.example.com"), "td-1")
         XCTAssertNil(try store.trustedDeviceToken(host: "https://b.example.com"))
     }
+
+    func test_inMemory_biometricEnabled_defaultsFalse_andRoundTrips() throws {
+        let store = InMemorySessionStore()
+        XCTAssertFalse(store.biometricEnabled())
+        try store.setBiometricEnabled(true)
+        XCTAssertTrue(store.biometricEnabled())
+        try store.setBiometricEnabled(false)
+        XCTAssertFalse(store.biometricEnabled())
+    }
 }
