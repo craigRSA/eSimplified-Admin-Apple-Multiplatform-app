@@ -71,7 +71,7 @@ struct ProfileScreen: View {
         .sheet(isPresented: $showSetup, onDismiss: { Task { await loadStatus() } }) {
             TwoFactorSetupView(host: session.host, accessToken: session.accessToken)
         }
-        .task { await load() }
+        .reload(on: 0) { await load() }
     }
 
     private func load() async {

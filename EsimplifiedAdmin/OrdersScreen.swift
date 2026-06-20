@@ -44,7 +44,7 @@ struct OrdersScreen: View {
         }
         .navigationTitle("Order History")
         .searchable(text: $search, prompt: "Package, customer, email, order #")
-        .task(id: tenant) { await load() }
+        .reload(on: tenant) { await load() }
         .refreshable { await load() }
         .autoRefresh { await load() }
     }

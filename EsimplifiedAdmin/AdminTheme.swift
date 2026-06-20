@@ -89,6 +89,33 @@ struct UTCClock: View {
     }()
 }
 
+// MARK: - Reliable load trigger
+
+/// Loads on appear and whenever `id` changes, using an **unstructured** Task.
+///
+/// On iPhone `NavigationSplitView` collapses, and navigating to a detail screen
+/// cancels its `.task` mid-flight — which silently dropped our network loads
+/// ("not connected" / stuck spinner). An unstructured Task isn't tied to the
+/// view's lifecycle, so the load completes regardless of navigation churn.
+private struct ReloadTrigger<ID: Equatable>: ViewModifier {
+    let id: ID
+    let action: () async -> Void
+    @State private var loadedID: ID?
+    func body(content: Content) -> some View {
+        content
+            .onAppear { if loadedID != id { loadedID = id; Task { await action() } } }
+            .onChange(of: id) { _, newID in loadedID = newID; Task { await action() } }
+    }
+}
+
+extension View {
+    /// Runs `action` on appear and when `id` changes, surviving the `.task`
+    /// cancellation that iPhone `NavigationSplitView` triggers on navigation.
+    func reload<ID: Equatable>(on id: ID, _ action: @escaping () async -> Void) -> some View {
+        modifier(ReloadTrigger(id: id, action: action))
+    }
+}
+
 // MARK: - Auto-refresh
 
 /// App-wide auto-refresh interval (seconds; 0 = off), persisted across launches.

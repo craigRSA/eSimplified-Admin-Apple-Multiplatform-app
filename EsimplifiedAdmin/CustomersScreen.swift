@@ -29,7 +29,7 @@ struct CustomersScreen: View {
         }
         .navigationTitle("Customers")
         .searchable(text: $search, prompt: "Name, email, phone")
-        .task(id: tenant) { await load() }
+        .reload(on: tenant) { await load() }
         .refreshable { await load() }
         .autoRefresh { await load() }
     }

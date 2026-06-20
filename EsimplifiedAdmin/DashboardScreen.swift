@@ -25,7 +25,7 @@ struct DashboardScreen: View {
         }
         .background(AppBackground())
         .navigationTitle("Overview")
-        .task(id: "\(tenant ?? "all")|\(range.rawValue)") { await load() }
+        .reload(on: "\(tenant ?? "all")|\(range.rawValue)") { await load() }
         .refreshable { await load() }
         .autoRefresh { await load() }
     }

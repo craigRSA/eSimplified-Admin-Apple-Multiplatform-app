@@ -25,7 +25,7 @@ struct SearchScreen: View {
         }
         .navigationTitle("Search")
         .searchable(text: $query, prompt: "Customers and orders")
-        .task(id: tenant) { await load() }
+        .reload(on: tenant) { await load() }
         .refreshable { await load() }
     }
 
