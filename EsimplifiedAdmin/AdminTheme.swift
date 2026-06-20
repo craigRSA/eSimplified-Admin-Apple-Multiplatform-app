@@ -72,7 +72,10 @@ struct SectionHeader: View {
 /// so this anchors it no matter where you are.
 struct UTCClock: View {
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { ctx in
+        // Display shows minutes only, so update once a minute — a per-second
+        // ticker on the nav chrome re-renders the container and cancels the
+        // detail screen's in-flight load on iPhone.
+        TimelineView(.periodic(from: .now, by: 60)) { ctx in
             Label(Self.formatter.string(from: ctx.date), systemImage: "clock")
                 .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                 .labelStyle(.titleAndIcon)
