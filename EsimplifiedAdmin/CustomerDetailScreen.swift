@@ -275,7 +275,7 @@ private struct EsimDetailCard: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
-                if let st = detail.euicc?.state { Badge(text: st.capitalized, color: .green) }
+                if let st = detail.euicc?.state { Badge(text: st.capitalized, color: stateColor(st)) }
                 Badge(text: detail.autoTopUp ? "Auto Top-Up On" : "Auto Top-Up Off",
                       color: detail.autoTopUp ? .blue : .secondary)
             }
@@ -344,7 +344,7 @@ private struct EsimDetailCard: View {
         VStack(alignment: .leading, spacing: 3) {
             sectionHeader("ACTIVE PACKAGE", view: detail.packages.isEmpty ? nil : .packages(detail.packages))
             if let pkg {
-                Text(pkg.name ?? "—").font(.callout)
+                Text(pkg.displayName).font(.callout)
                 if !pkg.supportedCountries.isEmpty {
                     Text("\(pkg.supportedCountries.count) countries").font(.caption2).foregroundStyle(.secondary)
                 }
@@ -430,12 +430,16 @@ private struct SessionsSheet: View {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack {
                         Text(s.countryName ?? "—").font(.body)
+                        if let t = s.type { Text(t).font(.caption2).foregroundStyle(.tertiary) }
                         Spacer()
-                        if let gb = s.durationGb { Text(fmtGB(gb)).font(.caption.monospacedDigit()).foregroundStyle(.secondary) }
+                        // Usage is the byte-count "duration" field (matches the web).
+                        Text(fmtBytes(s.durationBytes)).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                     }
-                    HStack(spacing: 6) {
-                        if let t = s.type { Text(t).font(.caption2).foregroundStyle(.secondary) }
-                        if let when = epochDate(s.connectTimeEpoch) { Text(when).font(.caption2).foregroundStyle(.secondary) }
+                    if let when = epochDate(s.connectTimeEpoch) {
+                        Text("Connected \(when) UTC").font(.caption2).foregroundStyle(.secondary)
+                    }
+                    if let when = epochDate(s.closeTimeEpoch) {
+                        Text("Closed \(when) UTC").font(.caption2).foregroundStyle(.secondary)
                     }
                 }
             }
@@ -456,12 +460,12 @@ private struct PackagesSheet: View {
             ForEach(packages) { pkg in
                 VStack(alignment: .leading, spacing: 2) {
                     HStack {
-                        Text(pkg.name ?? "—").font(.body)
+                        Text(pkg.displayName).font(.body)
                         Spacer()
                         if let s = pkg.status { StatusBadge(status: s) }
                     }
                     HStack(spacing: 8) {
-                        if let gb = pkg.dataAllowanceGB { Text(fmtGB((gb as NSDecimalNumber).doubleValue)).font(.caption2).foregroundStyle(.secondary) }
+                        // Allowance is already part of displayName; show countries + created date here.
                         if !pkg.supportedCountries.isEmpty { Text("\(pkg.supportedCountries.count) countries").font(.caption2).foregroundStyle(.secondary) }
                         if let when = epochDate(pkg.dateCreatedEpoch) { Text(when).font(.caption2).foregroundStyle(.secondary) }
                     }
@@ -531,6 +535,7 @@ private func epochDate(_ e: Double?) -> String? {
 
 private func fmtGB(_ gb: Double) -> String {
     guard gb.isFinite else { return "—" }
+    if gb < 0 { return "Unlimited" }   // negative allowance = unlimited (matches the web)
     return gb >= 1 ? String(format: "%.1fGB", gb) : String(format: "%.0fMB", gb * 1024)
 }
 
@@ -538,6 +543,30 @@ private func fmtKB(_ kb: Double) -> String {
     if kb >= 1_048_576 { return String(format: "%.2fGB", kb / 1_048_576) }
     if kb >= 1024 { return String(format: "%.1fMB", kb / 1024) }
     return String(format: "%.0fKB", kb)
+}
+
+/// Human-readable byte count, mirroring the web `format_bytes` (scales B→TB at
+/// 1024 steps, 2 decimals; 0/absent → "0 GB", negative → "Unlimited"). Used for
+/// a session's raw byte-count "duration".
+private func fmtBytes(_ bytes: Double?) -> String {
+    guard let b = bytes, b.isFinite else { return "—" }
+    if b < 0 { return "Unlimited" }
+    if b == 0 { return "0 GB" }
+    let units = ["B", "KB", "MB", "GB", "TB"]
+    var v = b, i = 0
+    while v >= 1024 && i < units.count - 1 { v /= 1024; i += 1 }
+    return String(format: "%.2f %@", v, units[i])
+}
+
+/// Colour an eUICC state badge by meaning — the web shows no colour, but a flat
+/// green badge wrongly implies "all good" for ERROR/DISABLED states.
+private func stateColor(_ state: String) -> Color {
+    switch state.uppercased() {
+    case "RELEASED", "ENABLED", "INSTALLED": return .green
+    case "DISABLED", "DELETED": return .orange
+    case "ERROR", "UNKNOWN": return .red
+    default: return .secondary
+    }
 }
 
 private struct ProfileCard: View {
