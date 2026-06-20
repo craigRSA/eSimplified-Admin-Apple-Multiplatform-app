@@ -21,5 +21,7 @@
 			<string>eSimplified revenue</string>
 		</dict>
 	</array>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Unlock the app with Face ID.</string>
 </dict>
 </plist>

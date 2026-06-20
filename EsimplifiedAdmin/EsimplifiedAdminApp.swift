@@ -122,6 +122,10 @@ final class AdminAppModel {
                 if newSession == nil { self?.tenants = []; self?.selectedTenant = nil }
             }
         } }
+        // Wire up the real isEnabled closure now that self is fully initialised.
+        #if os(iOS)
+        lock = AppLockController(isEnabled: { [weak self] in self?.biometricEnabled ?? false })
+        #endif
     }
 
     func authClient() -> LiveAuthClient { LiveAuthClient(clientID: clientID, clientSecret: clientSecret) }
@@ -143,6 +147,10 @@ final class AdminAppModel {
         Task { await sessionManager.setRefreshEnabled(enabled) }
         #endif
     }
+
+    #if os(iOS)
+    private(set) var lock: AppLockController = AppLockController(isEnabled: { false })
+    #endif
 
     /// The schema name to scope queries by, or nil for all tenants.
     var tenantScope: String? { selectedTenant?.schemaName }
@@ -177,8 +185,14 @@ struct AdminRootView: View {
         if model.session == nil {
             LoginView(model: model)
         } else {
+            #if os(iOS)
             AdminShell(model: model)
                 .environment(\.tokenProvider, model.sessionManager)
+                .modifier(LockContainer(controller: model.lock, onUsePassword: { model.logout() }))
+            #else
+            AdminShell(model: model)
+                .environment(\.tokenProvider, model.sessionManager)
+            #endif
         }
     }
 }

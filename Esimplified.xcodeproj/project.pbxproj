@@ -29,6 +29,7 @@
 		A300000000000000000002D /* AgentApprovalsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A300000000000000000001D /* AgentApprovalsScreen.swift */; };
 		A300000000000000000002E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A300000000000000000001E /* Assets.xcassets */; };
 		A3000000000000000000032 /* EsimplifiedKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3000000000000000000031 /* EsimplifiedKit */; };
+		A3000000000000000000061 /* BiometricLock.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000060 /* BiometricLock.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -82,6 +83,7 @@
 		A300000000000000000001C /* SearchScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchScreen.swift; sourceTree = "<group>"; };
 		A300000000000000000001D /* AgentApprovalsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentApprovalsScreen.swift; sourceTree = "<group>"; };
 		A300000000000000000001E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A3000000000000000000060 /* BiometricLock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiometricLock.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -155,6 +157,7 @@
 				A300000000000000000001B /* ProfileScreen.swift */,
 				A300000000000000000001C /* SearchScreen.swift */,
 				A300000000000000000001D /* AgentApprovalsScreen.swift */,
+				A3000000000000000000060 /* BiometricLock.swift */,
 				A300000000000000000001E /* Assets.xcassets */,
 			);
 			path = EsimplifiedAdmin;
@@ -285,6 +288,7 @@
 				A300000000000000000002B /* ProfileScreen.swift in Sources */,
 				A300000000000000000002C /* SearchScreen.swift in Sources */,
 				A300000000000000000002D /* AgentApprovalsScreen.swift in Sources */,
+				A3000000000000000000061 /* BiometricLock.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
