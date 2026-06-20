@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 // MARK: - Backdrop
 
@@ -346,19 +347,34 @@ struct RefreshIntervalMenu: View {
     /// next refresh (only ticks per-second while a cadence is set).
     @ViewBuilder private var label: some View {
         if seconds > 0 {
-            TimelineView(.periodic(from: .now, by: 1)) { ctx in
-                let target = state.nextFireAt ?? ctx.date.addingTimeInterval(Double(seconds))
-                let remaining = max(0, Int(target.timeIntervalSince(ctx.date).rounded(.up)))
-                Label(Self.countdown(remaining), systemImage: "timer.circle.fill")
-                    .monospacedDigit()
-            }
+            // Only instantiated while a cadence is set, so its 1 Hz ticker stops at Off.
+            CountdownLabel(seconds: seconds, state: state)
         } else {
             Label("Auto-refresh", systemImage: "timer")
         }
     }
+}
 
-    private static func countdown(_ seconds: Int) -> String {
-        String(format: "%d:%02d", seconds / 60, seconds % 60)
+/// Live m:ss countdown to the next auto-refresh, shown on the toolbar timer glyph.
+///
+/// Driven by a 1 Hz `Timer` publisher, **not** `TimelineView`: a `TimelineView`
+/// schedule does not fire inside a toolbar `Menu` label on macOS (the toolbar
+/// re-renders its label only when an observed value changes), so the countdown
+/// would appear frozen. `onReceive` of a Timer publisher does fire there, and the
+/// `@State` write re-renders the label each second.
+private struct CountdownLabel: View {
+    let seconds: Int
+    let state: AutoRefreshState
+    @State private var now = Date()
+    private let ticker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        let target = state.nextFireAt ?? now.addingTimeInterval(Double(seconds))
+        let remaining = max(0, Int(target.timeIntervalSince(now).rounded(.up)))
+        Label(String(format: "%d:%02d", remaining / 60, remaining % 60),
+              systemImage: "timer.circle.fill")
+            .monospacedDigit()
+            .onReceive(ticker) { now = $0 }
     }
 }
 
