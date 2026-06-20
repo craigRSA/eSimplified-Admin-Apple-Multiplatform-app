@@ -116,6 +116,7 @@ struct Badge: View {
         }
         .labelStyle(.titleAndIcon)
         .font(.caption2.weight(.semibold))
+        .lineLimit(1)
         .padding(.horizontal, Spacing.sm).padding(.vertical, 3)
         .background(color.opacity(0.18), in: Capsule())
         .foregroundStyle(color)

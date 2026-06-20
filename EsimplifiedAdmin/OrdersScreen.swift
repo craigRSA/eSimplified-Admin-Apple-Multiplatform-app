@@ -47,11 +47,18 @@ struct OrdersScreen: View {
                             OrdersTable(orders: orders) { path.append($0) }
                         } else {
                             List(orders) { order in
-                                if let ref = order.customerRef {
-                                    NavigationLink(value: ref) { OrderRow(order: order) }
-                                } else {
-                                    OrderRow(order: order)
+                                Group {
+                                    if let ref = order.customerRef {
+                                        Button { path.append(ref) } label: { OrderRow(order: order) }
+                                            .buttonStyle(.plain)
+                                    } else {
+                                        OrderRow(order: order)
+                                    }
                                 }
+                                .listRowInsets(EdgeInsets(top: Spacing.xs, leading: Spacing.lg,
+                                                          bottom: Spacing.xs, trailing: Spacing.lg))
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
                             }
                             .listStyle(.plain)
                             .scrollContentBackground(.hidden)
@@ -286,44 +293,94 @@ private struct OrdersTable: View {
     }
 }
 
+/// iPhone order row — a transaction-ledger cell (à la Wallet): a leading status
+/// medallion carries the one color signal (status + category, color-blind-safe via
+/// its glyph), a three-tier text hierarchy reads what / how / who, and prices sit
+/// right-aligned and monospaced. No competing pills — the medallion and the tinted
+/// title encode category, so promo/voucher need no separate tag.
 private struct OrderRow: View {
     let order: Order
 
     private var accent: Color? { orderAccent(order) }
     private var title: String { order.packageName.isEmpty ? order.orderNumber : order.packageName }
+    private var showsChevron: Bool { order.customerRef != nil }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.xs) {
-            HStack(alignment: .firstTextBaseline) {
+        HStack(alignment: .center, spacing: Spacing.md) {
+            medallion
+            VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .font(.headline).foregroundStyle(accent ?? .primary).lineLimit(1)
-                Spacer(minLength: Spacing.sm)
-                VStack(alignment: .trailing, spacing: 1) {
-                    Text(order.usdPriceDisplay).font(.headline.monospacedDigit())
-                    if let local = order.localPriceDisplay {
-                        Text(local).font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
-                    }
+                Text(detailLine)
+                    .font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+                if let who = subtitle {
+                    Text(who).font(.caption).foregroundStyle(.tertiary).lineLimit(1)
                 }
             }
-            HStack(spacing: Spacing.sm) {
-                StatusBadge(status: order.paymentStatus)
-                OrderCategoryBadge(order: order)
-                if !order.orderType.isEmpty {
-                    Badge(text: order.orderType)
+            Spacer(minLength: Spacing.sm)
+            VStack(alignment: .trailing, spacing: 3) {
+                Text(order.usdPriceDisplay).font(.headline.monospacedDigit())
+                if let local = order.localPriceDisplay {
+                    Text(local).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                 }
-                if let code = order.discountCode {
-                    Badge(text: code, color: .orange, systemImage: "tag.fill")
-                }
-                Spacer(minLength: Spacing.sm)
-                Text(shortDate(order.purchaseDate)).font(.caption2).foregroundStyle(.secondary)
             }
-            if let who = subtitle {
-                Text(who).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            if showsChevron {
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
+                    .padding(.leading, 2)
             }
         }
-        .padding(.vertical, Spacing.xs)
+        .padding(.vertical, Spacing.md).padding(.horizontal, Spacing.md)
+        .background(
+            RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
+                .fill(Color.white.opacity(0.06))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
+                )
+        )
+        .contentShape(.rect(cornerRadius: Radius.card))
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
+    }
+
+    /// The leading medallion: one tinted glyph standing in for the whole pill row.
+    private var medallion: some View {
+        Image(systemName: medallionGlyph)
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(medallionColor)
+            .frame(width: 38, height: 38)
+            .background(medallionColor.opacity(0.15), in: Circle())
+            .overlay(Circle().strokeBorder(medallionColor.opacity(0.22), lineWidth: 0.5))
+            .accessibilityHidden(true)
+    }
+
+    private var medallionColor: Color { accent ?? StatusStyle.color(order.paymentStatus) }
+
+    /// The category glyph when the order has one (refund/voucher/comp/agent/promo);
+    /// otherwise a glyph for the payment status.
+    private var medallionGlyph: String {
+        if let cat = OrderCategory(order) { return cat.glyph }
+        switch order.paymentStatus.lowercased() {
+        case "success", "approved", "active", "released": return "checkmark"
+        case "pending", "requested", "awaiting_s2s": return "clock"
+        case "refunded", "cancelled", "canceled": return "arrow.uturn.backward"
+        case "error", "failed": return "exclamationmark"
+        default: return "creditcard"
+        }
+    }
+
+    /// Second line: a non-success status (so refunds/pending aren't color-only), the
+    /// order type, and the date — the "how / when" tier.
+    private var detailLine: String {
+        var parts: [String] = []
+        let s = order.paymentStatus.lowercased()
+        if !(s == "success" || s == "approved" || s == "active" || s == "released") {
+            parts.append(order.paymentStatus.capitalized)
+        }
+        if !order.orderType.isEmpty { parts.append(order.orderType) }
+        parts.append(shortDate(order.purchaseDate))
+        return parts.joined(separator: " · ")
     }
 
     /// One spoken summary for the whole row, in reading order: what was bought,
