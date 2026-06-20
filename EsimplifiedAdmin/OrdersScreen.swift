@@ -370,33 +370,37 @@ private struct OrderRow: View {
         }
     }
 
-    /// Second line: a non-success status (so refunds/pending aren't color-only), the
-    /// order type, and the date — the "how / when" tier.
+    /// Second line — the prominent metadata tier: a non-success status (so
+    /// refunds/pending aren't color-only), the tenant the sale ran through (which
+    /// matters more than the order type — the medallion/title color already encodes
+    /// category), and the date.
     private var detailLine: String {
         var parts: [String] = []
         let s = order.paymentStatus.lowercased()
         if !(s == "success" || s == "approved" || s == "active" || s == "released") {
             parts.append(order.paymentStatus.capitalized)
         }
-        if !order.orderType.isEmpty { parts.append(order.orderType) }
+        if let t = tenantName { parts.append(t) }
         parts.append(shortDate(order.purchaseDate))
         return parts.joined(separator: " · ")
     }
 
     /// One spoken summary for the whole row, in reading order: what was bought,
-    /// its status + category, the USD price, when, and for whom.
+    /// its status + category, the USD price, the tenant, when, and for whom.
     private var accessibilityLabel: String {
         var parts: [String] = [title, "Status \(order.paymentStatus.capitalized)"]
         if let cat = OrderCategory(order) { parts.append(cat.word) }
         parts.append("\(order.usdPriceDisplay) USD")
+        if let t = tenantName { parts.append(t) }
         parts.append(shortDate(order.purchaseDate))
         if let who = subtitle { parts.append(who) }
         return parts.joined(separator: ", ")
     }
 
+    /// Third line — the people tier: who bought it and from where.
     private var subtitle: String? {
         let who = order.customerName ?? order.customerEmail
-        let parts = [who, order.purchaseCountry, tenantName].compactMap { $0 }.filter { !$0.isEmpty }
+        let parts = [who, order.purchaseCountry].compactMap { $0 }.filter { !$0.isEmpty }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
     private var tenantName: String? { order.tenant.isEmpty ? nil : order.tenant }
