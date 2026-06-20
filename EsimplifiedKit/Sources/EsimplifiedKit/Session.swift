@@ -24,7 +24,9 @@ public struct Session: Codable, Equatable, Sendable {
     }
 }
 
-public protocol SessionStore {
+/// Sendable so it can cross the @MainActor (AdminAppModel) ↔ actor (SessionManager)
+/// boundary safely — the same store instance is held by both.
+public protocol SessionStore: Sendable {
     func save(_ session: Session) throws
     func load() throws -> Session?
     func clear() throws
@@ -34,18 +36,19 @@ public protocol SessionStore {
     func biometricEnabled() -> Bool
 }
 
-public final class InMemorySessionStore: SessionStore {
+public final class InMemorySessionStore: SessionStore, @unchecked Sendable {
+    private let lock = NSLock()
     private var session: Session?
     private var trusted: [String: String] = [:]
     private var biometric = false
 
     public init() {}
 
-    public func save(_ session: Session) throws { self.session = session }
-    public func load() throws -> Session? { session }
-    public func clear() throws { session = nil }
-    public func saveTrustedDeviceToken(_ token: String, host: String) throws { trusted[host] = token }
-    public func trustedDeviceToken(host: String) throws -> String? { trusted[host] }
-    public func setBiometricEnabled(_ enabled: Bool) throws { biometric = enabled }
-    public func biometricEnabled() -> Bool { biometric }
+    public func save(_ session: Session) throws { lock.withLock { self.session = session } }
+    public func load() throws -> Session? { lock.withLock { session } }
+    public func clear() throws { lock.withLock { session = nil } }
+    public func saveTrustedDeviceToken(_ token: String, host: String) throws { lock.withLock { trusted[host] = token } }
+    public func trustedDeviceToken(host: String) throws -> String? { lock.withLock { trusted[host] } }
+    public func setBiometricEnabled(_ enabled: Bool) throws { lock.withLock { biometric = enabled } }
+    public func biometricEnabled() -> Bool { lock.withLock { biometric } }
 }

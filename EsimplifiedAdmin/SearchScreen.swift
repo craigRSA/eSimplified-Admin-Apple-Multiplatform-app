@@ -140,6 +140,7 @@ struct SearchScreen: View {
         } catch let error as APIError {
             phase = .failed(adminErrorMessage(error))
         } catch is CancellationError {
+            // View navigated away mid-search — not a real error.
         } catch {
             phase = .failed("Unexpected error.")
         }

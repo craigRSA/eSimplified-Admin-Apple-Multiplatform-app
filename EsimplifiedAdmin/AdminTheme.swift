@@ -1,5 +1,48 @@
 import SwiftUI
 import Combine
+import EsimplifiedKit
+
+// MARK: - Shared formatting & error helpers
+
+/// Maps an `APIError` to a user-facing message — shared by every admin screen.
+func adminErrorMessage(_ error: APIError) -> String {
+    switch error {
+    case .unreachable: "Couldn't reach the server."
+    case .authExpired: "Your session expired — sign in again."
+    case .notFound: "Not found."
+    case let .requestFailed(code, message): message.map { "Server (\(code)): \($0)" } ?? "Request failed (\(code))."
+    case .decoding: "Couldn't read the server response."
+    }
+}
+
+/// Parses an ISO-8601 timestamp (with or without fractional seconds) to a short
+/// local date-time, falling back to the date prefix if it can't parse.
+func shortDate(_ iso: String) -> String {
+    let parser = ISO8601DateFormatter()
+    parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    let date = parser.date(from: iso) ?? ISO8601DateFormatter().date(from: iso)
+    guard let date else { return String(iso.prefix(10)) }
+    return date.formatted(date: .abbreviated, time: .shortened)
+}
+
+/// Decimal → Double, for the (Double-based) Charts API and the money formatter.
+func dbl(_ d: Decimal) -> Double { (d as NSDecimalNumber).doubleValue }
+
+/// App-wide money / count formatting.
+enum Fmt {
+    /// One consistent rule: abbreviate at/above $1,000 ($2.3K, $129K, $2.0M);
+    /// show exact dollars and cents below ($12.90).
+    static func money(_ d: Decimal) -> String {
+        let v = dbl(d)
+        if abs(v) >= 1000 {
+            return "$" + v.formatted(.number.notation(.compactName).precision(.fractionLength(1)))
+        }
+        return "$" + d.formatted(.number.precision(.fractionLength(2)).grouping(.automatic))
+    }
+    static func countCompact(_ n: Int) -> String {
+        n >= 1000 ? Double(n).formatted(.number.notation(.compactName).precision(.fractionLength(1))) : n.formatted()
+    }
+}
 
 // MARK: - Backdrop
 
@@ -57,8 +100,8 @@ struct QuietEmptyState: View {
 // MARK: - Glass card
 
 private struct GlassCard: ViewModifier {
-    var radius: CGFloat = 18
-    var padding: CGFloat = 18
+    let radius: CGFloat
+    let padding: CGFloat
     func body(content: Content) -> some View {
         content
             .padding(padding)
@@ -259,6 +302,22 @@ extension Text {
     }
 }
 
+/// A titled glass section — a `SectionHeader` over its content, wrapped in a glass
+/// card. Shared by the dashboard cards and the customer-detail sections so every
+/// titled section reads the same (one title style, one card treatment).
+struct SectionCard<Content: View>: View {
+    let title: String
+    var eyebrow: String?
+    @ViewBuilder var content: Content
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.md) {
+            SectionHeader(title, eyebrow: eyebrow)
+            content
+        }
+        .glassCard()
+    }
+}
+
 // MARK: - UTC clock
 
 /// Live UTC clock for the toolbar — the dashboard's hourly series is in UTC,
@@ -353,9 +412,11 @@ enum RefreshInterval {
     static func label(_ s: Int) -> String {
         switch s {
         case 0: "Off"
+        case 15: "15 sec"
+        case 30: "30 sec"
         case 60: "1 min"
         case 300: "5 min"
-        default: "\(s)s"
+        default: "\(s) sec"
         }
     }
 }

@@ -431,21 +431,5 @@ struct TenantAvatar: View {
     }
 }
 
-/// Shared mapping from an APIError to a user-facing message (used by admin screens).
-func adminErrorMessage(_ error: APIError) -> String {
-    switch error {
-    case .unreachable: "Couldn't reach the server."
-    case .authExpired: "Your session expired — sign in again."
-    case .notFound: "Not found."
-    case let .requestFailed(code, message): message.map { "Server (\(code)): \($0)" } ?? "Request failed (\(code))."
-    case .decoding: "Couldn't read the server response."
-    }
-}
-
-func shortDate(_ iso: String) -> String {
-    let parser = ISO8601DateFormatter()
-    parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    let date = parser.date(from: iso) ?? ISO8601DateFormatter().date(from: iso)
-    guard let date else { return String(iso.prefix(10)) }
-    return date.formatted(date: .abbreviated, time: .shortened)
-}
+// adminErrorMessage / shortDate / Fmt / dbl now live in AdminTheme.swift — shared
+// app-wide formatting helpers, no longer parked inside a screen file.

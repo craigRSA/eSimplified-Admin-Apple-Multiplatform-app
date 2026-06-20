@@ -261,6 +261,7 @@ struct CustomerDetailScreen: View {
                     ? "Server reports \(page.count) order\(page.count == 1 ? "" : "s") but they couldn't be read (response shape)."
                     : nil
             } catch is CancellationError {
+                // View navigated away mid-load — not a real error.
             } catch let e as APIError {
                 orders = []; ordersError = adminErrorMessage(e)
             } catch {
@@ -272,6 +273,7 @@ struct CustomerDetailScreen: View {
         } catch let error as APIError {
             phase = .failed(adminErrorMessage(error))
         } catch is CancellationError {
+            // View navigated away mid-load — not a real error.
         } catch {
             phase = .failed("Unexpected error.")
         }
@@ -289,6 +291,7 @@ struct CustomerDetailScreen: View {
         } catch let error as APIError {
             detailPhase = .failed(adminErrorMessage(error))
         } catch is CancellationError {
+            // View navigated away mid-load — not a real error.
         } catch {
             detailPhase = .failed("Unexpected error loading eSIM detail.")
         }
@@ -760,19 +763,6 @@ private struct ProfileCard: View {
             if let phone = customer.phoneNumber, !phone.isEmpty { Field("Phone", phone) }
             if let cid = customer.customerId { Field("Customer ID", cid) }
             if let created = customer.created { Field("Created", shortDate(created)) }
-        }
-        .glassCard()
-    }
-}
-
-private struct SectionCard<Content: View>: View {
-    let title: String
-    var eyebrow: String?
-    @ViewBuilder var content: Content
-    var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.md) {
-            SectionHeader(title, eyebrow: eyebrow)
-            content
         }
         .glassCard()
     }

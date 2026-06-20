@@ -9,6 +9,9 @@ struct EsimplifiedWidgetBundle: WidgetBundle {
 }
 
 struct RevenueWidget: Widget {
+    // Frozen identity — WidgetKit keys installed widget instances by `kind`, so
+    // changing it orphans every placed widget. The "glance" namespace is historical
+    // (the app's former name); do not "fix" it.
     private let kind = "io.esimplified.glance.RevenueWidget"
 
     var body: some WidgetConfiguration {

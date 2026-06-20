@@ -1,7 +1,7 @@
 import Foundation
 import Security
 
-public final class KeychainSessionStore: SessionStore {
+public final class KeychainSessionStore: SessionStore, @unchecked Sendable {
     private let service = "io.esimplified.admin"
     private let sessionAccount = "session"
     private let biometricAccount = "biometric-enabled"

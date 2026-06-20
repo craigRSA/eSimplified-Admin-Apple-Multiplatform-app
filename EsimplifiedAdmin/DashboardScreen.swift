@@ -123,14 +123,14 @@ struct DashboardScreen: View {
             .glassCard()
 
             if !s.revenuePerTenant.isEmpty {
-                Card(title: "Revenue per tenant") {
+                SectionCard(title: "Revenue per tenant") {
                     RevenueBarChart(items: Array(s.revenuePerTenant.prefix(8)).map { ($0.tenant, $0.amount) })
                         .frame(height: 240)
                 }
             }
 
             if !s.revenuePerMonth.isEmpty {
-                Card(title: "Revenue per month") {
+                SectionCard(title: "Revenue per month") {
                     RevenueBarChart(items: s.revenuePerMonth.map { (shortMonth($0.month), $0.amount) })
                         .frame(height: 220)
                 }
@@ -144,10 +144,10 @@ struct DashboardScreen: View {
                     : AnyLayout(HStackLayout(alignment: .top, spacing: Spacing.lg))
                 layout {
                     if !s.current.topPackages.isEmpty {
-                        Card(title: "Top packages") { TopList(items: s.current.topPackages) }
+                        SectionCard(title: "Top packages") { TopList(items: s.current.topPackages) }
                     }
                     if !s.current.topCountries.isEmpty {
-                        Card(title: "Top countries") { TopList(items: s.current.topCountries) }
+                        SectionCard(title: "Top countries") { TopList(items: s.current.topCountries) }
                     }
                 }
             }
@@ -391,18 +391,6 @@ private struct Sparkline: View {
     }
 }
 
-private struct Card<Content: View>: View {
-    let title: String
-    @ViewBuilder var content: Content
-    var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.md) {
-            Text(title).font(.headline)
-            content
-        }
-        .glassCard(radius: Radius.card, padding: Spacing.lg)
-    }
-}
-
 private struct MetricItem: Identifiable {
     let id = UUID()
     let title: String
@@ -620,8 +608,6 @@ private struct TopList: View {
     }
 }
 
-private func dbl(_ d: Decimal) -> Double { (d as NSDecimalNumber).doubleValue }
-
 /// Dashboard date-range options (sent as `?date_range=`), in the web's display
 /// order. All values except `year_to_date` are live on the backend today;
 /// `year_to_date` is a documented pending addition
@@ -658,17 +644,4 @@ enum DashRange: String, CaseIterable, Identifiable {
     var isYearScale: Bool { self == .thisYear || self == .yearToDate }
 }
 
-enum Fmt {
-    /// One consistent rule: abbreviate at/above $1,000 ($2.3K, $129K, $2.0M);
-    /// show exact dollars and cents below ($12.90).
-    static func money(_ d: Decimal) -> String {
-        let v = dbl(d)
-        if abs(v) >= 1000 {
-            return "$" + v.formatted(.number.notation(.compactName).precision(.fractionLength(1)))
-        }
-        return "$" + d.formatted(.number.precision(.fractionLength(2)).grouping(.automatic))
-    }
-    static func countCompact(_ n: Int) -> String {
-        n >= 1000 ? Double(n).formatted(.number.notation(.compactName).precision(.fractionLength(1))) : n.formatted()
-    }
-}
+// Fmt + dbl now live in AdminTheme.swift (shared formatting helpers).
