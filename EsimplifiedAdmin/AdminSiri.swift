@@ -12,13 +12,10 @@ import EsimplifiedKit
 enum RevenueIntentSupport {
     static func fetch() async throws -> AdminDashboardStats {
         let store = KeychainSessionStore()
-        guard var session = try? store.load() else { throw RevenueIntentError.notSignedIn }
-        if session.expiresAt <= Date(), let auth = authClient(),
-           let refreshed = try? await auth.refresh(host: session.host, refreshToken: session.refreshToken) {
-            try? store.save(refreshed)
-            session = refreshed
-        }
-        let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
+        guard let session = try? store.load() else { throw RevenueIntentError.notSignedIn }
+        guard let auth = authClient() else { throw RevenueIntentError.notSignedIn }
+        let manager = SessionManager(session: session, store: store, authClient: auth, refreshEnabled: true)
+        let client = LiveAPIClient(host: session.host, tokenProvider: manager)
         do {
             return try await client.get("/api/statistics/", query: [:], as: AdminDashboardStats.self)
         } catch APIError.authExpired {

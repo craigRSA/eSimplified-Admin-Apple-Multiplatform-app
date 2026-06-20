@@ -51,20 +51,14 @@ struct RevenueProvider: TimelineProvider {
     }
 
     private func fetchEntry() async -> RevenueEntry {
-        guard var session = try? store.load() else {
+        guard let session = try? store.load() else {
             return RevenueEntry(date: Date(), content: .needsAuth)
         }
-        // The widget runs with the app closed, so refresh an expired token itself.
-        if session.expiresAt <= Date() {
-            guard let auth = authClient(),
-                  let refreshed = try? await auth.refresh(host: session.host,
-                                                          refreshToken: session.refreshToken) else {
-                return RevenueEntry(date: Date(), content: .needsAuth)
-            }
-            try? store.save(refreshed)
-            session = refreshed
+        guard let auth = authClient() else {
+            return RevenueEntry(date: Date(), content: .needsAuth)
         }
-        let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
+        let manager = SessionManager(session: session, store: store, authClient: auth, refreshEnabled: true)
+        let client = LiveAPIClient(host: session.host, tokenProvider: manager)
         do {
             let stats = try await client.get("/api/statistics/", query: [:], as: AdminDashboardStats.self)
             return RevenueEntry(date: Date(),
