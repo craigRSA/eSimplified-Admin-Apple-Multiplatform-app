@@ -369,6 +369,11 @@ private struct ComparisonAreaChart: View {
     /// Year-to-date data is monthly — label the x-axis by month instead of by
     /// day index.
     var monthly: Bool = false
+    @State private var selected: Int?
+
+    private func label(_ i: Int) -> String {
+        monthly && current.indices.contains(i) ? shortMonth(current[i].date) : "Day \(i + 1)"
+    }
 
     var body: some View {
         Chart {
@@ -386,8 +391,20 @@ private struct ComparisonAreaChart: View {
                          series: .value("Period", "Previous"))
                     .foregroundStyle(.gray).interpolationMethod(.catmullRom)
             }
+            if let selected, current.indices.contains(selected) {
+                RuleMark(x: .value("Point", selected))
+                    .foregroundStyle(Color.secondary.opacity(0.25))
+                    .annotation(position: .top, spacing: 0,
+                                overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
+                        ChartTooltip(title: label(selected), rows: [
+                            ("This", Fmt.money(current[selected].revenue), .accentColor),
+                            ("Prev", Fmt.money(previous.indices.contains(selected) ? previous[selected].revenue : 0), .gray),
+                        ])
+                    }
+            }
         }
         .chartForegroundStyleScale(["This period": Color.accentColor, "Previous": Color.gray])
+        .chartXSelection(value: $selected)
         .chartXAxis {
             if monthly {
                 AxisMarks(values: tickIndices(count: current.count, desired: 6)) { value in
@@ -406,11 +423,23 @@ private struct RevenueBarChart: View {
     let items: [(String, Decimal)]
     /// Cap on x-axis labels — keeps month names from colliding on a phone.
     var desiredLabels = 8
+    @State private var selected: Int?
     var body: some View {
-        Chart(Array(items.enumerated()), id: \.offset) { i, item in
-            BarMark(x: .value("Index", i), y: .value("Revenue", dbl(item.1)))
-                .foregroundStyle(Color.accentColor)
+        Chart {
+            ForEach(Array(items.enumerated()), id: \.offset) { i, item in
+                BarMark(x: .value("Index", i), y: .value("Revenue", dbl(item.1)))
+                    .foregroundStyle(Color.accentColor.opacity(selected == nil || selected == i ? 1 : 0.4))
+            }
+            if let selected, items.indices.contains(selected) {
+                RuleMark(x: .value("Index", selected))
+                    .foregroundStyle(.clear)
+                    .annotation(position: .top, spacing: 0,
+                                overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
+                        ChartTooltip(title: items[selected].0, rows: [("", Fmt.money(items[selected].1), .accentColor)])
+                    }
+            }
         }
+        .chartXSelection(value: $selected)
         .chartXAxis {
             AxisMarks(values: tickIndices(count: items.count, desired: desiredLabels)) { value in
                 if let i = value.as(Int.self), items.indices.contains(i) {
