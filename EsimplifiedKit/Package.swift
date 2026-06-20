@@ -11,8 +11,7 @@ let package = Package(
         .target(name: "EsimplifiedKit"),
         .testTarget(
             name: "EsimplifiedKitTests",
-            dependencies: ["EsimplifiedKit"],
-            resources: [.copy("Fixtures")]
+            dependencies: ["EsimplifiedKit"]
         ),
     ]
 )

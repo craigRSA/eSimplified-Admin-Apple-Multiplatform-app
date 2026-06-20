@@ -85,3 +85,7 @@ public final class KeychainSessionStore: SessionStore {
         }
     }
 }
+
+public enum KeychainError: Error, Equatable {
+    case unhandled(OSStatus)
+}

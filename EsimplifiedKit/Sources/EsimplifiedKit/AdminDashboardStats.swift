@@ -32,6 +32,25 @@ public struct HourPoint: Identifiable, Equatable, Sendable {
     public init(hour: Int, revenue: Decimal) { self.hour = hour; self.revenue = revenue }
 }
 
+/// A `{ date, revenue }` point in the daily revenue series.
+public struct DayRevenue: Decodable, Equatable, Sendable {
+    public let date: String
+    public let revenue: Decimal
+
+    public init(date: String, revenue: Decimal) {
+        self.date = date
+        self.revenue = revenue
+    }
+
+    private enum CodingKeys: String, CodingKey { case date, revenue }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        date = try c.decode(String.self, forKey: .date)
+        revenue = try c.decode(FlexibleDecimal.self, forKey: .revenue).value
+    }
+}
+
 /// A period bucket (`current` = this period, `comparison` = the previous one).
 public struct StatsPeriod: Decodable, Equatable, Sendable {
     public let revenue: Decimal
