@@ -74,7 +74,7 @@ struct UTCClock: View {
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { ctx in
             Label(Self.formatter.string(from: ctx.date), systemImage: "clock")
-                .font(.callout.monospacedDigit()).foregroundStyle(.secondary)
+                .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                 .labelStyle(.titleAndIcon)
         }
     }

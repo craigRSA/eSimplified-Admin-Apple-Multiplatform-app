@@ -36,6 +36,7 @@ struct DashboardScreen: View {
             Picker("Date range", selection: $range) {
                 ForEach(DashRange.allCases) { Text($0.label).tag($0) }
             }
+            .pickerStyle(.inline)
         } label: {
             Label(range.label, systemImage: "calendar")
                 .font(.subheadline).labelStyle(.titleAndIcon)
@@ -163,11 +164,12 @@ private struct HeroCard: View {
             if hourlyToday.count > 1 {
                 HourlyComparisonChart(today: hourlyToday, yesterday: hourlyYesterday)
                     .frame(height: 120).padding(.top, 6)
-            } else if trend.count > 1 {
-                // Fallback until hourly data ships: the recent daily trend, labelled honestly.
+            } else if trend.count > 2 {
+                // Fallback until hourly data ships: the recent daily trend. Drop the
+                // last point — it's the in-progress UTC day, so it nosedives to ~0.
                 VStack(alignment: .leading, spacing: 4) {
-                    Sparkline(points: trend.map { dbl($0.revenue) }).frame(height: 54)
-                    Text("DAILY TREND").font(.caption2.weight(.semibold)).tracking(0.6)
+                    Sparkline(points: trend.dropLast().map { dbl($0.revenue) }).frame(height: 54)
+                    Text("DAILY TREND · COMPLETED DAYS").font(.caption2.weight(.semibold)).tracking(0.6)
                         .foregroundStyle(.tertiary)
                 }
                 .padding(.top, 4)

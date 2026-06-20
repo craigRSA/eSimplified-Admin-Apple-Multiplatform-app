@@ -60,13 +60,13 @@ struct AdminShell: View {
         } detail: {
             detail
                 .toolbar {
-                    ToolbarItem(placement: .principal) { UTCClock() }
                     ToolbarItemGroup(placement: .primaryAction) {
                         if !model.tenants.isEmpty { TenantMenu(model: model) }
                         RefreshIntervalMenu(seconds: $autoRefreshSeconds)
                     }
                 }
         }
+        .safeAreaInset(edge: .bottom) { StatusBar() }
         .task { await model.loadTenants() }
         .onAppear { if selection == nil { selection = model.sections.first } }
     }
@@ -118,6 +118,19 @@ private struct TenantMenu: View {
                 .labelStyle(.iconOnly)
         }
         .help(model.selectedTenant?.name ?? "All Tenants")
+    }
+}
+
+/// Slim bottom status bar — currently the live UTC clock, with room to grow.
+private struct StatusBar: View {
+    var body: some View {
+        HStack(spacing: 8) {
+            Spacer()
+            UTCClock()
+        }
+        .padding(.horizontal, 14).padding(.vertical, 5)
+        .background(.bar)
+        .overlay(alignment: .top) { Divider() }
     }
 }
 
