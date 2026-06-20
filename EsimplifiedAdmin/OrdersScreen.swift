@@ -10,6 +10,7 @@ struct OrdersScreen: View {
     @State private var orders: [Order] = []
     @State private var total = 0
     @State private var search = ""
+    @State private var searchTask: Task<Void, Never>?
     @State private var path = NavigationPath()
 
     enum Phase { case loading, loaded, failed(String) }
@@ -27,19 +28,18 @@ struct OrdersScreen: View {
                     ContentUnavailableView("Couldn't load orders", systemImage: "exclamationmark.triangle",
                                            description: Text(message))
                 default:
-                    let shown = filtered(orders)
                     VStack(spacing: 0) {
-                        OrdersCountHeader(showing: shown.count, total: total, filtering: !search.isEmpty)
+                        OrdersCountHeader(showing: orders.count, total: total, filtering: !search.isEmpty)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 16).padding(.vertical, 8)
                         Divider()
-                        if shown.isEmpty {
+                        if orders.isEmpty {
                             ContentUnavailableView("No matching orders", systemImage: "tray")
                                 .frame(maxHeight: .infinity)
                         } else if useTable {
-                            OrdersTable(orders: shown) { path.append($0) }
+                            OrdersTable(orders: orders) { path.append($0) }
                         } else {
-                            List(shown) { order in
+                            List(orders) { order in
                                 if let ref = order.customerRef {
                                     NavigationLink(value: ref) { OrderRow(order: order) }
                                 } else {
@@ -55,19 +55,21 @@ struct OrdersScreen: View {
             .navigationDestination(for: CustomerRef.self) { CustomerDetailScreen(session: session, ref: $0) }
         }
         .searchable(text: $search, prompt: "Package, customer, email, order #")
+        .onChange(of: search) { _, _ in debouncedSearch() }
         .reload(on: tenant) { await load() }
         .refreshable { await load() }
         .autoRefresh { await load() }
     }
 
-    private func filtered(_ orders: [Order]) -> [Order] {
-        let q = search.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !q.isEmpty else { return orders }
-        return orders.filter {
-            $0.orderNumber.lowercased().contains(q)
-            || $0.packageName.lowercased().contains(q)
-            || ($0.customerEmail ?? "").lowercased().contains(q)
-            || ($0.customerName ?? "").lowercased().contains(q)
+    /// Debounce keystrokes, then reload from the server so search spans the whole
+    /// dataset — the web searches server-side; a local filter would only see the
+    /// rows already loaded (and silently miss matches beyond the page).
+    private func debouncedSearch() {
+        searchTask?.cancel()
+        searchTask = Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            if Task.isCancelled { return }
+            await load()
         }
     }
 
@@ -76,7 +78,10 @@ struct OrdersScreen: View {
         do {
             let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
             let path = tenant.map { "/api/orders/\($0)/" } ?? "/api/orders/"
-            let page = try await client.get(path, query: ["limit": "100"], as: OrdersPage.self)
+            var query = ["limit": "500"]
+            let term = search.trimmingCharacters(in: .whitespaces)
+            if !term.isEmpty { query["search"] = term }
+            let page = try await client.get(path, query: query, as: OrdersPage.self)
             orders = page.orders
             total = page.count
             phase = .loaded

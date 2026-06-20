@@ -7,6 +7,7 @@ struct CustomersScreen: View {
 
     @State private var phase: Phase = .loading
     @State private var search = ""
+    @State private var searchTask: Task<Void, Never>?
 
     enum Phase { case loading, loaded([Customer]), failed(String) }
 
@@ -19,28 +20,29 @@ struct CustomersScreen: View {
                 ContentUnavailableView("Couldn't load customers", systemImage: "exclamationmark.triangle",
                                        description: Text(message))
             case let .loaded(customers):
-                let shown = filtered(customers)
-                if shown.isEmpty {
+                if customers.isEmpty {
                     ContentUnavailableView("No customers", systemImage: "person.2.slash")
                 } else {
-                    List(shown) { CustomerRow(customer: $0) }
+                    List(customers) { CustomerRow(customer: $0) }
                 }
             }
         }
         .navigationTitle("Customers")
         .searchable(text: $search, prompt: "Name, email, phone")
+        .onChange(of: search) { _, _ in debouncedSearch() }
         .reload(on: tenant) { await load() }
         .refreshable { await load() }
         .autoRefresh { await load() }
     }
 
-    private func filtered(_ customers: [Customer]) -> [Customer] {
-        let q = search.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !q.isEmpty else { return customers }
-        return customers.filter {
-            ($0.fullName ?? "").lowercased().contains(q)
-            || ($0.email ?? "").lowercased().contains(q)
-            || ($0.phoneNumber ?? "").lowercased().contains(q)
+    /// Debounce keystrokes, then reload from the server (the web searches
+    /// server-side; a local filter would only see the already-loaded rows).
+    private func debouncedSearch() {
+        searchTask?.cancel()
+        searchTask = Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            if Task.isCancelled { return }
+            await load()
         }
     }
 
@@ -48,7 +50,11 @@ struct CustomersScreen: View {
         do {
             let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
             let path = tenant.map { "/api/customers/\($0)/" } ?? "/api/customers/"
-            let page = try await client.get(path, query: ["limit": "100"], as: CustomersPage.self)
+            // Match the web default: active-only (no all/inactive toggle in the app).
+            var query = ["limit": "500", "is_active": "true"]
+            let term = search.trimmingCharacters(in: .whitespaces)
+            if !term.isEmpty { query["search"] = term }
+            let page = try await client.get(path, query: query, as: CustomersPage.self)
             phase = .loaded(page.customers)
         } catch let error as APIError {
             phase = .failed(adminErrorMessage(error))
