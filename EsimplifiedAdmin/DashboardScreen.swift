@@ -234,9 +234,9 @@ private struct HeroCard: View {
     /// hourly data exists; otherwise the full prior day — the pre-hourly fallback.
     private var comparisonBase: Decimal { yesterdayToDate ?? yesterday }
     private var deltaCaption: String {
-        yesterdayToDate != nil
-            ? "vs \(Fmt.money(comparisonBase)) at this time yesterday"
-            : "vs \(Fmt.money(yesterday)) yesterday"
+        // "(to date)" = compared against yesterday cumulative through this same point
+        // in the day. Without hourly data we fall back to the full-day comparison.
+        yesterdayToDate != nil ? "vs yesterday (to date)" : "vs yesterday"
     }
 
     var body: some View {
