@@ -67,12 +67,15 @@ enum Radius {
     static let tooltip: CGFloat = 8
 }
 
-extension Color {
-    /// Semantic status colors. IMPORTANT: meaning must never rest on color alone
-    /// — always pair these with a glyph or text (see `TrendDelta`, `StatusBadge`).
-    static let positive = Color.green
-    static let negative = Color.red
-    static let warning = Color.orange
+extension ShapeStyle where Self == Color {
+    /// Semantic status colors. Defined on `ShapeStyle where Self == Color` so the
+    /// leading-dot form works in `.foregroundStyle(.positive)` / `.tint(.negative)`
+    /// AND the explicit `Color.positive` form resolves too.
+    /// IMPORTANT: meaning must never rest on color alone — always pair these with
+    /// a glyph or text (see `TrendDelta`, `StatusBadge`).
+    static var positive: Color { .green }
+    static var negative: Color { .red }
+    static var warning: Color { .orange }
 }
 
 /// Maps a backend status / eUICC state string to its semantic color — the single
