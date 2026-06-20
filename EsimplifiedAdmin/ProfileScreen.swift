@@ -1,17 +1,28 @@
 import SwiftUI
 import EsimplifiedKit
+#if os(iOS)
+import UIKit
+#endif
 
 struct ProfileScreen: View {
     let session: Session
     var onLogout: () -> Void
 
+    /// Honest tri-state: we only know 2FA is on/off when the status call returns.
+    /// A failed fetch leaves us in `.unknown`, never coerced to "off".
+    private enum TOTPState { case unknown, on, off }
+
     @State private var me: MeUser?
-    @State private var totpEnabled: Bool?
+    @State private var totp: TOTPState = .unknown
+    @State private var statusLoaded = false
     @State private var error: String?
     @State private var status: String?
+    @State private var statusOK = false
     @State private var disableCode = ""
     @State private var busy = false
     @State private var showSetup = false
+    @State private var confirmLogout = false
+    @State private var confirmDisable = false
 
     private var twoFA: LiveTwoFactorClient {
         LiveTwoFactorClient(host: session.host, accessToken: session.accessToken)
@@ -25,8 +36,15 @@ struct ProfileScreen: View {
                     if !me.email.isEmpty { LabeledContent("Email", value: me.email) }
                     LabeledContent("Username", value: me.username)
                     LabeledContent("Account type", value: me.accountType.capitalized)
-                    if me.isSuperuser { Label("Superuser", systemImage: "star.fill").foregroundStyle(.orange) }
-                    else if me.isStaff { Label("Staff", systemImage: "person.badge.key").foregroundStyle(.blue) }
+                    if me.isSuperuser {
+                        Label("Superuser", systemImage: "star.fill")
+                            .foregroundStyle(.warning)
+                            .accessibilityLabel("Role: Superuser")
+                    } else if me.isStaff {
+                        Label("Staff", systemImage: "person.badge.key")
+                            .foregroundStyle(.blue)
+                            .accessibilityLabel("Role: Staff")
+                    }
                 } else {
                     ProgressView()
                 }
@@ -41,37 +59,75 @@ struct ProfileScreen: View {
             }
 
             Section("Security") {
-                switch totpEnabled {
-                case .some(true):
-                    Label("Two-factor authentication is on", systemImage: "checkmark.shield.fill")
-                        .foregroundStyle(.green)
-                    TextField("6-digit code to disable", text: $disableCode)
-                        #if os(iOS)
-                        .keyboardType(.numberPad)
-                        #endif
-                    Button("Turn off two-factor", role: .destructive) { Task { await disable() } }
-                        .disabled(busy || disableCode.count < 6)
-                case .some(false):
-                    Label("Two-factor authentication is off", systemImage: "shield.slash").foregroundStyle(.secondary)
-                    Button("Set up two-factor authentication") { showSetup = true }
-                case nil:
-                    ProgressView()
-                }
-                if let status { Text(status).font(.caption).foregroundStyle(.secondary) }
+                securityContent
+                statusRow
             }
 
             Section {
-                Button("Log out", role: .destructive, action: onLogout)
+                Button("Log out", role: .destructive) { confirmLogout = true }
             }
-
-            if let error { Text(error).foregroundStyle(.red) }
         }
         .formStyle(.grouped)
         .navigationTitle("Profile")
+        .confirmationDialog("Log out of eSimplified Admin?", isPresented: $confirmLogout, titleVisibility: .visible) {
+            Button("Log Out", role: .destructive, action: onLogout)
+            Button("Cancel", role: .cancel) {}
+        }
+        .confirmationDialog("Turn off two-factor authentication?", isPresented: $confirmDisable, titleVisibility: .visible) {
+            Button("Turn Off", role: .destructive) { Task { await disable() } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This makes your account easier to compromise. The 6-digit code you entered will be used to confirm.")
+        }
         .sheet(isPresented: $showSetup, onDismiss: { Task { await loadStatus() } }) {
             TwoFactorSetupView(host: session.host, accessToken: session.accessToken)
         }
         .reload(on: 0) { await load() }
+    }
+
+    @ViewBuilder private var securityContent: some View {
+        switch totp {
+        case .on:
+            Label("Two-factor authentication is on", systemImage: "checkmark.shield.fill")
+                .foregroundStyle(.positive)
+                .accessibilityLabel("Two-factor authentication: On")
+            TextField("6-digit code to disable", text: $disableCode)
+                .textContentType(.oneTimeCode)
+                #if os(iOS)
+                .keyboardType(.numberPad)
+                #endif
+            Button("Turn off two-factor", role: .destructive) { confirmDisable = true }
+                .disabled(busy || disableCode.count < 6)
+        case .off:
+            Label("Two-factor authentication is off", systemImage: "shield.slash")
+                .foregroundStyle(.secondary)
+                .accessibilityLabel("Two-factor authentication: Off")
+            Button("Set up two-factor authentication") { showSetup = true }
+        case .unknown:
+            if statusLoaded {
+                Label("Two-factor status unavailable", systemImage: "questionmark.circle")
+                    .foregroundStyle(.warning)
+                    .accessibilityLabel("Two-factor authentication: status unknown")
+                Button("Retry") { Task { await loadStatus() } }
+            } else {
+                ProgressView()
+            }
+        }
+    }
+
+    @ViewBuilder private var statusRow: some View {
+        if let status {
+            Label(status, systemImage: statusOK ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                .font(.callout)
+                .foregroundStyle(statusOK ? Color.positive : Color.negative)
+                .accessibilityLabel("\(statusOK ? "Success" : "Error"): \(status)")
+        }
+        if let error {
+            Label(error, systemImage: "exclamationmark.triangle.fill")
+                .font(.callout)
+                .foregroundStyle(.negative)
+                .accessibilityLabel("Error: \(error)")
+        }
     }
 
     private func load() async {
@@ -89,7 +145,15 @@ struct ProfileScreen: View {
     }
 
     private func loadStatus() async {
-        totpEnabled = (try? await twoFA.status()) ?? false
+        do {
+            // Keep the genuine value; only a real failure leaves us "unknown".
+            totp = try await twoFA.status() ? .on : .off
+        } catch is CancellationError {
+            // Navigated away mid-load — leave whatever we had.
+        } catch {
+            totp = .unknown
+        }
+        statusLoaded = true
     }
 
     private func disable() async {
@@ -98,10 +162,20 @@ struct ProfileScreen: View {
         do {
             try await twoFA.disable(code: disableCode)
             disableCode = ""
+            statusOK = true
             status = "Two-factor turned off."
+            haptic(success: true)
             await loadStatus()
         } catch {
+            statusOK = false
             status = "That code didn't work."
+            haptic(success: false)
         }
+    }
+
+    private func haptic(success: Bool) {
+        #if os(iOS)
+        UINotificationFeedbackGenerator().notificationOccurred(success ? .success : .error)
+        #endif
     }
 }

@@ -13,10 +13,17 @@ struct LoginView: View {
     @State private var error: String?
     @State private var busy = false
 
+    /// The fields the cursor can land in. The login form and the 2FA form share
+    /// the same enum so `@FocusState` survives the swap between the two cards.
+    private enum Field { case username, password, code }
+    @FocusState private var focus: Field?
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         ZStack {
             AppBackground()
-            VStack(spacing: 22) {
+            VStack(spacing: Spacing.xl) {
                 header
                 Group {
                     if twoFAToken == nil { credentialsCard } else { twoFactorCard }
@@ -24,21 +31,25 @@ struct LoginView: View {
                 .frame(maxWidth: 380)
                 if let error {
                     Label(error, systemImage: "exclamationmark.triangle.fill")
-                        .font(.callout).foregroundStyle(.red)
+                        .font(.callout).foregroundStyle(.negative)
                         .frame(maxWidth: 380, alignment: .leading)
                         .transition(.opacity)
+                        .accessibilityLabel("Error: \(error)")
                 }
             }
-            .padding(28)
+            .padding(Spacing.xxl)
         }
-        .animation(.snappy, value: twoFAToken)
-        .animation(.snappy, value: error)
+        .animation(reduceMotion ? nil : .snappy, value: twoFAToken)
+        .animation(reduceMotion ? nil : .snappy, value: error)
+        .onAppear { if twoFAToken == nil { focus = .username } }
+        .onChange(of: twoFAToken) { _, token in focus = token == nil ? .username : .code }
     }
 
     private var header: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: Spacing.md) {
             Image("BrandMark").resizable().scaledToFit().frame(height: 56)
                 .shadow(color: .accentColor.opacity(0.35), radius: 18, y: 6)
+                .accessibilityHidden(true)
             Text("eSimplified Admin").font(.title.weight(.semibold))
             Text(twoFAToken == nil ? "Sign in to your console" : "Enter your authenticator code")
                 .font(.subheadline).foregroundStyle(.secondary)
@@ -46,29 +57,38 @@ struct LoginView: View {
     }
 
     private var credentialsCard: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: Spacing.md) {
             field(systemImage: "person") {
                 TextField("Username", text: $username)
+                    .textContentType(.username)
+                    .focused($focus, equals: .username)
+                    .submitLabel(.next)
+                    .onSubmit { focus = .password }
                     #if os(iOS)
                     .textInputAutocapitalization(.never).autocorrectionDisabled()
                     #endif
             }
             field(systemImage: "lock") {
                 SecureField("Password", text: $password)
+                    .textContentType(.password)
+                    .focused($focus, equals: .password)
+                    .submitLabel(.go)
                     .onSubmit { Task { await signIn() } }
             }
             primaryButton(title: "Sign in", busyTitle: "Signing in…") { await signIn() }
                 .disabled(busy || host.isEmpty || username.isEmpty || password.isEmpty)
         }
-        .padding(20)
-        .glassEffect(.regular, in: .rect(cornerRadius: 20))
+        .glassCard(radius: Radius.card, padding: Spacing.xl)
     }
 
     private var twoFactorCard: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: Spacing.md) {
             field(systemImage: "number") {
                 TextField("6-digit code", text: $code)
                     .font(.title3.monospacedDigit()).tracking(4)
+                    .textContentType(.oneTimeCode)
+                    .focused($focus, equals: .code)
+                    .submitLabel(.go)
                     #if os(iOS)
                     .keyboardType(.numberPad)
                     #endif
@@ -81,24 +101,24 @@ struct LoginView: View {
             Button("Use a different account") { twoFAToken = nil; code = "" }
                 .font(.callout).buttonStyle(.plain).foregroundStyle(.secondary)
         }
-        .padding(20)
-        .glassEffect(.regular, in: .rect(cornerRadius: 20))
+        .glassCard(radius: Radius.card, padding: Spacing.xl)
     }
 
     @ViewBuilder private func field<Content: View>(systemImage: String, @ViewBuilder _ content: () -> Content) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Spacing.sm) {
             Image(systemName: systemImage).foregroundStyle(.secondary).frame(width: 20)
+                .accessibilityHidden(true)
             content().textFieldStyle(.plain)
         }
-        .padding(.horizontal, 14).padding(.vertical, 12)
-        .background(.thinMaterial, in: .rect(cornerRadius: 12))
+        .padding(.horizontal, Spacing.md).padding(.vertical, Spacing.md)
+        .background(.thinMaterial, in: .rect(cornerRadius: Radius.chip))
     }
 
     private func primaryButton(title: String, busyTitle: String, action: @escaping () async -> Void) -> some View {
         Button {
             Task { await action() }
         } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: Spacing.sm) {
                 if busy { ProgressView().controlSize(.small) }
                 Text(busy ? busyTitle : title).fontWeight(.semibold)
             }
@@ -120,22 +140,9 @@ struct LoginView: View {
             case let .needs2FA(token): twoFAToken = token
             }
         } catch let e as APIError {
-            self.error = Self.message(for: e)
+            self.error = adminErrorMessage(e)
         } catch {
             self.error = "Sign-in failed. Check your details and try again."
-        }
-    }
-
-    private static func message(for error: APIError) -> String {
-        switch error {
-        case .unreachable: "Couldn't reach the server — check the host and your connection."
-        case let .requestFailed(status, serverMessage):
-            if let serverMessage { "Server (\(status)): \(serverMessage)" }
-            else { "Sign-in rejected (HTTP \(status))." }
-        case .authExpired: "Sign-in rejected (401)."
-        case .notFound: "Endpoint not found — check the host."
-        case .server(let code): "Server error (\(code))."
-        case .decoding: "Unexpected response from the server."
         }
     }
 
