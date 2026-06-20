@@ -208,6 +208,11 @@ private struct HourlyComparisonChart: View {
                     .foregroundStyle(Color.accentColor)
                     .lineStyle(StrokeStyle(lineWidth: 2)).interpolationMethod(.catmullRom)
             }
+            // Dot on today's latest point so a single early-day value still shows.
+            if let last = Self.cumulative(today).last {
+                PointMark(x: .value("Hour", last.hour), y: .value("Revenue", last.total))
+                    .foregroundStyle(Color.accentColor).symbolSize(28)
+            }
         }
         .chartForegroundStyleScale(["Today": Color.accentColor, "Yesterday": Color.gray])
         .chartXScale(domain: 0...23) // always the full UTC day

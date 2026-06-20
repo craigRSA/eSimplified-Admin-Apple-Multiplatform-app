@@ -4,7 +4,8 @@ import EsimplifiedKit
 
 /// What the widget renders for a given timeline entry.
 enum RevenueContent: Equatable {
-    case revenue(today: Decimal, deltaPercent: Decimal?, series: [DayRevenue])
+    case revenue(today: Decimal, deltaPercent: Decimal?,
+                 hourlyToday: [HourPoint], hourlyYesterday: [HourPoint])
     case needsAuth
     case unavailable
 }
@@ -28,7 +29,8 @@ struct RevenueProvider: TimelineProvider {
     func placeholder(in context: Context) -> RevenueEntry {
         RevenueEntry(date: Date(), content: .revenue(today: Decimal(string: "1523.45")!,
                                                       deltaPercent: Decimal(string: "8.6"),
-                                                      series: Self.sampleSeries))
+                                                      hourlyToday: Self.sampleToday,
+                                                      hourlyYesterday: Self.sampleYesterday))
     }
 
     func getSnapshot(in context: Context, completion: @escaping (RevenueEntry) -> Void) {
@@ -68,7 +70,8 @@ struct RevenueProvider: TimelineProvider {
             return RevenueEntry(date: Date(),
                                 content: .revenue(today: stats.revenueToday,
                                                   deltaPercent: stats.deltaPercent,
-                                                  series: stats.revenuePerDate))
+                                                  hourlyToday: stats.revenuePerHourToday,
+                                                  hourlyYesterday: stats.revenuePerHourYesterday))
         } catch APIError.authExpired {
             return RevenueEntry(date: Date(), content: .needsAuth)
         } catch {
@@ -85,13 +88,10 @@ struct RevenueProvider: TimelineProvider {
         return LiveAuthClient(clientID: id, clientSecret: secret)
     }
 
-    private static let sampleSeries: [DayRevenue] = [
-        DayRevenue(date: "2026-06-11", revenue: Decimal(string: "1100.00")!),
-        DayRevenue(date: "2026-06-12", revenue: Decimal(string: "1250.50")!),
-        DayRevenue(date: "2026-06-13", revenue: Decimal(string: "1402.10")!),
-        DayRevenue(date: "2026-06-14", revenue: Decimal(string: "1290.00")!),
-        DayRevenue(date: "2026-06-15", revenue: Decimal(string: "1480.75")!),
-        DayRevenue(date: "2026-06-16", revenue: Decimal(string: "1402.10")!),
-        DayRevenue(date: "2026-06-17", revenue: Decimal(string: "1523.45")!),
-    ]
+    private static let sampleToday: [HourPoint] = (0...10).map {
+        HourPoint(hour: $0, revenue: Decimal(120 + $0 * 95))
+    }
+    private static let sampleYesterday: [HourPoint] = (0...23).map {
+        HourPoint(hour: $0, revenue: Decimal(95 + $0 * 70))
+    }
 }

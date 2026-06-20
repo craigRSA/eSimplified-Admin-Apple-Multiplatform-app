@@ -1,5 +1,6 @@
 import SwiftUI
 import WidgetKit
+import Charts
 import EsimplifiedKit
 
 struct RevenueWidgetView: View {
@@ -9,9 +10,10 @@ struct RevenueWidgetView: View {
 
     var body: some View {
         switch entry.content {
-        case let .revenue(today, deltaPercent, series):
+        case let .revenue(today, deltaPercent, hToday, hYesterday):
             if family == .systemMedium {
-                MediumRevenueView(symbol: symbol, today: today, deltaPercent: deltaPercent, series: series)
+                MediumRevenueView(symbol: symbol, today: today, deltaPercent: deltaPercent,
+                                  hourlyToday: hToday, hourlyYesterday: hYesterday)
             } else {
                 SmallRevenueView(symbol: symbol, today: today, deltaPercent: deltaPercent)
             }
@@ -46,7 +48,8 @@ private struct MediumRevenueView: View {
     let symbol: String
     let today: Decimal
     let deltaPercent: Decimal?
-    let series: [DayRevenue]
+    let hourlyToday: [HourPoint]
+    let hourlyYesterday: [HourPoint]
 
     var body: some View {
         HStack(alignment: .center, spacing: 16) {
@@ -59,8 +62,8 @@ private struct MediumRevenueView: View {
                 DeltaLabel(deltaPercent: deltaPercent)
             }
             Spacer(minLength: 0)
-            Sparkline(values: series.map(\.revenue))
-                .frame(width: 130)
+            HourlyChart(today: hourlyToday, yesterday: hourlyYesterday)
+                .frame(width: 140)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     }
@@ -80,6 +83,47 @@ private struct DeltaLabel: View {
     }
 }
 
+/// Cumulative today-vs-yesterday curve (same as the app's hero): yesterday
+/// dashed over the full day, today solid with a dot on the latest point so a
+/// single early-day value is still visible.
+private struct HourlyChart: View {
+    let today: [HourPoint]
+    let yesterday: [HourPoint]
+
+    var body: some View {
+        let t = cumulative(today)
+        let y = cumulative(yesterday)
+        Chart {
+            ForEach(y, id: \.hour) { p in
+                LineMark(x: .value("Hour", p.hour), y: .value("Revenue", p.total),
+                         series: .value("Day", "Yesterday"))
+                    .foregroundStyle(.gray).lineStyle(StrokeStyle(lineWidth: 1.5, dash: [3, 2]))
+                    .interpolationMethod(.catmullRom)
+            }
+            ForEach(t, id: \.hour) { p in
+                LineMark(x: .value("Hour", p.hour), y: .value("Revenue", p.total),
+                         series: .value("Day", "Today"))
+                    .foregroundStyle(.tint).lineStyle(StrokeStyle(lineWidth: 2))
+                    .interpolationMethod(.catmullRom)
+            }
+            if let last = t.last {
+                PointMark(x: .value("Hour", last.hour), y: .value("Revenue", last.total))
+                    .foregroundStyle(.tint).symbolSize(22)
+            }
+        }
+        .chartXScale(domain: 0...23)
+        .chartXAxis(.hidden).chartYAxis(.hidden)
+    }
+
+    private func cumulative(_ points: [HourPoint]) -> [(hour: Int, total: Double)] {
+        var running = 0.0
+        return points.sorted { $0.hour < $1.hour }.map { p in
+            running += (p.revenue as NSDecimalNumber).doubleValue
+            return (p.hour, running)
+        }
+    }
+}
+
 private struct PlaceholderMessage: View {
     let icon: String
     let text: String
@@ -93,43 +137,5 @@ private struct PlaceholderMessage: View {
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
-/// Dependency-free 7-point line chart drawn with a `Path`.
-private struct Sparkline: View {
-    let values: [Decimal]
-
-    var body: some View {
-        GeometryReader { geo in
-            let points = normalizedPoints(in: geo.size)
-            ZStack {
-                if points.count >= 2 {
-                    Path { path in
-                        path.move(to: points[0])
-                        for p in points.dropFirst() { path.addLine(to: p) }
-                    }
-                    .stroke(.tint, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-                    if let last = points.last {
-                        Circle().fill(.tint).frame(width: 5, height: 5).position(last)
-                    }
-                }
-            }
-        }
-    }
-
-    private func normalizedPoints(in size: CGSize) -> [CGPoint] {
-        let nums = values.map { ($0 as NSDecimalNumber).doubleValue }
-        guard nums.count >= 2 else { return [] }
-        let minV = nums.min() ?? 0
-        let maxV = nums.max() ?? 1
-        let range = maxV - minV
-        let stepX = size.width / CGFloat(nums.count - 1)
-        return nums.enumerated().map { i, v in
-            let y: CGFloat = range == 0
-                ? size.height / 2
-                : size.height * (1 - CGFloat((v - minV) / range))
-            return CGPoint(x: CGFloat(i) * stepX, y: y)
-        }
     }
 }
