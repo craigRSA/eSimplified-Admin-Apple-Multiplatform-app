@@ -8,26 +8,52 @@ struct DashboardScreen: View {
 
     @State private var phase: Phase = .loading
     @State private var range: DashRange = .monthToDate
+    @Environment(\.horizontalSizeClass) private var hSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// Cap the column to a comfortable reading measure on wide displays.
+    private let readingWidth: CGFloat = 900
 
     enum Phase { case loading, loaded(AdminDashboardStats), failed(String) }
 
     var body: some View {
         ScrollView {
-            switch phase {
-            case .loading:
-                ProgressView().controlSize(.large).frame(maxWidth: .infinity, minHeight: 320)
-            case let .failed(message):
-                ContentUnavailableView("Couldn't load the dashboard", systemImage: "exclamationmark.triangle",
-                                       description: Text(message)).frame(minHeight: 320)
-            case let .loaded(stats):
-                content(stats)
+            Group {
+                switch phase {
+                case .loading:
+                    LoadingSkeleton()
+                case let .failed(message):
+                    failedView(message)
+                case let .loaded(stats):
+                    content(stats)
+                }
             }
+            .frame(maxWidth: readingWidth)
+            .frame(maxWidth: .infinity)
+            .animation(reduceMotion ? nil : .snappy, value: isLoaded)
         }
         .background(AppBackground())
         .navigationTitle("Overview")
         .reload(on: "\(tenant ?? "all")|\(range.rawValue)") { await load() }
         .refreshable { await load() }
+        .refreshCommand { Task { await load() } }
         .autoRefresh { await load() }
+    }
+
+    /// Drives the phase-change animation without animating between two loaded
+    /// payloads (which would re-run chart transitions on every auto-refresh).
+    private var isLoaded: Bool { if case .loaded = phase { return true }; return false }
+
+    @ViewBuilder private func failedView(_ message: String) -> some View {
+        ContentUnavailableView {
+            Label("Couldn't load the dashboard", systemImage: "exclamationmark.triangle")
+        } description: {
+            Text(message)
+        } actions: {
+            Button("Try Again") { Task { await load() } }
+                .buttonStyle(.glassProminent)
+        }
+        .frame(minHeight: 320)
     }
 
     /// Compact date-range picker that lives on the comparison chart it controls.
@@ -40,15 +66,15 @@ struct DashboardScreen: View {
         } label: {
             Label(range.label, systemImage: "calendar")
                 .font(.subheadline).labelStyle(.titleAndIcon)
-                .padding(.horizontal, 10).padding(.vertical, 5)
+                .padding(.horizontal, Spacing.md).padding(.vertical, Spacing.xs)
                 .glassEffect(.regular.interactive(), in: .capsule)
         }
         .menuStyle(.borderlessButton).fixedSize()
     }
 
     @ViewBuilder private func content(_ s: AdminDashboardStats) -> some View {
-        GlassEffectContainer(spacing: 16) {
-        VStack(alignment: .leading, spacing: 22) {
+        GlassEffectContainer(spacing: Spacing.lg) {
+        VStack(alignment: .leading, spacing: Spacing.xl) {
             // Signature: today's gross volume
             HeroCard(today: s.revenueToday, yesterday: s.revenueYesterday,
                      hourlyToday: s.revenuePerHourToday, hourlyYesterday: s.revenuePerHourYesterday,
@@ -56,12 +82,12 @@ struct DashboardScreen: View {
 
             // Headline metrics
             MetricGrid(items: [
-                .init("Tenants", s.tenants.formatted(), "building.2", .purple),
-                .init("Customers", Fmt.countCompact(s.customers), "person.2", .orange),
-                .init("Successful orders", Fmt.countCompact(s.successOrders), "checkmark.seal", .green),
-                .init("Revenue (all time)", Fmt.money(s.revenue), "dollarsign.circle", .green),
-                .init("Avg order value", Fmt.money(s.averageOrderValue), "cart", .pink),
-                .init("Best day", Fmt.money(s.bestDay?.revenue ?? 0), "trophy", .yellow),
+                .init("Tenants", s.tenants.formatted(), "building.2"),
+                .init("Customers", Fmt.countCompact(s.customers), "person.2"),
+                .init("Successful orders", Fmt.countCompact(s.successOrders), "checkmark.seal"),
+                .init("Revenue (all time)", Fmt.money(s.revenue), "dollarsign.circle"),
+                .init("Avg order value", Fmt.money(s.averageOrderValue), "cart"),
+                .init("Best day", Fmt.money(s.bestDay?.revenue ?? 0), "trophy"),
                 .comparison("This month", Fmt.money(s.revenueCurrentMonth),
                             AdminDashboardStats.change(s.revenueCurrentMonth, vs: s.revenueLastMonth),
                             "vs last: \(Fmt.money(s.revenueLastMonth))"),
@@ -72,9 +98,9 @@ struct DashboardScreen: View {
 
             // Selected range vs previous comparable period — the date picker
             // lives on this card because it's what the range controls.
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: Spacing.md) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text("\(range.label) vs previous").font(.headline)
+                    SectionHeader("\(range.label) vs previous", eyebrow: "Selected range")
                     Spacer()
                     rangeMenu
                 }
@@ -109,7 +135,12 @@ struct DashboardScreen: View {
             }
 
             if !s.current.topPackages.isEmpty || !s.current.topCountries.isEmpty {
-                HStack(alignment: .top, spacing: 16) {
+                // Side-by-side on regular width; stacked on a phone so each list
+                // keeps a readable measure.
+                let layout = hSize == .compact
+                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: Spacing.lg))
+                    : AnyLayout(HStackLayout(alignment: .top, spacing: Spacing.lg))
+                layout {
                     if !s.current.topPackages.isEmpty {
                         Card(title: "Top packages") { TopList(items: s.current.topPackages) }
                     }
@@ -119,7 +150,7 @@ struct DashboardScreen: View {
                 }
             }
         }
-        .padding(20)
+        .padding(Spacing.xl)
         }
     }
 
@@ -139,6 +170,42 @@ struct DashboardScreen: View {
     }
 }
 
+// MARK: - Loading skeleton
+
+/// Redacted placeholder that mirrors the hero card + metric grid, so a range or
+/// tenant change reshapes in place instead of blanking the whole screen.
+private struct LoadingSkeleton: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.xl) {
+            // Hero
+            VStack(alignment: .leading, spacing: Spacing.md) {
+                SkeletonBar(width: 160, height: 12)
+                SkeletonBar(width: 220, height: 44)
+                SkeletonBar(width: 140, height: 14)
+                SkeletonBar(height: 110)
+            }
+            .glassCard(radius: Radius.card, padding: Spacing.xl)
+
+            // Metric grid
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 165), spacing: Spacing.md)], spacing: Spacing.md) {
+                ForEach(0..<6, id: \.self) { _ in
+                    VStack(alignment: .leading, spacing: Spacing.sm) {
+                        SkeletonBar(width: 26, height: 22)
+                        SkeletonBar(width: 90, height: 20)
+                        SkeletonBar(width: 64, height: 12)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(Spacing.md)
+                    .glassEffect(.regular, in: .rect(cornerRadius: Radius.chip))
+                }
+            }
+        }
+        .padding(Spacing.xl)
+        .accessibilityElement()
+        .accessibilityLabel("Loading dashboard")
+    }
+}
+
 // MARK: - Building blocks
 
 /// The hero: today's gross volume, the day's delta, and — when the backend
@@ -151,14 +218,16 @@ private struct HeroCard: View {
     let trend: [DayRevenue]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("TODAY'S GROSS VOLUME")
-                .font(.caption.weight(.semibold)).tracking(1.0).foregroundStyle(.secondary)
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
+        VStack(alignment: .leading, spacing: Spacing.md) {
+            // Hero eyebrow (the big number below is the headline, drawn at hero scale).
+            Eyebrow("Today's gross volume")
+            HStack(alignment: .firstTextBaseline, spacing: Spacing.md) {
                 Text(Fmt.money(today))
-                    .font(.system(size: 44, weight: .bold, design: .rounded)).monospacedDigit()
+                    .font(Font.display(.largeTitle)).monospacedDigit()
+                    .contentTransition(.numericText())
                     .lineLimit(1).minimumScaleFactor(0.5)
-                DeltaPill(delta: AdminDashboardStats.change(today, vs: yesterday))
+                    .accessibilityLabel("Today's gross volume: \(Fmt.money(today))")
+                TrendDelta(percent: AdminDashboardStats.change(today, vs: yesterday), pill: true)
             }
             Text("vs \(Fmt.money(yesterday)) yesterday")
                 .font(.subheadline).foregroundStyle(.secondary)
@@ -167,21 +236,38 @@ private struct HeroCard: View {
                 // Show the intraday chart whenever either day has data — so before
                 // today's first sale you still see yesterday's curve.
                 HourlyComparisonChart(today: hourlyToday, yesterday: hourlyYesterday)
-                    .frame(height: 120).padding(.top, 6)
+                    .frame(height: 120).padding(.top, Spacing.xs)
             } else if trend.count > 2 {
                 // Fallback until hourly data ships: the recent daily trend. Drop the
                 // last point — it's the in-progress UTC day, so it nosedives to ~0.
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: Spacing.xs) {
                     Sparkline(points: trend.dropLast().map { dbl($0.revenue) }).frame(height: 54)
-                    Text("DAILY TREND · COMPLETED DAYS").font(.caption2.weight(.semibold)).tracking(0.6)
-                        .foregroundStyle(.tertiary)
+                        .accessibilityElement()
+                        .accessibilityLabel("Daily revenue trend over completed days")
+                    Eyebrow("Daily trend · completed days")
                 }
-                .padding(.top, 4)
+                .padding(.top, Spacing.xs)
             }
         }
-        .padding(22)
+        .padding(Spacing.xl)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular, in: .rect(cornerRadius: 22))
+        .glassEffect(.regular, in: .rect(cornerRadius: Radius.card))
+    }
+}
+
+/// A standalone eyebrow overline, matching `SectionHeader`'s eyebrow register —
+/// used where the headline is rendered separately at a larger scale (the hero
+/// figure, the sparkline) so a full `SectionHeader` title would duplicate it.
+/// Defined once here so both the hero and the daily-trend overline share one
+/// consistent eyebrow, replacing the hand-typed `.caption`/`.caption2` +
+/// `tracking` variants this file used before.
+private struct Eyebrow: View {
+    let text: String
+    init(_ text: String) { self.text = text }
+    var body: some View {
+        Text(text.uppercased())
+            .font(.caption2.weight(.semibold)).tracking(0.8)
+            .foregroundStyle(.secondary)
     }
 }
 
@@ -193,6 +279,7 @@ private struct HourlyComparisonChart: View {
     let today: [HourPoint]
     let yesterday: [HourPoint]
     @State private var selectedX: Int?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let t = Self.points(today)
@@ -213,6 +300,7 @@ private struct HourlyComparisonChart: View {
             if let selectedX {
                 RuleMark(x: .value("Hour", selectedX))
                     .foregroundStyle(Color.secondary.opacity(0.25))
+                    .accessibilityHidden(true)
                     .annotation(position: .top, spacing: 0,
                                 overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
                         ChartTooltip(title: String(format: "%02d:00", min(max(selectedX, 0), 24)), rows: [
@@ -229,7 +317,13 @@ private struct HourlyComparisonChart: View {
             AxisValueLabel { if let h = v.as(Int.self) { Text(String(format: "%02d:00", h)) } }
         } }
         .chartXSelection(value: $selectedX)
-        .chartLegend(position: .top, alignment: .leading, spacing: 8)
+        .animation(reduceMotion ? nil : .snappy, value: selectedX)
+        .chartLegend(position: .top, alignment: .leading, spacing: Spacing.sm)
+        .accessibilityElement()
+        .accessibilityLabel("Cumulative sales today versus yesterday")
+        .accessibilityValue(
+            "Today \(Fmt.money(Decimal(Self.valueAt(t, 24)))), yesterday \(Fmt.money(Decimal(Self.valueAt(y, 24))))"
+        )
     }
 
     /// Running total plotted at the end of each hour, prefixed with a 0 origin.
@@ -254,10 +348,10 @@ struct ChartTooltip: View {
     let title: String
     let rows: [(String, String, Color)]
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: Spacing.xs) {
             Text(title).font(.caption2.weight(.semibold))
             ForEach(rows, id: \.0) { row in
-                HStack(spacing: 5) {
+                HStack(spacing: Spacing.xs) {
                     if !row.0.isEmpty {
                         Circle().fill(row.2).frame(width: 6, height: 6)
                         Text(row.0).font(.caption2).foregroundStyle(.secondary)
@@ -266,27 +360,12 @@ struct ChartTooltip: View {
                 }
             }
         }
-        .padding(7)
-        .background(.regularMaterial, in: .rect(cornerRadius: 7))
+        .padding(Spacing.sm)
+        .background(.regularMaterial, in: .rect(cornerRadius: Radius.tooltip))
         .shadow(radius: 3, y: 1)
     }
 }
 
-
-private struct DeltaPill: View {
-    let delta: Decimal?
-    var body: some View {
-        if let delta {
-            let up = delta >= 0
-            Label("\(up ? "+" : "")\(delta.formatted(.number.precision(.fractionLength(1))))%",
-                  systemImage: up ? "arrow.up.right" : "arrow.down.right")
-                .font(.subheadline.weight(.semibold).monospacedDigit())
-                .foregroundStyle(up ? .green : .red)
-                .padding(.horizontal, 10).padding(.vertical, 5)
-                .background((up ? Color.green : .red).opacity(0.16), in: Capsule())
-        }
-    }
-}
 
 /// A minimal filled area sparkline — no axes, just the shape of the trend.
 private struct Sparkline: View {
@@ -309,13 +388,11 @@ private struct Card<Content: View>: View {
     let title: String
     @ViewBuilder var content: Content
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: Spacing.md) {
             Text(title).font(.headline)
             content
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(18)
-        .glassEffect(.regular, in: .rect(cornerRadius: 18))
+        .glassCard(radius: Radius.card, padding: Spacing.lg)
     }
 }
 
@@ -324,40 +401,42 @@ private struct MetricItem: Identifiable {
     let title: String
     let value: String
     let icon: String?
-    let tint: Color
     let delta: Decimal?
     let sub: String?
 
-    init(_ title: String, _ value: String, _ icon: String, _ tint: Color) {
-        self.title = title; self.value = value; self.icon = icon; self.tint = tint; self.delta = nil; self.sub = nil
+    init(_ title: String, _ value: String, _ icon: String) {
+        self.title = title; self.value = value; self.icon = icon; self.delta = nil; self.sub = nil
     }
     static func comparison(_ title: String, _ value: String, _ delta: Decimal?, _ sub: String) -> MetricItem {
         MetricItem(title: title, value: value, delta: delta, sub: sub)
     }
     private init(title: String, value: String, delta: Decimal?, sub: String) {
-        self.title = title; self.value = value; self.icon = nil; self.tint = .secondary; self.delta = delta; self.sub = sub
+        self.title = title; self.value = value; self.icon = nil; self.delta = delta; self.sub = sub
     }
 }
 
 private struct MetricGrid: View {
     let items: [MetricItem]
     var body: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 165), spacing: 14)], spacing: 14) {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 165), spacing: Spacing.md)], spacing: Spacing.md) {
             ForEach(items) { item in
-                VStack(alignment: .leading, spacing: 6) {
-                    if let icon = item.icon { Image(systemName: icon).foregroundStyle(item.tint).font(.title3) }
+                VStack(alignment: .leading, spacing: Spacing.sm) {
+                    // Icons read quietly in .secondary so the figures lead and the
+                    // one accent (the hero) stays special.
+                    if let icon = item.icon {
+                        Image(systemName: icon).foregroundStyle(.secondary).font(.title3)
+                            .accessibilityHidden(true)
+                    }
                     Text(item.value).font(.title3.weight(.semibold).monospacedDigit()).lineLimit(1).minimumScaleFactor(0.55)
                     Text(item.title).font(.caption).foregroundStyle(.secondary)
                     if let delta = item.delta {
-                        let up = delta >= 0
-                        Text("\(up ? "+" : "")\(delta.formatted(.number.precision(.fractionLength(1))))%")
-                            .font(.caption.weight(.semibold)).foregroundStyle(up ? .green : .red)
+                        TrendDelta(percent: delta, font: .caption.weight(.semibold))
                     }
                     if let sub = item.sub { Text(sub).font(.caption2).foregroundStyle(.secondary) }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(14)
-                .glassEffect(.regular, in: .rect(cornerRadius: 14))
+                .padding(Spacing.md)
+                .glassEffect(.regular, in: .rect(cornerRadius: Radius.chip))
             }
         }
     }
@@ -370,6 +449,7 @@ private struct ComparisonAreaChart: View {
     /// day index.
     var monthly: Bool = false
     @State private var selected: Int?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private func label(_ i: Int) -> String {
         monthly && current.indices.contains(i) ? shortMonth(current[i].date) : "Day \(i + 1)"
@@ -394,6 +474,7 @@ private struct ComparisonAreaChart: View {
             if let selected, current.indices.contains(selected) {
                 RuleMark(x: .value("Point", selected))
                     .foregroundStyle(Color.secondary.opacity(0.25))
+                    .accessibilityHidden(true)
                     .annotation(position: .top, spacing: 0,
                                 overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
                         ChartTooltip(title: label(selected), rows: [
@@ -405,6 +486,7 @@ private struct ComparisonAreaChart: View {
         }
         .chartForegroundStyleScale(["This period": Color.accentColor, "Previous": Color.gray])
         .chartXSelection(value: $selected)
+        .animation(reduceMotion ? nil : .snappy, value: selected)
         .chartXAxis {
             if monthly {
                 AxisMarks(values: tickIndices(count: current.count, desired: 6)) { value in
@@ -416,6 +498,12 @@ private struct ComparisonAreaChart: View {
                 AxisMarks(values: .automatic(desiredCount: 5))
             }
         }
+        .accessibilityElement()
+        .accessibilityLabel("This period versus the previous comparable period")
+        .accessibilityValue(
+            "This period total \(Fmt.money(current.reduce(Decimal(0)) { $0 + $1.revenue })), "
+            + "previous \(Fmt.money(previous.reduce(Decimal(0)) { $0 + $1.revenue }))"
+        )
     }
 }
 
@@ -424,6 +512,7 @@ private struct RevenueBarChart: View {
     /// Cap on x-axis labels — keeps month names from colliding on a phone.
     var desiredLabels = 8
     @State private var selected: Int?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
         Chart {
             ForEach(Array(items.enumerated()), id: \.offset) { i, item in
@@ -433,6 +522,7 @@ private struct RevenueBarChart: View {
             if let selected, items.indices.contains(selected) {
                 RuleMark(x: .value("Index", selected))
                     .foregroundStyle(.clear)
+                    .accessibilityHidden(true)
                     .annotation(position: .top, spacing: 0,
                                 overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
                         ChartTooltip(title: items[selected].0, rows: [("", Fmt.money(items[selected].1), .accentColor)])
@@ -440,6 +530,7 @@ private struct RevenueBarChart: View {
             }
         }
         .chartXSelection(value: $selected)
+        .animation(reduceMotion ? nil : .snappy, value: selected)
         .chartXAxis {
             AxisMarks(values: tickIndices(count: items.count, desired: desiredLabels)) { value in
                 if let i = value.as(Int.self), items.indices.contains(i) {
@@ -447,6 +538,16 @@ private struct RevenueBarChart: View {
                 }
             }
         }
+        .accessibilityElement()
+        .accessibilityLabel("Revenue by category")
+        .accessibilityValue(axSummary)
+    }
+
+    /// Names the top entries so VoiceOver conveys the chart without the visual bars.
+    private var axSummary: String {
+        items.prefix(3)
+            .map { "\($0.0) \(Fmt.money($0.1))" }
+            .joined(separator: ", ")
     }
 }
 
@@ -469,9 +570,9 @@ private struct TopList: View {
     let items: [LabeledCount]
     var body: some View {
         let maxCount = max(items.map(\.count).max() ?? 1, 1)
-        VStack(spacing: 8) {
+        VStack(spacing: Spacing.sm) {
             ForEach(items.prefix(5)) { item in
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: Spacing.xs) {
                     HStack {
                         Text(item.label).font(.caption).lineLimit(1)
                         Spacer()
@@ -485,7 +586,10 @@ private struct TopList: View {
                             }
                     }
                     .frame(height: 5)
+                    .accessibilityHidden(true)
                 }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(item.label): \(item.count.formatted())")
             }
         }
     }
