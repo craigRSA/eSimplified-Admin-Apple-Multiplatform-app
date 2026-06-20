@@ -57,6 +57,8 @@ struct EsimplifiedAdminApp: App {
 final class AdminAppModel {
     let store: SessionStore
     private(set) var session: Session?
+    let sessionManager: SessionManager
+    private(set) var biometricEnabled: Bool
 
     /// Tenant scope shared by all screens. `nil` = all tenants.
     var selectedTenant: Tenant?
@@ -76,37 +78,60 @@ final class AdminAppModel {
 
     init(store: SessionStore = KeychainSessionStore()) {
         self.store = store
-        self.clientID = (Bundle.main.object(forInfoDictionaryKey: "ESPClientID") as? String) ?? ""
-        self.clientSecret = (Bundle.main.object(forInfoDictionaryKey: "ESPClientSecret") as? String) ?? ""
+        let id = (Bundle.main.object(forInfoDictionaryKey: "ESPClientID") as? String) ?? ""
+        let secret = (Bundle.main.object(forInfoDictionaryKey: "ESPClientSecret") as? String) ?? ""
+        self.clientID = id
+        self.clientSecret = secret
         let configured = (Bundle.main.object(forInfoDictionaryKey: "ESPHost") as? String) ?? ""
         self.host = configured.isEmpty ? "https://live.esimplified.io" : configured
-        self.session = try? store.load()
+
+        let loaded = try? store.load()
+        self.session = loaded
+        let enabled = store.biometricEnabled()
+        self.biometricEnabled = enabled
+
+        // Refresh is allowed on macOS always; on iOS only when biometric sign-in
+        // is enabled (otherwise the session is ephemeral — sign out on expiry).
+        #if os(macOS)
+        let refreshEnabled = true
+        #else
+        let refreshEnabled = enabled
+        #endif
+
+        self.sessionManager = SessionManager(
+            session: loaded, store: store,
+            authClient: LiveAuthClient(clientID: id, clientSecret: secret),
+            refreshEnabled: refreshEnabled)
+
+        // The manager is the single writer of `session`; mirror its changes to the
+        // observable on the main actor (also clears tenants on sign-out).
+        let mgr = sessionManager
+        Task { await mgr.setOnChange { [weak self] newSession in
+            Task { @MainActor in
+                self?.session = newSession
+                if newSession == nil { self?.tenants = []; self?.selectedTenant = nil }
+            }
+        } }
     }
 
-    func authClient() -> LiveAuthClient {
-        LiveAuthClient(clientID: clientID, clientSecret: clientSecret)
-    }
+    func authClient() -> LiveAuthClient { LiveAuthClient(clientID: clientID, clientSecret: clientSecret) }
+
+    func apiClient() -> LiveAPIClient { LiveAPIClient(host: host, tokenProvider: sessionManager) }
 
     func adopt(_ session: Session) {
-        try? store.save(session)
-        self.session = session
-    }
-
-    /// Refreshes the OAuth access token when it's expired or about to expire,
-    /// using the refresh token. Updating `session` re-renders the shell, so
-    /// screens (which key their reloads on the token) re-fetch with the new one.
-    func refreshSessionIfNeeded() async {
-        guard let s = session, s.expiresAt.timeIntervalSinceNow < 120 else { return }
-        if let refreshed = try? await authClient().refresh(host: s.host, refreshToken: s.refreshToken) {
-            adopt(refreshed)
-        }
+        Task { await sessionManager.adopt(session) }   // persists + fires onChange → sets self.session
     }
 
     func logout() {
-        try? store.clear()
-        session = nil
-        tenants = []
-        selectedTenant = nil
+        Task { await sessionManager.clear() }            // clears store + fires onChange(nil)
+    }
+
+    func setBiometricEnabled(_ enabled: Bool) {
+        biometricEnabled = enabled
+        try? store.setBiometricEnabled(enabled)
+        #if os(iOS)
+        Task { await sessionManager.setRefreshEnabled(enabled) }
+        #endif
     }
 
     /// The schema name to scope queries by, or nil for all tenants.
@@ -114,7 +139,7 @@ final class AdminAppModel {
 
     func loadTenants() async {
         guard let session, tenants.isEmpty else { return }
-        let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
+        let client = apiClient()
         if let page = try? await client.get("/api/tenants/", query: ["limit": "1000", "order_by": "name"],
                                             as: TenantsPage.self) {
             tenants = page.tenants

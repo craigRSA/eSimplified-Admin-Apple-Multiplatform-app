@@ -12,7 +12,7 @@ public actor SessionManager: AccessTokenProviding {
     private let refreshBuffer: TimeInterval
     private var refreshEnabled: Bool
     private let now: @Sendable () -> Date
-    private let onChange: @Sendable (Session?) -> Void
+    private var onChange: @Sendable (Session?) -> Void
 
     private var refreshTask: Task<Session, Error>?
 
@@ -30,6 +30,8 @@ public actor SessionManager: AccessTokenProviding {
     }
 
     public func currentSession() -> Session? { session }
+
+    public func setOnChange(_ handler: @escaping @Sendable (Session?) -> Void) { onChange = handler }
 
     public func setRefreshEnabled(_ enabled: Bool) { refreshEnabled = enabled }
 
