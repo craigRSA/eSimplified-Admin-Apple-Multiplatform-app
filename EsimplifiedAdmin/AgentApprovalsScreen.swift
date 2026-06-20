@@ -18,23 +18,39 @@ struct AgentApprovalsScreen: View {
         Group {
             switch phase {
             case .loading:
-                ProgressView().controlSize(.large).frame(maxWidth: .infinity, maxHeight: .infinity)
+                List {
+                    ForEach(0..<8, id: \.self) { _ in
+                        OrderApprovalRowSkeleton().listRowSeparator(.hidden)
+                    }
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
             case let .failed(message):
-                ContentUnavailableView("Couldn't load approvals", systemImage: "exclamationmark.triangle",
-                                       description: Text(message))
+                ContentUnavailableView {
+                    Label("Couldn't load approvals", systemImage: "exclamationmark.triangle")
+                } description: {
+                    Text(message)
+                } actions: {
+                    Button("Try Again") { Task { await load() } }
+                        .buttonStyle(.glassProminent)
+                }
             case let .loaded(orders):
                 if orders.isEmpty {
                     ContentUnavailableView("No agent orders", systemImage: "checkmark.seal",
                                            description: Text("No agent-payment orders for this tenant."))
                 } else {
                     List(orders) { OrderApprovalRow(order: $0) }
+                        .listStyle(.plain)
+                        .scrollContentBackground(.hidden)
                 }
             }
         }
+        .background(AppBackground())
         .navigationTitle("Agent Approvals")
         .reload(on: tenant) { await load() }
         .refreshable { await load() }
         .autoRefresh { await load() }
+        .refreshCommand { Task { await load() } }
     }
 
     private func load() async {
@@ -62,22 +78,53 @@ struct AgentApprovalsScreen: View {
 private struct OrderApprovalRow: View {
     let order: Order
 
+    private var title: String { order.orderNumber.isEmpty ? order.packageName : order.orderNumber }
+    private var who: String? {
+        let name = order.customerName ?? order.customerEmail
+        return (name?.isEmpty == false) ? name : nil
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: Spacing.xs) {
             HStack {
-                Text(order.orderNumber.isEmpty ? order.packageName : order.orderNumber).font(.headline)
+                Text(title).font(.headline)
                 Spacer()
-                Text(order.priceDisplay).font(.headline.monospacedDigit())
+                // Match Orders/CustomerDetail: the normalized USD price, not the raw
+                // local-currency `priceDisplay`, so the same order reads consistently.
+                Text(order.usdPriceDisplay).font(.headline.monospacedDigit())
             }
             HStack {
                 StatusBadge(status: order.paymentStatus)
                 Spacer()
                 Text(shortDate(order.purchaseDate)).font(.caption).foregroundStyle(.secondary)
             }
-            if let who = order.customerName ?? order.customerEmail, !who.isEmpty {
-                Text(who).font(.caption).foregroundStyle(.secondary)
-            }
+            if let who { Text(who).font(.caption).foregroundStyle(.secondary) }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, Spacing.xs)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityLabel)
+    }
+
+    private var accessibilityLabel: String {
+        var parts = [title, "Status \(order.paymentStatus.capitalized)", "\(order.usdPriceDisplay) USD",
+                     shortDate(order.purchaseDate)]
+        if let who { parts.append(who) }
+        return parts.joined(separator: ", ")
+    }
+}
+
+/// Redacted placeholder row so the list doesn't pop in from a blank spinner —
+/// mirrors the shape of `OrderApprovalRow` (title + price, then status + date).
+private struct OrderApprovalRowSkeleton: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            HStack {
+                SkeletonBar(width: 160, height: 16)
+                Spacer()
+                SkeletonBar(width: 60, height: 16)
+            }
+            SkeletonBar(width: 120, height: 12)
+        }
+        .padding(.vertical, Spacing.xs)
     }
 }
