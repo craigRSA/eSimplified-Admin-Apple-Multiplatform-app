@@ -17,9 +17,10 @@ public struct EsimDetail: Decodable, Sendable {
     public let packages: [EsimPackage]
     public let openDataSessions: [OpenDataSession]
     public let latestLocation: EsimLocation?
+    public let whitelist: [Whitelist]
 
     private enum K: String, CodingKey {
-        case iccid, imsi, coverage, packages, archived
+        case iccid, imsi, coverage, packages, archived, whitelist
         case esimName = "esim_name"
         case smDpAddress = "sm_dp_address"
         case matchingId = "matching_id"
@@ -50,6 +51,7 @@ public struct EsimDetail: Decodable, Sendable {
         packages = (try? c.decode([EsimPackage].self, forKey: .packages)) ?? []
         openDataSessions = (try? c.decode([OpenDataSession].self, forKey: .openDataSessions)) ?? []
         latestLocation = try? c.decode(EsimLocation.self, forKey: .latestLocation)
+        whitelist = (try? c.decode([Whitelist].self, forKey: .whitelist)) ?? []
     }
 
     /// The newest ACTIVE package, if any.
@@ -141,11 +143,12 @@ public struct OpenDataSession: Decodable, Sendable {
     }
 }
 
-public struct EsimLocation: Decodable, Sendable {
+public struct EsimLocation: Decodable, Sendable, Identifiable {
     public let countryName: String?
     public let dateEpoch: Double?
     public let `operator`: String?
     public let dataAllowed: Bool
+    public var id: String { "\(dateEpoch ?? 0)-\(countryName ?? "")-\(`operator` ?? "")" }
 
     private enum K: String, CodingKey {
         case `operator`
@@ -157,10 +160,78 @@ public struct EsimLocation: Decodable, Sendable {
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: K.self)
         countryName = try c.decodeIfPresent(String.self, forKey: .countryName)
-        dateEpoch = try c.decodeIfPresent(Double.self, forKey: .dateEpoch)
+        dateEpoch = try? c.decode(Double.self, forKey: .dateEpoch)
         `operator` = try c.decodeIfPresent(String.self, forKey: .operator)
         dataAllowed = try c.decodeIfPresent(Bool.self, forKey: .dataAllowed) ?? false
     }
+}
+
+/// One whitelist entry (on the eSIM object).
+public struct Whitelist: Decodable, Sendable, Identifiable {
+    public let country: String?
+    public let `operator`: String?
+    public let whitelistName: String?
+    public let dataAllowed: Bool
+    public let bestConnectivity: String?
+    public var id: String { "\(country ?? "")-\(`operator` ?? "")-\(whitelistName ?? "")" }
+
+    private enum K: String, CodingKey {
+        case country, `operator`
+        case whitelistName = "whitelist_name"
+        case dataAllowed = "data_allowed"
+        case bestConnectivity = "best_connectivity"
+    }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: K.self)
+        country = try? c.decode(String.self, forKey: .country)
+        `operator` = try? c.decode(String.self, forKey: .operator)
+        whitelistName = try? c.decode(String.self, forKey: .whitelistName)
+        dataAllowed = (try? c.decode(Bool.self, forKey: .dataAllowed)) ?? false
+        bestConnectivity = try? c.decode(String.self, forKey: .bestConnectivity)
+    }
+}
+
+/// One session / CDR record from `GET /api/esim/{iccid}/cdr/`.
+public struct EsimSession: Decodable, Sendable, Identifiable {
+    public let type: String?
+    public let countryName: String?
+    public let connectTimeEpoch: Double?
+    public let durationGb: Double?
+    public var id: String { "\(connectTimeEpoch ?? 0)-\(type ?? "")" }
+
+    private enum K: String, CodingKey {
+        case type
+        case countryName = "country_name"
+        case connectTimeEpoch = "connect_time_epoch"
+        case durationGb = "duration_gb"
+    }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: K.self)
+        type = try? c.decode(String.self, forKey: .type)
+        countryName = try? c.decode(String.self, forKey: .countryName)
+        connectTimeEpoch = try? c.decode(Double.self, forKey: .connectTimeEpoch)
+        durationGb = try? c.decode(Double.self, forKey: .durationGb)
+    }
+}
+
+/// `GET /api/esim/{iccid}/location/` — paginated location history.
+public struct EsimLocationList: Decodable, Sendable {
+    public let results: [EsimLocation]
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        results = (try? c.decode([EsimLocation].self, forKey: .results)) ?? []
+    }
+    private enum CodingKeys: String, CodingKey { case results }
+}
+
+/// `GET /api/esim/{iccid}/cdr/` — paginated session/CDR history.
+public struct EsimSessionList: Decodable, Sendable {
+    public let results: [EsimSession]
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        results = (try? c.decode([EsimSession].self, forKey: .results)) ?? []
+    }
+    private enum CodingKeys: String, CodingKey { case results }
 }
 
 /// `GET /api/esim/{iccid}/` → `{ esim, tenant }` (full detail, no `?search`).

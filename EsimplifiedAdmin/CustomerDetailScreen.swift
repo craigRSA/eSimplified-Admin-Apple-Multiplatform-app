@@ -34,6 +34,7 @@ struct CustomerDetailScreen: View {
 
     enum Phase { case loading, loaded, failed(String) }
     enum DetailPhase { case idle, loading, loaded(EsimDetail), failed(String) }
+    @State private var sheet: EsimDetailSheet?
 
     private var client: LiveAPIClient { LiveAPIClient(host: session.host, accessToken: session.accessToken) }
 
@@ -56,6 +57,24 @@ struct CustomerDetailScreen: View {
         .background(AppBackground())
         .reload(on: ref.customerId) { await load() }
         .refreshable { await load() }
+        .sheet(item: $sheet) { sheetContent($0) }
+    }
+
+    @ViewBuilder private func sheetContent(_ s: EsimDetailSheet) -> some View {
+        NavigationStack {
+            Group {
+                switch s {
+                case let .locations(iccid): LocationsSheet(session: session, iccid: iccid)
+                case let .sessions(iccid): SessionsSheet(session: session, iccid: iccid)
+                case let .packages(pkgs): PackagesSheet(packages: pkgs)
+                case let .whitelist(items): WhitelistSheet(items: items)
+                }
+            }
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { sheet = nil } } }
+        }
+        #if os(macOS)
+        .frame(minWidth: 460, minHeight: 420)
+        #endif
     }
 
     @ViewBuilder private var content: some View {
@@ -95,7 +114,7 @@ struct CustomerDetailScreen: View {
                 ProgressView().frame(maxWidth: .infinity).padding(.vertical, 8)
             }
         case let .loaded(detail):
-            EsimDetailCard(detail: detail)
+            EsimDetailCard(detail: detail) { sheet = $0 }
         case let .failed(message):
             SectionCard(title: "eSIM details") {
                 Text(message).font(.callout).foregroundStyle(.secondary)
@@ -207,6 +226,7 @@ struct CustomerDetailScreen: View {
 
 private struct EsimDetailCard: View {
     let detail: EsimDetail
+    var onView: (EsimDetailSheet) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -218,16 +238,31 @@ private struct EsimDetailCard: View {
                     ForEach(euiccItems, id: \.0) { LabeledValue(label: $0.0, value: $0.1) }
                 }
             }
+            if !detail.whitelist.isEmpty {
+                HStack { Spacer(); viewButton("Whitelist (\(detail.whitelist.count))", .whitelist(detail.whitelist)) }
+            }
             divider
             dataUsageBlock
-            if let loc = detail.latestLocation { divider; locationBlock(loc) }
-            if let pkg = detail.activePackage { divider; packageBlock(pkg) }
-            if let s = detail.openDataSessions.first { divider; sessionBlock(s) }
+            divider; locationBlock(detail.latestLocation)
+            divider; packageBlock(detail.activePackage)
+            divider; sessionBlock(detail.openDataSessions.first)
         }
         .glassCard()
     }
 
     private var divider: some View { Divider().padding(.vertical, 1) }
+
+    private func viewButton(_ title: String, _ sheet: EsimDetailSheet) -> some View {
+        Button(title) { onView(sheet) }.font(.caption).buttonStyle(.borderless)
+    }
+
+    private func sectionHeader(_ title: String, view: EsimDetailSheet?) -> some View {
+        HStack {
+            Text(title).font(.caption2.weight(.semibold)).tracking(0.6).foregroundStyle(.tertiary)
+            Spacer()
+            if let view { viewButton("View all", view) }
+        }
+    }
 
     private var header: some View {
         HStack(alignment: .top) {
@@ -285,44 +320,191 @@ private struct EsimDetailCard: View {
         }
     }
 
-    @ViewBuilder private func locationBlock(_ loc: EsimLocation) -> some View {
+    @ViewBuilder private func locationBlock(_ loc: EsimLocation?) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text("LAST LOCATION").font(.caption2.weight(.semibold)).tracking(0.6).foregroundStyle(.tertiary)
-            HStack {
-                Text(loc.countryName ?? "—").font(.callout)
-                Spacer()
-                if let op = loc.operator {
-                    Text(op).font(.caption.weight(.medium)).foregroundStyle(loc.dataAllowed ? .green : .red)
+            sectionHeader("LAST LOCATION", view: .locations(detail.iccid))
+            if let loc {
+                HStack {
+                    Text(loc.countryName ?? "—").font(.callout)
+                    Spacer()
+                    if let op = loc.operator {
+                        Text(op).font(.caption.weight(.medium)).foregroundStyle(loc.dataAllowed ? .green : .red)
+                    }
                 }
-            }
-            if let when = epochDate(loc.dateEpoch) {
-                Text("\(when) UTC").font(.caption2).foregroundStyle(.secondary)
+                if let when = epochDate(loc.dateEpoch) {
+                    Text("\(when) UTC").font(.caption2).foregroundStyle(.secondary)
+                }
+            } else {
+                Text("No location data.").font(.caption).foregroundStyle(.secondary)
             }
         }
     }
 
-    @ViewBuilder private func packageBlock(_ pkg: EsimPackage) -> some View {
+    @ViewBuilder private func packageBlock(_ pkg: EsimPackage?) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text("ACTIVE PACKAGE").font(.caption2.weight(.semibold)).tracking(0.6).foregroundStyle(.tertiary)
-            Text(pkg.name ?? "—").font(.callout)
-            if !pkg.supportedCountries.isEmpty {
-                Text("\(pkg.supportedCountries.count) countries").font(.caption2).foregroundStyle(.secondary)
+            sectionHeader("ACTIVE PACKAGE", view: detail.packages.isEmpty ? nil : .packages(detail.packages))
+            if let pkg {
+                Text(pkg.name ?? "—").font(.callout)
+                if !pkg.supportedCountries.isEmpty {
+                    Text("\(pkg.supportedCountries.count) countries").font(.caption2).foregroundStyle(.secondary)
+                }
+            } else {
+                Text("No active package.").font(.caption).foregroundStyle(.secondary)
             }
         }
     }
 
-    @ViewBuilder private func sessionBlock(_ s: OpenDataSession) -> some View {
+    @ViewBuilder private func sessionBlock(_ s: OpenDataSession?) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text("OPEN DATA SESSION").font(.caption2.weight(.semibold)).tracking(0.6).foregroundStyle(.tertiary)
-            HStack {
-                Text(detail.coverageName ?? "—").font(.callout)
-                if let when = epochDate(s.openedDate) {
-                    Text(when).font(.caption2).foregroundStyle(.secondary)
+            sectionHeader("OPEN DATA SESSION", view: .sessions(detail.iccid))
+            if let s {
+                HStack {
+                    Text(detail.coverageName ?? "—").font(.callout)
+                    if let when = epochDate(s.openedDate) {
+                        Text(when).font(.caption2).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if let kb = s.usageKb { Text(fmtKB(kb)).font(.caption.monospacedDigit()).foregroundStyle(.secondary) }
                 }
-                Spacer()
-                if let kb = s.usageKb { Text(fmtKB(kb)).font(.caption.monospacedDigit()).foregroundStyle(.secondary) }
+            } else {
+                Text("No open sessions.").font(.caption).foregroundStyle(.secondary)
             }
         }
+    }
+}
+
+// MARK: - Detail sheets
+
+enum EsimDetailSheet: Identifiable {
+    case locations(String)
+    case sessions(String)
+    case packages([EsimPackage])
+    case whitelist([Whitelist])
+    var id: String {
+        switch self {
+        case .locations: "locations"
+        case .sessions: "sessions"
+        case .packages: "packages"
+        case .whitelist: "whitelist"
+        }
+    }
+}
+
+private struct LocationsSheet: View {
+    let session: Session
+    let iccid: String
+    @State private var rows: [EsimLocation] = []
+    @State private var loading = true
+    var body: some View {
+        listOrEmpty(loading: loading, count: rows.count, empty: "No location history.") {
+            ForEach(rows) { loc in
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack {
+                        Text(loc.countryName ?? "—").font(.body)
+                        Spacer()
+                        if let op = loc.operator {
+                            Text(op).font(.caption).foregroundStyle(loc.dataAllowed ? .green : .red)
+                        }
+                    }
+                    if let when = epochDate(loc.dateEpoch) { Text("\(when) UTC").font(.caption).foregroundStyle(.secondary) }
+                }
+            }
+        }
+        .navigationTitle("Locations")
+        .task {
+            let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
+            rows = (try? await client.get("/api/esim/\(iccid)/location/", query: ["limit": "100"], as: EsimLocationList.self))?.results ?? []
+            loading = false
+        }
+    }
+}
+
+private struct SessionsSheet: View {
+    let session: Session
+    let iccid: String
+    @State private var rows: [EsimSession] = []
+    @State private var loading = true
+    var body: some View {
+        listOrEmpty(loading: loading, count: rows.count, empty: "No sessions.") {
+            ForEach(rows) { s in
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack {
+                        Text(s.countryName ?? "—").font(.body)
+                        Spacer()
+                        if let gb = s.durationGb { Text(fmtGB(gb)).font(.caption.monospacedDigit()).foregroundStyle(.secondary) }
+                    }
+                    HStack(spacing: 6) {
+                        if let t = s.type { Text(t).font(.caption2).foregroundStyle(.secondary) }
+                        if let when = epochDate(s.connectTimeEpoch) { Text(when).font(.caption2).foregroundStyle(.secondary) }
+                    }
+                }
+            }
+        }
+        .navigationTitle("Sessions")
+        .task {
+            let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
+            rows = (try? await client.get("/api/esim/\(iccid)/cdr/", query: ["limit": "100"], as: EsimSessionList.self))?.results ?? []
+            loading = false
+        }
+    }
+}
+
+private struct PackagesSheet: View {
+    let packages: [EsimPackage]
+    var body: some View {
+        listOrEmpty(loading: false, count: packages.count, empty: "No packages.") {
+            ForEach(packages) { pkg in
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack {
+                        Text(pkg.name ?? "—").font(.body)
+                        Spacer()
+                        if let s = pkg.status { StatusBadge(status: s) }
+                    }
+                    HStack(spacing: 8) {
+                        if let gb = pkg.dataAllowanceGB { Text(fmtGB((gb as NSDecimalNumber).doubleValue)).font(.caption2).foregroundStyle(.secondary) }
+                        if !pkg.supportedCountries.isEmpty { Text("\(pkg.supportedCountries.count) countries").font(.caption2).foregroundStyle(.secondary) }
+                        if let when = epochDate(pkg.dateCreatedEpoch) { Text(when).font(.caption2).foregroundStyle(.secondary) }
+                    }
+                }
+            }
+        }
+        .navigationTitle("Packages")
+    }
+}
+
+private struct WhitelistSheet: View {
+    let items: [Whitelist]
+    var body: some View {
+        listOrEmpty(loading: false, count: items.count, empty: "No whitelist entries.") {
+            ForEach(items) { w in
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack {
+                        Text(w.country ?? "—").font(.body)
+                        Spacer()
+                        if let op = w.operator {
+                            Text(op).font(.caption).foregroundStyle(w.dataAllowed ? .green : .red)
+                        }
+                    }
+                    HStack(spacing: 8) {
+                        if let n = w.whitelistName { Text(n).font(.caption2).foregroundStyle(.secondary) }
+                        if let bc = w.bestConnectivity { Text(bc).font(.caption2).foregroundStyle(.tertiary) }
+                    }
+                }
+            }
+        }
+        .navigationTitle("Whitelist")
+    }
+}
+
+@ViewBuilder
+private func listOrEmpty<Content: View>(loading: Bool, count: Int, empty: String,
+                                        @ViewBuilder content: () -> Content) -> some View {
+    if loading {
+        ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+    } else if count == 0 {
+        ContentUnavailableView(empty, systemImage: "tray")
+    } else {
+        List { content() }
     }
 }
 
