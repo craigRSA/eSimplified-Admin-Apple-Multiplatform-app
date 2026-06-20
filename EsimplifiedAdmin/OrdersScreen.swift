@@ -118,7 +118,10 @@ private struct OrdersCountHeader: View {
     let filtering: Bool
     var body: some View {
         HStack(spacing: 6) {
-            if filtering {
+            // Show "N of total" while filtering OR whenever the page is capped below
+            // the full count — otherwise an unfiltered tenant with >500 orders would
+            // read "1,200 orders" above a list that only holds the first 500.
+            if filtering || showing < total {
                 Text("\(showing.formatted()) of \(total.formatted())")
             } else {
                 Text("\(total.formatted())").font(.subheadline.weight(.semibold).monospacedDigit())
@@ -445,7 +448,6 @@ func adminErrorMessage(_ error: APIError) -> String {
     case .unreachable: "Couldn't reach the server."
     case .authExpired: "Your session expired — sign in again."
     case .notFound: "Not found."
-    case let .server(code): "Server error (\(code))."
     case let .requestFailed(code, message): message.map { "Server (\(code)): \($0)" } ?? "Request failed (\(code))."
     case .decoding: "Couldn't read the server response."
     }
