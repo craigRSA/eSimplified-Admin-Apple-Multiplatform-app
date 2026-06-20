@@ -31,6 +31,7 @@ struct CustomerDetailScreen: View {
     @State private var detailPhase: DetailPhase = .idle
     @State private var selectedIccid: String?
     @State private var customer: Customer?
+    @State private var ordersError: String?
 
     enum Phase { case loading, loaded, failed(String) }
     enum DetailPhase { case idle, loading, loaded(EsimDetail), failed(String) }
@@ -152,7 +153,9 @@ struct CustomerDetailScreen: View {
 
     private var ordersCard: some View {
         SectionCard(title: "Recent orders (\(orders.count))") {
-            if orders.isEmpty {
+            if let ordersError {
+                Text(ordersError).font(.callout).foregroundStyle(.orange)
+            } else if orders.isEmpty {
                 Text("No orders.").font(.callout).foregroundStyle(.secondary)
             } else {
                 ForEach(orders) { o in
@@ -192,7 +195,19 @@ struct CustomerDetailScreen: View {
                                             as: SingleCustomerResponse.self)
             customer = cust.customer
             esims = (try? await client.get("/api/esims/\(ref.tenant)/", query: q, as: AssignedEsimsPage.self))?.esims ?? []
-            orders = (try? await client.get("/api/orders/\(ref.tenant)/", query: q, as: OrdersPage.self))?.orders ?? []
+            // Don't silently swallow order-load failures — surface the cause.
+            do {
+                let page = try await client.get("/api/orders/\(ref.tenant)/", query: q, as: OrdersPage.self)
+                orders = page.orders
+                ordersError = (page.orders.isEmpty && page.count > 0)
+                    ? "Server reports \(page.count) order\(page.count == 1 ? "" : "s") but they couldn't be read (response shape)."
+                    : nil
+            } catch is CancellationError {
+            } catch let e as APIError {
+                orders = []; ordersError = adminErrorMessage(e)
+            } catch {
+                orders = []; ordersError = "Couldn't load orders."
+            }
             phase = .loaded
             let iccid = selectedIccid ?? ref.iccid ?? esims.first?.iccid
             if let iccid { await loadDetail(iccid) }
