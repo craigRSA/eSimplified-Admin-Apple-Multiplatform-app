@@ -88,4 +88,73 @@ final class SessionManagerTests: XCTestCase {
         XCTAssertEqual(calls, 1, "concurrent callers share one in-flight refresh")
         XCTAssertEqual(Set(results), ["acc-1"])
     }
+
+    func test_transientError_doesNotClearSession() async {
+        let auth = FakeAuthClient()
+        auth.refreshError = APIError.unreachable
+        let mgr = SessionManager(session: session(access: "acc-0", refresh: "ref-0", expiresIn: 30),
+                                 store: InMemorySessionStore(), authClient: auth, refreshBufferSeconds: 60)
+        do {
+            _ = try await mgr.validAccessToken()
+            XCTFail("expected unreachable error")
+        } catch {
+            XCTAssertEqual(error as? APIError, .unreachable,
+                           "transient error must propagate as-is, not authExpired")
+        }
+        let sess = await mgr.currentSession()
+        XCTAssertNotNil(sess, "transient refresh error must not sign the user out")
+    }
+
+    func test_authExpiredDuringRefresh_invalidatesSession() async {
+        let auth = FakeAuthClient()
+        auth.refreshError = APIError.authExpired
+        let mgr = SessionManager(session: session(access: "acc-0", refresh: "ref-0", expiresIn: 30),
+                                 store: InMemorySessionStore(), authClient: auth, refreshBufferSeconds: 60)
+        do {
+            _ = try await mgr.validAccessToken()
+            XCTFail("expected authExpired error")
+        } catch {
+            XCTAssertEqual(error as? APIError, .authExpired,
+                           "revoked refresh token must throw authExpired")
+        }
+        let sess = await mgr.currentSession()
+        XCTAssertNil(sess, "authExpired during refresh must invalidate the session")
+    }
+
+    func test_onChange_firesOnAdoptAndClear_notOnSilentRefresh() async throws {
+        // Thread-safe recorder: a final class with a lock is the simplest Sendable approach.
+        final class Recorder: @unchecked Sendable {
+            private let lock = NSLock()
+            private var _events: [Session?] = []
+            func record(_ s: Session?) { lock.withLock { _events.append(s) } }
+            var events: [Session?] { lock.withLock { _events } }
+        }
+
+        let recorder = Recorder()
+        let auth = FakeAuthClient()
+        let mgr = SessionManager(
+            session: session(access: "acc-0", refresh: "ref-0", expiresIn: 30),
+            store: InMemorySessionStore(), authClient: auth,
+            refreshBufferSeconds: 60,
+            onChange: { recorder.record($0) }
+        )
+
+        // Silent refresh (within-buffer) — onChange must NOT fire.
+        _ = try await mgr.validAccessToken()
+        let afterRefresh = recorder.events
+        XCTAssertEqual(afterRefresh.count, 0, "silent refresh must not fire onChange")
+
+        // adopt(_:) — onChange fires once with the adopted session.
+        let adopted = session(access: "acc-adopted", refresh: "ref-adopted", expiresIn: 3600)
+        await mgr.adopt(adopted)
+        let afterAdopt = recorder.events
+        XCTAssertEqual(afterAdopt.count, 1, "adopt must fire onChange once")
+        XCTAssertEqual(afterAdopt.first??.accessToken, "acc-adopted")
+
+        // clear() — onChange fires once with nil.
+        await mgr.clear()
+        let afterClear = recorder.events
+        XCTAssertEqual(afterClear.count, 2, "clear must fire onChange once")
+        XCTAssertNil(afterClear[1], "clear must pass nil to onChange")
+    }
 }
