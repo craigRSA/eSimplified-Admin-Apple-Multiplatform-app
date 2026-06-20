@@ -217,6 +217,16 @@ private func utcHourNow() -> Int {
     return cal.component(.hour, from: Date())
 }
 
+/// Current UTC time-of-day as a fractional hour (08:30 → 8.5) — where "now" sits on
+/// the hourly chart's 0…24 axis, so today's line stops partway through the current
+/// hour instead of running to its end.
+private func utcHourFractionNow() -> Double {
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = TimeZone(identifier: "UTC") ?? .gmt
+    let c = cal.dateComponents([.hour, .minute, .second], from: Date())
+    return Double(c.hour ?? 0) + (Double(c.minute ?? 0) * 60 + Double(c.second ?? 0)) / 3600
+}
+
 // MARK: - Building blocks
 
 /// The hero: today's gross volume, the day's delta, and — when the backend
@@ -300,11 +310,13 @@ private struct Eyebrow: View {
 private struct HourlyComparisonChart: View {
     let today: [HourPoint]
     let yesterday: [HourPoint]
-    @State private var selectedX: Int?
+    @State private var selectedX: Double?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        let t = Self.points(today)
+        // Today's line stops at the elapsed fraction of the current hour (08:30 → 8.5);
+        // yesterday is a complete day, so it draws across the full axis.
+        let t = Self.points(today, cappedAt: utcHourFractionNow())
         let y = Self.points(yesterday)
         Chart {
             ForEach(y, id: \.x) { p in
@@ -325,7 +337,7 @@ private struct HourlyComparisonChart: View {
                     .accessibilityHidden(true)
                     .annotation(position: .top, spacing: 0,
                                 overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
-                        ChartTooltip(title: String(format: "%02d:00", min(max(selectedX, 0), 24)), rows: [
+                        ChartTooltip(title: String(format: "%02d:00", min(max(Int(selectedX.rounded()), 0), 24)), rows: [
                             ("Today", Fmt.money(Decimal(Self.valueAt(t, selectedX))), .accentColor),
                             ("Yesterday", Fmt.money(Decimal(Self.valueAt(y, selectedX))), .gray),
                         ])
@@ -333,10 +345,10 @@ private struct HourlyComparisonChart: View {
             }
         }
         .chartForegroundStyleScale(["Today": Color.accentColor, "Yesterday": Color.gray])
-        .chartXScale(domain: 0...24)
-        .chartXAxis { AxisMarks(values: [0, 6, 12, 18, 24]) { v in
+        .chartXScale(domain: 0.0...24.0)
+        .chartXAxis { AxisMarks(values: [0.0, 6.0, 12.0, 18.0, 24.0]) { v in
             AxisGridLine()
-            AxisValueLabel { if let h = v.as(Int.self) { Text(String(format: "%02d:00", h)) } }
+            AxisValueLabel { if let h = v.as(Double.self) { Text(String(format: "%02d:00", Int(h))) } }
         } }
         .chartXSelection(value: $selectedX)
         .animation(reduceMotion ? nil : .snappy, value: selectedX)
@@ -349,18 +361,22 @@ private struct HourlyComparisonChart: View {
     }
 
     /// Running total plotted at the end of each hour, prefixed with a 0 origin.
-    static func points(_ src: [HourPoint]) -> [(x: Int, v: Double)] {
-        var out: [(x: Int, v: Double)] = [(0, 0)]
+    /// `cappedAt` (today only) is the current UTC time as a fractional hour: the
+    /// in-progress hour stops there (08:30 → x = 8.5) instead of running to its end.
+    /// Yesterday passes nil and draws each hour through its full end-of-hour mark.
+    static func points(_ src: [HourPoint], cappedAt now: Double? = nil) -> [(x: Double, v: Double)] {
+        var out: [(x: Double, v: Double)] = [(0, 0)]
         var running = 0.0
         for p in src.sorted(by: { $0.hour < $1.hour }) {
             running += dbl(p.revenue)
-            out.append((p.hour + 1, running))
+            let endOfHour = Double(p.hour + 1)
+            out.append((now.map { min(endOfHour, $0) } ?? endOfHour, running))
         }
         return out
     }
 
     /// Cumulative value at or before the selected hour mark.
-    static func valueAt(_ pts: [(x: Int, v: Double)], _ x: Int) -> Double {
+    static func valueAt(_ pts: [(x: Double, v: Double)], _ x: Double) -> Double {
         pts.last(where: { $0.x <= x })?.v ?? 0
     }
 }
