@@ -4,6 +4,16 @@ import EsimplifiedKit
 import AppKit
 #endif
 
+private struct TokenProviderKey: EnvironmentKey {
+    static let defaultValue: any AccessTokenProviding = StaticTokenProvider("")
+}
+extension EnvironmentValues {
+    var tokenProvider: any AccessTokenProviding {
+        get { self[TokenProviderKey.self] }
+        set { self[TokenProviderKey.self] = newValue }
+    }
+}
+
 #if os(macOS)
 /// Keeps the app (and its menu-bar item) alive after the last window closes.
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -39,11 +49,11 @@ struct EsimplifiedAdminApp: App {
         } label: {
             MenuBarLabel(revenue: menu)
                 .task(id: model.session?.accessToken) {
-                    await menu.load(session: model.session)
+                    await menu.load(session: model.session, provider: model.sessionManager)
                     while !Task.isCancelled {
                         try? await Task.sleep(for: .seconds(300))
                         if Task.isCancelled { break }
-                        await menu.load(session: model.session)
+                        await menu.load(session: model.session, provider: model.sessionManager)
                     }
                 }
         }
@@ -168,6 +178,7 @@ struct AdminRootView: View {
             LoginView(model: model)
         } else {
             AdminShell(model: model)
+                .environment(\.tokenProvider, model.sessionManager)
         }
     }
 }

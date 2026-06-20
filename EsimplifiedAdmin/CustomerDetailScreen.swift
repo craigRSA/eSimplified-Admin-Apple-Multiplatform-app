@@ -25,6 +25,7 @@ struct CustomerDetailScreen: View {
     let ref: CustomerRef
 
     @Environment(\.horizontalSizeClass) private var hSize
+    @Environment(\.tokenProvider) private var tokenProvider
     @State private var phase: Phase = .loading
     @State private var esims: [EsimSummary] = []
     @State private var orders: [Order] = []
@@ -37,7 +38,7 @@ struct CustomerDetailScreen: View {
     enum DetailPhase { case idle, loading, loaded(EsimDetail), failed(String) }
     @State private var sheet: EsimDetailSheet?
 
-    private var client: LiveAPIClient { LiveAPIClient(host: session.host, accessToken: session.accessToken) }
+    private var client: LiveAPIClient { LiveAPIClient(host: session.host, tokenProvider: tokenProvider) }
 
     var body: some View {
         Group {
@@ -471,6 +472,7 @@ enum EsimDetailSheet: Identifiable {
 private struct LocationsSheet: View {
     let session: Session
     let iccid: String
+    @Environment(\.tokenProvider) private var tokenProvider
     @State private var rows: [EsimLocation] = []
     @State private var loading = true
     @State private var error: String?
@@ -497,7 +499,7 @@ private struct LocationsSheet: View {
 
     private func load() async {
         loading = true; error = nil
-        let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
+        let client = LiveAPIClient(host: session.host, tokenProvider: tokenProvider)
         do {
             rows = try await client.get("/api/esim/\(iccid)/location/", query: ["limit": "100"], as: EsimLocationList.self).results
         } catch is CancellationError {
@@ -514,6 +516,7 @@ private struct LocationsSheet: View {
 private struct SessionsSheet: View {
     let session: Session
     let iccid: String
+    @Environment(\.tokenProvider) private var tokenProvider
     @State private var rows: [EsimSession] = []
     @State private var loading = true
     @State private var error: String?
@@ -545,7 +548,7 @@ private struct SessionsSheet: View {
 
     private func load() async {
         loading = true; error = nil
-        let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
+        let client = LiveAPIClient(host: session.host, tokenProvider: tokenProvider)
         do {
             rows = try await client.get("/api/esim/\(iccid)/cdr/", query: ["limit": "100"], as: EsimSessionList.self).results
         } catch is CancellationError {

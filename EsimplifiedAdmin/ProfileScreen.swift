@@ -12,6 +12,8 @@ struct ProfileScreen: View {
     /// A failed fetch leaves us in `.unknown`, never coerced to "off".
     private enum TOTPState { case unknown, on, off }
 
+    @Environment(\.tokenProvider) private var tokenProvider
+
     @State private var me: MeUser?
     @State private var totp: TOTPState = .unknown
     @State private var statusLoaded = false
@@ -25,7 +27,7 @@ struct ProfileScreen: View {
     @State private var confirmDisable = false
 
     private var twoFA: LiveTwoFactorClient {
-        LiveTwoFactorClient(host: session.host, accessToken: session.accessToken)
+        LiveTwoFactorClient(host: session.host, tokenProvider: tokenProvider)
     }
 
     var body: some View {
@@ -80,7 +82,7 @@ struct ProfileScreen: View {
             Text("This makes your account easier to compromise. The 6-digit code you entered will be used to confirm.")
         }
         .sheet(isPresented: $showSetup, onDismiss: { Task { await loadStatus() } }) {
-            TwoFactorSetupView(host: session.host, accessToken: session.accessToken)
+            TwoFactorSetupView(host: session.host, tokenProvider: tokenProvider)
         }
         .reload(on: 0) { await load() }
     }
@@ -132,7 +134,7 @@ struct ProfileScreen: View {
 
     private func load() async {
         do {
-            let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
+            let client = LiveAPIClient(host: session.host, tokenProvider: tokenProvider)
             me = try await client.get("/api/me/", query: [:], as: MeUser.self)
         } catch is CancellationError {
             // View navigated away mid-load — not a real error.

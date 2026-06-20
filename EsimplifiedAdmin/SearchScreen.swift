@@ -12,6 +12,7 @@ struct SearchScreen: View {
         var id: String { rawValue }
     }
 
+    @Environment(\.tokenProvider) private var tokenProvider
     @State private var mode: Mode = .customer
     @State private var term = ""
     @State private var phase: Phase = .idle
@@ -123,7 +124,7 @@ struct SearchScreen: View {
         guard canSearch else { return }
         phase = .loading
         do {
-            let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
+            let client = LiveAPIClient(host: session.host, tokenProvider: tokenProvider)
             if mode == .iccid {
                 let resp = try await client.get("/api/esim/\(t)/", query: ["search": "true"], as: EsimSearchResponse.self)
                 if let e = resp.esim, !e.iccid.isEmpty {

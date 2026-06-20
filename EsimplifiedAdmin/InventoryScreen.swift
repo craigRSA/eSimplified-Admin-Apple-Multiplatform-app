@@ -4,6 +4,7 @@ import EsimplifiedKit
 struct InventoryScreen: View {
     let session: Session
 
+    @Environment(\.tokenProvider) private var tokenProvider
     @State private var phase: Phase = .loading
 
     enum Phase { case loading, loaded(Inventory), failed(String) }
@@ -88,7 +89,7 @@ struct InventoryScreen: View {
 
     private func load() async {
         do {
-            let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
+            let client = LiveAPIClient(host: session.host, tokenProvider: tokenProvider)
             let inv = try await client.get("/api/inventory/", query: [:], as: Inventory.self)
             phase = .loaded(inv)
         } catch let error as APIError {

@@ -9,7 +9,6 @@ import UIKit
 
 struct TwoFactorSetupView: View {
     let host: String
-    let accessToken: String
     private let client: LiveTwoFactorClient
     @Environment(\.dismiss) private var dismiss
 
@@ -22,10 +21,9 @@ struct TwoFactorSetupView: View {
 
     @FocusState private var codeFocused: Bool
 
-    init(host: String, accessToken: String) {
+    init(host: String, tokenProvider: any AccessTokenProviding) {
         self.host = host
-        self.accessToken = accessToken
-        self.client = LiveTwoFactorClient(host: host, accessToken: accessToken)
+        self.client = LiveTwoFactorClient(host: host, tokenProvider: tokenProvider)
     }
 
     var body: some View {

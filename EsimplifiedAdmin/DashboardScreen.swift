@@ -10,6 +10,7 @@ struct DashboardScreen: View {
     @State private var range: DashRange = .monthToDate
     @Environment(\.horizontalSizeClass) private var hSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.tokenProvider) private var tokenProvider
 
     /// Cap the column to a comfortable reading measure on wide displays.
     private let readingWidth: CGFloat = 900
@@ -156,7 +157,7 @@ struct DashboardScreen: View {
 
     private func load() async {
         do {
-            let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
+            let client = LiveAPIClient(host: session.host, tokenProvider: tokenProvider)
             let path = tenant.map { "/api/statistics/\($0)/" } ?? "/api/statistics/"
             let stats = try await client.get(path, query: ["date_range": range.rawValue], as: AdminDashboardStats.self)
             phase = .loaded(stats)

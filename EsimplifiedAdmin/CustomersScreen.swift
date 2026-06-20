@@ -5,6 +5,7 @@ struct CustomersScreen: View {
     let session: Session
     var tenant: String?
 
+    @Environment(\.tokenProvider) private var tokenProvider
     @State private var phase: Phase = .loading
     @State private var search = ""
     @State private var searchTask: Task<Void, Never>?
@@ -95,7 +96,7 @@ struct CustomersScreen: View {
         // Tenant-scoped: don't fetch the unscoped endpoint (it returns nothing).
         guard let tenant else { return }
         do {
-            let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
+            let client = LiveAPIClient(host: session.host, tokenProvider: tokenProvider)
             let path = "/api/customers/\(tenant)/"
             // Default is Active (matches the web server-side default); the toolbar
             // filter can switch to Inactive or All (which omits is_active).

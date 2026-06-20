@@ -6,6 +6,7 @@ struct OrdersScreen: View {
     var tenant: String?
 
     @Environment(\.horizontalSizeClass) private var hSize
+    @Environment(\.tokenProvider) private var tokenProvider
     @State private var phase: Phase = .loading
     @State private var orders: [Order] = []
     @State private var total = 0
@@ -85,7 +86,7 @@ struct OrdersScreen: View {
     private func load() async {
         if orders.isEmpty { phase = .loading }
         do {
-            let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
+            let client = LiveAPIClient(host: session.host, tokenProvider: tokenProvider)
             let path = tenant.map { "/api/orders/\($0)/" } ?? "/api/orders/"
             var query = ["limit": "500"]
             let term = search.trimmingCharacters(in: .whitespaces)

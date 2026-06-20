@@ -14,11 +14,11 @@ final class MenuBarRevenue {
     private(set) var deltaPercent: Decimal?
     private(set) var updatedAt: Date?
 
-    func load(session: Session?) async {
+    func load(session: Session?, provider: any AccessTokenProviding) async {
         guard let session else { phase = .signedOut; return }
         if phase != .loaded { phase = .loading }
         do {
-            let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
+            let client = LiveAPIClient(host: session.host, tokenProvider: provider)
             let s = try await client.get("/api/statistics/", query: [:], as: AdminDashboardStats.self)
             today = s.revenueToday
             yesterday = s.revenueYesterday
@@ -86,7 +86,7 @@ struct MenuBarPanel: View {
             }
             Divider()
             HStack {
-                Button("Refresh") { Task { await revenue.load(session: model.session) } }
+                Button("Refresh") { Task { await revenue.load(session: model.session, provider: model.sessionManager) } }
                     .accessibilityLabel("Refresh revenue")
                 Spacer()
                 Button("Open") { NSApplication.shared.activate(ignoringOtherApps: true) }
@@ -98,7 +98,7 @@ struct MenuBarPanel: View {
         }
         .padding(Spacing.lg)
         .frame(width: 260)
-        .task { await revenue.load(session: model.session) }
+        .task { await revenue.load(session: model.session, provider: model.sessionManager) }
     }
 
     /// One coherent VoiceOver phrase for the hero figure + change + freshness.

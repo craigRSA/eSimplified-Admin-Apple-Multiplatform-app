@@ -9,6 +9,7 @@ struct AgentApprovalsScreen: View {
     let session: Session
     var tenant: String?
 
+    @Environment(\.tokenProvider) private var tokenProvider
     @State private var phase: Phase = .loading
 
     enum Phase { case loading, loaded([Order]), failed(String) }
@@ -38,7 +39,7 @@ struct AgentApprovalsScreen: View {
 
     private func load() async {
         do {
-            let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
+            let client = LiveAPIClient(host: session.host, tokenProvider: tokenProvider)
             let path = tenant.map { "/api/orders/\($0)/" } ?? "/api/orders/"
             let page = try await client.get(path, query: ["limit": "200", "payment_method": "agent_payment"],
                                             as: OrdersPage.self)
