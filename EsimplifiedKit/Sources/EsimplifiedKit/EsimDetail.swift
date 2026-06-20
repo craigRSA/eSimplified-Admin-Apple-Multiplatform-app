@@ -34,20 +34,22 @@ public struct EsimDetail: Decodable, Sendable {
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: K.self)
-        iccid = try c.decodeIfPresent(String.self, forKey: .iccid) ?? ""
-        esimName = try c.decodeIfPresent(String.self, forKey: .esimName)
-        imsi = try c.decodeIfPresent(String.self, forKey: .imsi)
-        coverageName = (try? c.decodeIfPresent(Named.self, forKey: .coverage))?.name
-        smDpAddress = try c.decodeIfPresent(String.self, forKey: .smDpAddress)
-        matchingId = try c.decodeIfPresent(String.self, forKey: .matchingId)
-        autoTopUp = try c.decodeIfPresent(Bool.self, forKey: .autoTopUp) ?? false
-        archived = try c.decodeIfPresent(Bool.self, forKey: .archived) ?? false
-        totalDataAllowanceGB = (try? c.decodeIfPresent(FlexibleDecimal.self, forKey: .totalDataAllowanceGB))??.value
-        totalDataRemainingGB = (try? c.decodeIfPresent(FlexibleDecimal.self, forKey: .totalDataRemainingGB))??.value
-        euicc = (try? c.decodeIfPresent(EuiccProfile.self, forKey: .euicc)) ?? nil
-        packages = ((try? c.decodeIfPresent([EsimPackage].self, forKey: .packages)) ?? nil) ?? []
-        openDataSessions = ((try? c.decodeIfPresent([OpenDataSession].self, forKey: .openDataSessions)) ?? nil) ?? []
-        latestLocation = (try? c.decodeIfPresent(EsimLocation.self, forKey: .latestLocation)) ?? nil
+        // Every field is tolerant — one type mismatch must not blank the whole
+        // panel. (imsi is a JSON number, not a string.)
+        iccid = (try? c.decode(String.self, forKey: .iccid)) ?? ""
+        esimName = try? c.decode(String.self, forKey: .esimName)
+        imsi = (try? c.decode(String.self, forKey: .imsi)) ?? (try? c.decode(Int.self, forKey: .imsi)).map(String.init)
+        coverageName = (try? c.decode(Named.self, forKey: .coverage))?.name
+        smDpAddress = try? c.decode(String.self, forKey: .smDpAddress)
+        matchingId = try? c.decode(String.self, forKey: .matchingId)
+        autoTopUp = (try? c.decode(Bool.self, forKey: .autoTopUp)) ?? false
+        archived = (try? c.decode(Bool.self, forKey: .archived)) ?? false
+        totalDataAllowanceGB = (try? c.decode(FlexibleDecimal.self, forKey: .totalDataAllowanceGB))?.value
+        totalDataRemainingGB = (try? c.decode(FlexibleDecimal.self, forKey: .totalDataRemainingGB))?.value
+        euicc = try? c.decode(EuiccProfile.self, forKey: .euicc)
+        packages = (try? c.decode([EsimPackage].self, forKey: .packages)) ?? []
+        openDataSessions = (try? c.decode([OpenDataSession].self, forKey: .openDataSessions)) ?? []
+        latestLocation = try? c.decode(EsimLocation.self, forKey: .latestLocation)
     }
 
     /// The newest ACTIVE package, if any.
@@ -124,22 +126,18 @@ public struct EsimPackage: Decodable, Sendable, Identifiable {
 }
 
 public struct OpenDataSession: Decodable, Sendable {
-    public let coverageName: String?
-    public let openedDate: String?
+    public let openedDate: Double?   // epoch
     public let usageKb: Double?
 
     private enum K: String, CodingKey {
-        case coverage
         case openedDate = "opened_date"
         case usageKb = "usage_kb"
     }
-    private struct Named: Decodable { let name: String? }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: K.self)
-        coverageName = (try? c.decodeIfPresent(Named.self, forKey: .coverage))?.name
-        openedDate = try c.decodeIfPresent(String.self, forKey: .openedDate)
-        usageKb = try c.decodeIfPresent(Double.self, forKey: .usageKb)
+        openedDate = try? c.decode(Double.self, forKey: .openedDate)
+        usageKb = try? c.decode(Double.self, forKey: .usageKb)
     }
 }
 

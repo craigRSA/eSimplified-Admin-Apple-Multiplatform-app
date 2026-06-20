@@ -24,6 +24,7 @@ struct CustomerDetailScreen: View {
     let session: Session
     let ref: CustomerRef
 
+    @Environment(\.horizontalSizeClass) private var hSize
     @State private var phase: Phase = .loading
     @State private var esims: [EsimSummary] = []
     @State private var orders: [Order] = []
@@ -59,13 +60,29 @@ struct CustomerDetailScreen: View {
 
     @ViewBuilder private var content: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                if let customer { ProfileCard(customer: customer) }
-                esimDetailSection
-                esimListCard
-                ordersCard
+            if hSize == .compact {
+                VStack(alignment: .leading, spacing: 18) {
+                    if let customer { ProfileCard(customer: customer) }
+                    esimDetailSection
+                    esimListCard
+                    ordersCard
+                }
+                .padding(20)
+            } else {
+                HStack(alignment: .top, spacing: 18) {
+                    VStack(alignment: .leading, spacing: 18) {
+                        if let customer { ProfileCard(customer: customer) }
+                        esimListCard
+                        ordersCard
+                    }
+                    .frame(maxWidth: .infinity, alignment: .top)
+                    VStack(alignment: .leading, spacing: 18) {
+                        esimDetailSection
+                    }
+                    .frame(maxWidth: .infinity, alignment: .top)
+                }
+                .padding(20)
             }
-            .padding(20)
         }
     }
 
@@ -192,66 +209,90 @@ private struct EsimDetailCard: View {
     let detail: EsimDetail
 
     var body: some View {
-        SectionCard(title: headerTitle) {
-            VStack(alignment: .leading, spacing: 12) {
-                if let euicc = detail.euicc { euiccBlock(euicc) }
-                if let allowance = detail.totalDataAllowanceGB { dataUsage(allowance) }
-                if let loc = detail.latestLocation { locationBlock(loc) }
-                if let pkg = detail.activePackage { packageBlock(pkg) }
-                if let session = detail.openDataSessions.first { sessionBlock(session) }
+        VStack(alignment: .leading, spacing: 16) {
+            header
+            if !euiccItems.isEmpty {
+                LazyVGrid(columns: [GridItem(.flexible(), alignment: .topLeading),
+                                    GridItem(.flexible(), alignment: .topLeading)],
+                          alignment: .leading, spacing: 12) {
+                    ForEach(euiccItems, id: \.0) { LabeledValue(label: $0.0, value: $0.1) }
+                }
+            }
+            divider
+            dataUsageBlock
+            if let loc = detail.latestLocation { divider; locationBlock(loc) }
+            if let pkg = detail.activePackage { divider; packageBlock(pkg) }
+            if let s = detail.openDataSessions.first { divider; sessionBlock(s) }
+        }
+        .glassCard()
+    }
+
+    private var divider: some View { Divider().padding(.vertical, 1) }
+
+    private var header: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(detail.coverageName.map { "\($0) eSIM" } ?? "eSIM Details").font(.headline)
+                Text(detail.iccid).font(.caption.monospaced()).foregroundStyle(.tint).textSelection(.enabled)
+                if let name = detail.esimName, !name.isEmpty {
+                    Text(name).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 4) {
+                if let st = detail.euicc?.state { Badge(text: st.capitalized, color: .green) }
+                Badge(text: detail.autoTopUp ? "Auto Top-Up On" : "Auto Top-Up Off",
+                      color: detail.autoTopUp ? .blue : .secondary)
             }
         }
     }
 
-    private var headerTitle: String {
-        let cov = detail.coverageName ?? "eSIM"
-        return detail.esimName.map { "\(cov) — \($0)" } ?? "\(cov) eSIM"
-    }
-
-    @ViewBuilder private func euiccBlock(_ e: EuiccProfile) -> some View {
-        Group {
-            Field("ICCID", detail.iccid)
-            if let imsi = detail.imsi, !imsi.isEmpty { Field("IMSI", imsi) }
-            if let state = e.stateMessage ?? e.state { Field("State", state) }
-            if let last = epochDate(e.lastOperationDate) { Field("Last operation", last) }
-            if let n = e.reuseRemainingCount {
-                Field("Reuse remaining", e.maxReuseCount.map { "\(n) / \($0)" } ?? "\(n)")
-            }
-            if (e.state ?? "").uppercased() == "RELEASED" {
-                if let dp = detail.smDpAddress, !dp.isEmpty { Field("SM-DP+", dp) }
-                if let mid = detail.matchingId, !mid.isEmpty { Field("Activation", mid) }
-                if let code = e.activationCode, !code.isEmpty { Field("LPA", code) }
-            }
-            if let eid = e.eid, !eid.isEmpty { Field("EID", eid) }
+    private var euiccItems: [(String, String)] {
+        var items: [(String, String)] = []
+        let e = detail.euicc
+        if let s = e?.stateMessage ?? e?.state { items.append(("State", s)) }
+        if let d = epochDate(e?.lastOperationDate) { items.append(("Last operation", d)) }
+        if let n = e?.reuseRemainingCount { items.append(("Remaining reuse", e?.maxReuseCount.map { "\(n) / \($0)" } ?? "\(n)")) }
+        if let imsi = detail.imsi, !imsi.isEmpty { items.append(("IMSI", imsi)) }
+        if let cov = detail.coverageName { items.append(("Coverage", cov)) }
+        if (e?.state ?? "").uppercased() == "RELEASED" {
+            if let dp = detail.smDpAddress, !dp.isEmpty { items.append(("SM-DP+", dp)) }
+            if let mid = detail.matchingId, !mid.isEmpty { items.append(("Activation", mid)) }
+            if let lpa = e?.activationCode, !lpa.isEmpty { items.append(("LPA", lpa)) }
         }
+        if let eid = e?.eid, !eid.isEmpty { items.append(("EID", eid)) }
+        return items
     }
 
-    @ViewBuilder private func dataUsage(_ allowanceGB: Decimal) -> some View {
-        let total = (allowanceGB as NSDecimalNumber).doubleValue
+    @ViewBuilder private var dataUsageBlock: some View {
+        let total = ((detail.totalDataAllowanceGB ?? 0) as NSDecimalNumber).doubleValue
         let remaining = ((detail.totalDataRemainingGB ?? 0) as NSDecimalNumber).doubleValue
-        VStack(alignment: .leading, spacing: 4) {
+        // Guard against NaN/inf — ProgressView crashes on a non-finite value.
+        let fraction: Double = {
+            guard total.isFinite, total > 0, remaining.isFinite else { return 1 }
+            let f = remaining / total
+            return f.isFinite ? min(max(f, 0), 1) : 1
+        }()
+        let unlimited = !(total.isFinite && total > 0)
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("Data remaining").font(.caption).foregroundStyle(.secondary)
+                Text("DATA").font(.caption2.weight(.semibold)).tracking(0.6).foregroundStyle(.tertiary)
                 Spacer()
-                Text(total <= 0 ? "Unlimited" : "\(fmtGB(remaining)) / \(fmtGB(total))")
-                    .font(.caption.monospacedDigit())
+                Text(unlimited ? "Unlimited" : "\(fmtGB(remaining)) of \(fmtGB(total)) left")
+                    .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
             }
-            if total > 0 {
-                ProgressView(value: max(0, min(remaining / total, 1)))
-                    .tint(.accentColor)
-            }
+            ProgressView(value: fraction).tint(.accentColor)
         }
-        .padding(.top, 2)
     }
 
     @ViewBuilder private func locationBlock(_ loc: EsimLocation) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 3) {
             Text("LAST LOCATION").font(.caption2.weight(.semibold)).tracking(0.6).foregroundStyle(.tertiary)
             HStack {
                 Text(loc.countryName ?? "—").font(.callout)
                 Spacer()
                 if let op = loc.operator {
-                    Text(op).font(.caption).foregroundStyle(loc.dataAllowed ? .green : .red)
+                    Text(op).font(.caption.weight(.medium)).foregroundStyle(loc.dataAllowed ? .green : .red)
                 }
             }
             if let when = epochDate(loc.dateEpoch) {
@@ -261,7 +302,7 @@ private struct EsimDetailCard: View {
     }
 
     @ViewBuilder private func packageBlock(_ pkg: EsimPackage) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 3) {
             Text("ACTIVE PACKAGE").font(.caption2.weight(.semibold)).tracking(0.6).foregroundStyle(.tertiary)
             Text(pkg.name ?? "—").font(.callout)
             if !pkg.supportedCountries.isEmpty {
@@ -271,10 +312,13 @@ private struct EsimDetailCard: View {
     }
 
     @ViewBuilder private func sessionBlock(_ s: OpenDataSession) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 3) {
             Text("OPEN DATA SESSION").font(.caption2.weight(.semibold)).tracking(0.6).foregroundStyle(.tertiary)
             HStack {
-                Text(s.coverageName ?? "—").font(.callout)
+                Text(detail.coverageName ?? "—").font(.callout)
+                if let when = epochDate(s.openedDate) {
+                    Text(when).font(.caption2).foregroundStyle(.secondary)
+                }
                 Spacer()
                 if let kb = s.usageKb { Text(fmtKB(kb)).font(.caption.monospacedDigit()).foregroundStyle(.secondary) }
             }
@@ -282,16 +326,30 @@ private struct EsimDetailCard: View {
     }
 }
 
+private struct LabeledValue: View {
+    let label: String
+    let value: String
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label).font(.caption2).foregroundStyle(.secondary)
+            Text(value).font(.callout.monospaced()).textSelection(.enabled)
+                .lineLimit(2).minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 // MARK: - Shared building blocks
 
 private func epochDate(_ e: Double?) -> String? {
-    guard let e, e > 0 else { return nil }
+    guard let e, e.isFinite, e > 0, e < 1e15 else { return nil }
     let seconds = e > 1_000_000_000_000 ? e / 1000 : e
     return Date(timeIntervalSince1970: seconds).formatted(date: .abbreviated, time: .shortened)
 }
 
 private func fmtGB(_ gb: Double) -> String {
-    gb >= 1 ? String(format: "%.1fGB", gb) : String(format: "%.0fMB", gb * 1024)
+    guard gb.isFinite else { return "—" }
+    return gb >= 1 ? String(format: "%.1fGB", gb) : String(format: "%.0fMB", gb * 1024)
 }
 
 private func fmtKB(_ kb: Double) -> String {
