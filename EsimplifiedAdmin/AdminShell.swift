@@ -131,10 +131,13 @@ private struct TenantMenu: View {
     }
 }
 
-/// Slim bottom status bar — currently the live UTC clock, with room to grow.
+#if os(macOS)
+/// Slim bottom status bar — the auto-refresh countdown (when on) and the live UTC
+/// clock. macOS-only: it's hosted in the window's bottom safe-area inset.
 private struct StatusBar: View {
     var body: some View {
         HStack(spacing: 8) {
+            RefreshStatus()
             Spacer()
             UTCClock()
         }
@@ -143,6 +146,7 @@ private struct StatusBar: View {
         .overlay(alignment: .top) { Divider() }
     }
 }
+#endif
 
 private struct PlaceholderDetail: View {
     let title: String

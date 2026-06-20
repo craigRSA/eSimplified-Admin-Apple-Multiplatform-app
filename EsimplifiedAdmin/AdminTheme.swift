@@ -319,67 +319,96 @@ struct RefreshIntervalMenu: View {
             }
             .pickerStyle(.inline)
         } label: {
+            #if os(macOS)
+            // A macOS toolbar menu label is cached by AppKit and won't animate, so keep
+            // it static here — the live countdown ring lives in the status bar
+            // (RefreshStatus), which re-renders reliably.
+            Label("Auto-refresh", systemImage: "timer")
+            #else
             if seconds > 0 {
                 CountdownIcon(seconds: seconds)
             } else {
                 Label("Auto-refresh", systemImage: "timer")
             }
+            #endif
         }
         .accessibilityLabel("Auto-refresh")
         .accessibilityValue(seconds == 0 ? "Off" : "Every \(RefreshInterval.label(seconds))")
     }
 }
 
-/// The toolbar auto-refresh glyph drawn as a ring that empties as the next refresh
-/// approaches — a glanceable countdown without a separate clock.
-///
-/// It runs its own 1 Hz `Timer` (a `TimelineView` schedule does not fire inside a
-/// toolbar `Menu` label on macOS, but `onReceive` of a Timer publisher does) and
-/// tracks elapsed time within the interval. No shared state with the refresh loop:
-/// both use the same period and reset together when the cadence changes, so the
-/// ring stays in step without any coupling.
+/// Fraction of the current interval still to go (1 → 0 each cycle), from a
+/// self-contained anchor — no coupling to the refresh loop; both run on the same
+/// period and reset together when the cadence changes, so they stay in step.
+private func refreshRemaining(seconds: Int, anchor: Date, now: Date) -> Double {
+    let period = Double(seconds)
+    guard period > 0 else { return 1 }
+    let elapsed = now.timeIntervalSince(anchor).truncatingRemainder(dividingBy: period)
+    return min(1, max(0, 1 - elapsed / period))
+}
+
+/// A ring that empties toward the next refresh, drawn around a small timer glyph.
+private struct CountdownRing: View {
+    let remaining: Double
+    var body: some View {
+        ZStack {
+            Circle().stroke(Color.secondary.opacity(0.3), lineWidth: 2)
+            Circle().trim(from: 0, to: remaining)
+                .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+            Image(systemName: "timer").font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary)
+        }
+    }
+}
+
+#if os(macOS)
+/// Live auto-refresh countdown for the macOS bottom status bar — a small ring that
+/// empties toward the next refresh. It lives here, not the toolbar, because a macOS
+/// toolbar menu label is cached by AppKit and won't animate; the status bar (like
+/// its UTC clock) re-renders reliably. Its `@State` is scoped to this fixed-size
+/// leaf, so only this view ticks — the container and detail screen never re-render.
+struct RefreshStatus: View {
+    @AppStorage("autoRefreshSeconds") private var seconds = 0
+    @State private var anchor = Date()
+    @State private var now = Date()
+    private let ticker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        if seconds > 0 {
+            HStack(spacing: 6) {
+                CountdownRing(remaining: refreshRemaining(seconds: seconds, anchor: anchor, now: now))
+                    .frame(width: 12, height: 12)
+                Text("Auto-refresh \(RefreshInterval.label(seconds))")
+                    .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+            }
+            .onReceive(ticker) { now = $0 }
+            .onChange(of: seconds) { anchor = Date(); now = Date() }
+            .accessibilityElement()
+            .accessibilityLabel("Auto-refresh every \(RefreshInterval.label(seconds))")
+        }
+    }
+}
+#endif
+
+#if !os(macOS)
+/// iOS toolbar countdown glyph — the ring that empties toward the next refresh.
+/// (macOS shows the equivalent in the status bar; its toolbar menu label is cached
+/// by AppKit and won't animate.)
 private struct CountdownIcon: View {
     let seconds: Int
     @State private var anchor = Date()
     @State private var now = Date()
     private let ticker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
-    /// Fraction of the current interval still to go (1 → 0 each cycle).
-    private var remaining: Double {
-        let period = Double(seconds)
-        guard period > 0 else { return 0 }
-        let elapsed = now.timeIntervalSince(anchor).truncatingRemainder(dividingBy: period)
-        return min(1, max(0, 1 - elapsed / period))
-    }
-
     var body: some View {
-        shape
+        CountdownRing(remaining: refreshRemaining(seconds: seconds, anchor: anchor, now: now))
+            .frame(width: 16, height: 16)
             .onReceive(ticker) { now = $0 }
             .onChange(of: seconds) { anchor = Date(); now = Date() }
             .accessibilityHidden(true)
     }
-
-    // A macOS toolbar menu label renders SF Symbols / Text but not arbitrary Shape
-    // views, so the Mac fades the glyph (bright just after a refresh → dim as the
-    // next one nears); iOS, whose toolbar draws custom views fine, gets the ring.
-    @ViewBuilder private var shape: some View {
-        #if os(macOS)
-        Image(systemName: "timer.circle.fill")
-            .foregroundStyle(Color.accentColor)
-            .opacity(0.25 + 0.75 * remaining)
-        #else
-        ZStack {
-            Circle().stroke(Color.secondary.opacity(0.3), lineWidth: 2)
-            Circle()
-                .trim(from: 0, to: remaining)
-                .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-            Image(systemName: "timer").font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary)
-        }
-        .frame(width: 16, height: 16)
-        #endif
-    }
 }
+#endif
 
 private struct AutoRefresh: ViewModifier {
     @AppStorage("autoRefreshSeconds") private var seconds = 0
