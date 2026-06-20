@@ -255,14 +255,24 @@ struct UTCClock: View {
 /// cancels its `.task` mid-flight — which silently dropped our network loads
 /// ("not connected" / stuck spinner). An unstructured Task isn't tied to the
 /// view's lifecycle, so the load completes regardless of navigation churn.
+///
+/// The prior load is cancelled before a new one starts, so a rapid switch
+/// (tenant → tenant, date range → date range) can't resolve newest-loses: every
+/// `load()` swallows `CancellationError`, so cancel-and-replace is deterministic
+/// newest-wins rather than a coin-flip on which response returns last.
 private struct ReloadTrigger<ID: Equatable>: ViewModifier {
     let id: ID
     let action: () async -> Void
     @State private var loadedID: ID?
+    @State private var task: Task<Void, Never>?
     func body(content: Content) -> some View {
         content
-            .onAppear { if loadedID != id { loadedID = id; Task { await action() } } }
-            .onChange(of: id) { _, newID in loadedID = newID; Task { await action() } }
+            .onAppear { if loadedID != id { loadedID = id; start() } }
+            .onChange(of: id) { _, newID in loadedID = newID; start() }
+    }
+    private func start() {
+        task?.cancel()
+        task = Task { await action() }
     }
 }
 
