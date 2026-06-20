@@ -353,6 +353,21 @@ private struct CountdownIcon: View {
     }
 
     var body: some View {
+        shape
+            .onReceive(ticker) { now = $0 }
+            .onChange(of: seconds) { anchor = Date(); now = Date() }
+            .accessibilityHidden(true)
+    }
+
+    // A macOS toolbar menu label renders SF Symbols / Text but not arbitrary Shape
+    // views, so the Mac fades the glyph (bright just after a refresh → dim as the
+    // next one nears); iOS, whose toolbar draws custom views fine, gets the ring.
+    @ViewBuilder private var shape: some View {
+        #if os(macOS)
+        Image(systemName: "timer.circle.fill")
+            .foregroundStyle(Color.accentColor)
+            .opacity(0.25 + 0.75 * remaining)
+        #else
         ZStack {
             Circle().stroke(Color.secondary.opacity(0.3), lineWidth: 2)
             Circle()
@@ -362,9 +377,7 @@ private struct CountdownIcon: View {
             Image(systemName: "timer").font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary)
         }
         .frame(width: 16, height: 16)
-        .onReceive(ticker) { now = $0 }
-        .onChange(of: seconds) { anchor = Date(); now = Date() }
-        .accessibilityHidden(true)
+        #endif
     }
 }
 
