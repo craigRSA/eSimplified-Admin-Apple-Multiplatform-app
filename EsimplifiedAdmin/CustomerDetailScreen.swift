@@ -626,13 +626,3 @@ private struct Field: View {
     }
 }
 
-private struct Badge: View {
-    let text: String
-    let color: Color
-    var body: some View {
-        Text(text).font(.caption2.weight(.semibold))
-            .padding(.horizontal, 8).padding(.vertical, 3)
-            .background(color.opacity(0.18), in: Capsule())
-            .foregroundStyle(color)
-    }
-}

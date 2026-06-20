@@ -22,12 +22,18 @@ struct EsimplifiedAdminApp: App {
     var body: some Scene {
         WindowGroup {
             AdminRootView(model: model)
+                .preferredColorScheme(.dark)
         }
         #if os(macOS)
         .defaultSize(width: 1000, height: 700)
+        .commands { AdminCommands(model: model) }
         #endif
 
         #if os(macOS)
+        Settings {
+            SettingsView(model: model)
+        }
+
         MenuBarExtra {
             MenuBarPanel(model: model, revenue: menu)
         } label: {
@@ -55,6 +61,10 @@ final class AdminAppModel {
     /// Tenant scope shared by all screens. `nil` = all tenants.
     var selectedTenant: Tenant?
     private(set) var tenants: [Tenant] = []
+
+    /// Selected sidebar section — lifted here so the ⌘1…⌘9 menu commands can
+    /// drive the same selection the shell binds to.
+    var selection: AdminSection?
 
     // Client credentials injected from the build (Info.plist keys), never hardcoded.
     let clientID: String
@@ -115,9 +125,13 @@ final class AdminAppModel {
     }
 
     /// Sections allowed by the current token's scopes (Profile always shown).
+    /// `.agentOrder` is excluded until it's actually built — it had no detail
+    /// screen and always landed on a "Coming soon" placeholder.
     var sections: [AdminSection] {
         guard let session else { return [] }
-        return AdminSection.allCases.filter { $0.scopeResource == nil || session.hasScope($0.scopeResource!) }
+        return AdminSection.allCases.filter {
+            $0 != .agentOrder && ($0.scopeResource == nil || session.hasScope($0.scopeResource!))
+        }
     }
 }
 
@@ -132,3 +146,56 @@ struct AdminRootView: View {
         }
     }
 }
+
+#if os(macOS)
+/// Menu-bar commands: ⌘R refresh (routed to the focused screen) and ⌘1…⌘9 to
+/// jump sections. ⌘, opens Settings automatically.
+struct AdminCommands: Commands {
+    let model: AdminAppModel
+    @FocusedValue(\.refreshAction) private var refresh
+
+    var body: some Commands {
+        CommandGroup(after: .toolbar) {
+            Button("Refresh") { refresh?() }
+                .keyboardShortcut("r", modifiers: .command)
+                .disabled(refresh == nil)
+        }
+        CommandMenu("Go") {
+            ForEach(Array(model.sections.prefix(9).enumerated()), id: \.element) { index, section in
+                Button(section.title) { model.selection = section }
+                    .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: .command)
+            }
+        }
+    }
+}
+
+/// Standard ⌘, Settings: the auto-refresh cadence, the configured host, and a
+/// place for the destructive Log Out action.
+struct SettingsView: View {
+    @Bindable var model: AdminAppModel
+    @AppStorage("autoRefreshSeconds") private var autoRefreshSeconds = 0
+    @State private var confirmLogout = false
+
+    var body: some View {
+        Form {
+            Section("Data") {
+                Picker("Auto-refresh", selection: $autoRefreshSeconds) {
+                    ForEach(RefreshInterval.options, id: \.self) { Text(RefreshInterval.label($0)).tag($0) }
+                }
+                LabeledContent("Host", value: model.host)
+            }
+            Section("Account") {
+                if let s = model.session {
+                    LabeledContent("Account type", value: s.accountType.capitalized)
+                }
+                Button("Log Out…", role: .destructive) { confirmLogout = true }
+                    .confirmationDialog("Log out of eSimplified?", isPresented: $confirmLogout) {
+                        Button("Log Out", role: .destructive) { model.logout() }
+                    }
+            }
+        }
+        .formStyle(.grouped)
+        .frame(width: 440, height: 260)
+    }
+}
+#endif

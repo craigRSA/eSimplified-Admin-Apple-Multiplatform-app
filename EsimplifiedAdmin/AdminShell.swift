@@ -48,15 +48,17 @@ enum AdminSection: String, CaseIterable, Identifiable, Hashable {
 
 struct AdminShell: View {
     @Bindable var model: AdminAppModel
-    @State private var selection: AdminSection?
     @AppStorage("autoRefreshSeconds") private var autoRefreshSeconds = 0
 
     var body: some View {
         NavigationSplitView {
-            List(model.sections, selection: $selection) { section in
+            List(model.sections, selection: $model.selection) { section in
                 Label(section.title, systemImage: section.systemImage).tag(section)
             }
             .navigationTitle("eSimplified")
+            .scrollContentBackground(.hidden)
+            .background(AppBackground())
+            .navigationSplitViewColumnWidth(min: 200, ideal: 230, max: 300)
         } detail: {
             detail
                 .toolbar {
@@ -70,12 +72,12 @@ struct AdminShell: View {
         .safeAreaInset(edge: .bottom) { StatusBar() }
         #endif
         .task { await model.refreshSessionIfNeeded(); await model.loadTenants() }
-        .onAppear { if selection == nil { selection = model.sections.first } }
+        .onAppear { if model.selection == nil { model.selection = model.sections.first } }
     }
 
     @ViewBuilder private var detail: some View {
         let scope = model.tenantScope
-        switch selection {
+        switch model.selection {
         case .dashboard:
             if let session = model.session { DashboardScreen(session: session, tenant: scope) }
         case .orders:
@@ -120,6 +122,8 @@ private struct TenantMenu: View {
                 .labelStyle(.iconOnly)
         }
         .help(model.selectedTenant?.name ?? "All Tenants")
+        .accessibilityLabel("Tenant scope")
+        .accessibilityValue(model.selectedTenant?.name ?? "All tenants")
     }
 }
 

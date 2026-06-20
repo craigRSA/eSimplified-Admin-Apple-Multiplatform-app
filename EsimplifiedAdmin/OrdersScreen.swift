@@ -226,27 +226,6 @@ private struct OrderRow: View {
     private var tenantName: String? { order.tenant.isEmpty ? nil : order.tenant }
 }
 
-struct StatusBadge: View {
-    let status: String
-
-    var body: some View {
-        Text(status.capitalized)
-            .font(.caption2.weight(.semibold))
-            .padding(.horizontal, 8).padding(.vertical, 3)
-            .background(color.opacity(0.18), in: Capsule())
-            .foregroundStyle(color)
-    }
-
-    private var color: Color {
-        switch status.lowercased() {
-        case "success", "approved", "active": .green
-        case "refunded", "cancelled": .red
-        case "pending", "requested", "awaiting_s2s": .orange
-        default: .secondary
-        }
-    }
-}
-
 /// Shared mapping from an APIError to a user-facing message (used by admin screens).
 func adminErrorMessage(_ error: APIError) -> String {
     switch error {

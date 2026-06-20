@@ -41,8 +41,161 @@ private struct GlassCard: ViewModifier {
 extension View {
     /// Wraps content in a padded Liquid Glass card. One radius/padding system
     /// across the whole app so surfaces feel like one material.
-    func glassCard(radius: CGFloat = 18, padding: CGFloat = 18) -> some View {
+    func glassCard(radius: CGFloat = Radius.card, padding: CGFloat = Spacing.lg) -> some View {
         modifier(GlassCard(radius: radius, padding: padding))
+    }
+}
+
+// MARK: - Design tokens
+
+/// One spacing rhythm for the whole app (replaces the ~14 ad-hoc values that
+/// had crept in). Use these instead of bare numbers.
+enum Spacing {
+    static let xs: CGFloat = 4
+    static let sm: CGFloat = 8
+    static let md: CGFloat = 12
+    static let lg: CGFloat = 16
+    static let xl: CGFloat = 22
+    static let xxl: CGFloat = 28
+}
+
+/// One radius scale: a card radius, a chip/field radius, and a tooltip radius.
+/// Everything that draws a rounded rect routes through these.
+enum Radius {
+    static let card: CGFloat = 18
+    static let chip: CGFloat = 12
+    static let tooltip: CGFloat = 8
+}
+
+extension Color {
+    /// Semantic status colors. IMPORTANT: meaning must never rest on color alone
+    /// — always pair these with a glyph or text (see `TrendDelta`, `StatusBadge`).
+    static let positive = Color.green
+    static let negative = Color.red
+    static let warning = Color.orange
+}
+
+/// Maps a backend status / eUICC state string to its semantic color — the single
+/// source of truth so every screen tints "refunded", "pending", etc. the same.
+enum StatusStyle {
+    static func color(_ status: String) -> Color {
+        switch status.lowercased() {
+        case "success", "approved", "active", "enabled", "installed", "released": .positive
+        case "refunded", "cancelled", "canceled", "error", "disabled", "deleted": .negative
+        case "pending", "requested", "awaiting_s2s": .warning
+        default: .secondary
+        }
+    }
+}
+
+extension Font {
+    /// Scalable, rounded display face for the signature figures (today's gross
+    /// volume, etc.). Built on a Dynamic Type text style — replaces the fixed
+    /// 44pt/30pt sizes that ignored accessibility text sizing.
+    static func display(_ style: Font.TextStyle = .largeTitle) -> Font {
+        .system(style, design: .rounded).weight(.bold)
+    }
+}
+
+// MARK: - Shared chrome components
+
+/// A small capsule chip. One component for every badge in the app.
+/// `systemImage` lets meaning ride on a glyph, not just the tint.
+struct Badge: View {
+    let text: String
+    var color: Color = .secondary
+    var systemImage: String? = nil
+    var body: some View {
+        Label {
+            Text(text)
+        } icon: {
+            if let systemImage { Image(systemName: systemImage) }
+        }
+        .labelStyle(.titleAndIcon)
+        .font(.caption2.weight(.semibold))
+        .padding(.horizontal, Spacing.sm).padding(.vertical, 3)
+        .background(color.opacity(0.18), in: Capsule())
+        .foregroundStyle(color)
+    }
+}
+
+/// Capsule for a backend status — colored via `StatusStyle` and announced to
+/// VoiceOver as "Status: …" so the meaning isn't color-only.
+struct StatusBadge: View {
+    let status: String
+    var body: some View {
+        Badge(text: status.capitalized, color: StatusStyle.color(status))
+            .accessibilityElement()
+            .accessibilityLabel("Status: \(status.capitalized)")
+    }
+}
+
+/// A signed percentage delta. The arrow makes direction legible without color,
+/// and the VoiceOver label speaks "up/down N percent".
+struct TrendDelta: View {
+    let percent: Decimal?
+    var font: Font = .subheadline.weight(.semibold)
+    var pill: Bool = false
+    var body: some View {
+        if let percent {
+            let up = percent >= 0
+            let str = percent.formatted(.number.precision(.fractionLength(1)))
+            let tint: Color = up ? .positive : .negative
+            Label("\(up ? "+" : "")\(str)%", systemImage: up ? "arrow.up.right" : "arrow.down.right")
+                .labelStyle(.titleAndIcon)
+                .font(font)
+                .monospacedDigit()
+                .foregroundStyle(tint)
+                .modifier(DeltaPillBackground(tint: tint, on: pill))
+                .accessibilityElement()
+                .accessibilityLabel("\(up ? "Up" : "Down") \(str) percent")
+        }
+    }
+}
+
+private struct DeltaPillBackground: ViewModifier {
+    let tint: Color
+    let on: Bool
+    func body(content: Content) -> some View {
+        if on {
+            content.padding(.horizontal, 10).padding(.vertical, 5)
+                .background(tint.opacity(0.16), in: Capsule())
+        } else { content }
+    }
+}
+
+// MARK: - Loading skeleton
+
+/// A redacted placeholder block — use instead of a bare spinner so layout
+/// doesn't jump when content arrives. Honours Reduce Motion (no shimmer).
+struct SkeletonBar: View {
+    var width: CGFloat? = nil
+    var height: CGFloat = 14
+    var body: some View {
+        RoundedRectangle(cornerRadius: Radius.tooltip, style: .continuous)
+            .fill(.quaternary)
+            .frame(width: width, height: height)
+            .frame(maxWidth: width == nil ? .infinity : nil, alignment: .leading)
+            .accessibilityHidden(true)
+    }
+}
+
+// MARK: - Focused refresh action (⌘R)
+
+/// Each screen publishes its reload closure here so the app-level ⌘R command can
+/// refresh whatever is focused without threading callbacks through the shell.
+struct RefreshActionKey: FocusedValueKey { typealias Value = @MainActor () -> Void }
+extension FocusedValues {
+    var refreshAction: RefreshActionKey.Value? {
+        get { self[RefreshActionKey.self] }
+        set { self[RefreshActionKey.self] = newValue }
+    }
+}
+
+extension View {
+    /// Registers a refresh action for the ⌘R menu command while this view is focused.
+    func refreshCommand(_ action: @escaping @MainActor () -> Void) -> some View {
+        focusedSceneValue(\.refreshAction, action)
     }
 }
 
