@@ -206,7 +206,6 @@ private struct HourlyComparisonChart: View {
                          series: .value("Day", "Today"))
                     .foregroundStyle(Color.accentColor)
                     .lineStyle(StrokeStyle(lineWidth: 2))
-                    .symbol(Circle())
             }
         }
         .chartForegroundStyleScale(["Today": Color.accentColor, "Yesterday": Color.gray])

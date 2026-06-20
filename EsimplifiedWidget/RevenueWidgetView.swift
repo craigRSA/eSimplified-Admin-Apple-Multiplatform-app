@@ -103,7 +103,6 @@ private struct HourlyChart: View {
                 LineMark(x: .value("Hour", p.x), y: .value("Sales", p.v),
                          series: .value("Day", "Today"))
                     .foregroundStyle(.tint).lineStyle(StrokeStyle(lineWidth: 2))
-                    .symbol(Circle())
             }
         }
         .chartXScale(domain: 0...24)
