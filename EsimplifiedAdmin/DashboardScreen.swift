@@ -211,7 +211,8 @@ private struct LoadingSkeleton: View {
 
 /// Current hour (0–23) in UTC — the dashboard's time basis (matches the UTC status
 /// clock and the UTC hourly series), so "to date" lines up with `revenue_per_hour_*`.
-private func utcHourNow() -> Int {
+/// Shared with the menu-bar item so its "to date" comparison matches the hero.
+func utcHourNow() -> Int {
     var cal = Calendar(identifier: .gregorian)
     cal.timeZone = TimeZone(identifier: "UTC") ?? .gmt
     return cal.component(.hour, from: Date())

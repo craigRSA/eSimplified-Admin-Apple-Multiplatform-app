@@ -11,6 +11,9 @@ final class MenuBarRevenue {
     private(set) var phase: Phase = .idle
     private(set) var today: Decimal = 0
     private(set) var yesterday: Decimal = 0
+    /// Yesterday's revenue through the current UTC hour — the like-for-like base the
+    /// delta compares against (nil before the hourly series ships).
+    private(set) var yesterdayToDate: Decimal?
     private(set) var deltaPercent: Decimal?
     private(set) var updatedAt: Date?
 
@@ -22,7 +25,11 @@ final class MenuBarRevenue {
             let s = try await client.get("/api/statistics/", query: [:], as: AdminDashboardStats.self)
             today = s.revenueToday
             yesterday = s.revenueYesterday
-            deltaPercent = s.deltaPercent
+            // Compare today-so-far against yesterday through the same UTC hour — the
+            // dashboard hero's "to date" basis — not the full prior day.
+            let toDate = s.revenueYesterdayThroughHour(utcHourNow())
+            yesterdayToDate = toDate
+            deltaPercent = AdminDashboardStats.change(today, vs: toDate ?? yesterday)
             updatedAt = Date()
             phase = .loaded
         } catch is CancellationError {
@@ -76,8 +83,13 @@ struct MenuBarPanel: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel(volumeAccessibilityLabel)
                 VStack(alignment: .leading, spacing: Spacing.xs) {
-                    Text("vs \(Fmt.money(revenue.yesterday)) yesterday")
-                        .font(.caption).foregroundStyle(.secondary)
+                    if let toDate = revenue.yesterdayToDate {
+                        Text("vs \(Fmt.money(toDate)) yesterday (to date)")
+                            .font(.caption).foregroundStyle(.secondary)
+                    } else {
+                        Text("vs \(Fmt.money(revenue.yesterday)) yesterday")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                     if let at = revenue.updatedAt {
                         Text("Updated \(at.formatted(date: .omitted, time: .shortened))")
                             .font(.caption2).foregroundStyle(.tertiary)
@@ -107,7 +119,8 @@ struct MenuBarPanel: View {
         if let d = revenue.deltaPercent {
             let dir = d >= 0 ? "up" : "down"
             let mag = d.magnitude.formatted(.number.precision(.fractionLength(1)))
-            parts.append("\(dir) \(mag) percent versus yesterday")
+            let base = revenue.yesterdayToDate != nil ? "versus yesterday to date" : "versus yesterday"
+            parts.append("\(dir) \(mag) percent \(base)")
         }
         if let at = revenue.updatedAt {
             parts.append("updated \(at.formatted(date: .omitted, time: .shortened))")
