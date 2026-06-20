@@ -404,7 +404,7 @@ private struct EsimDetailCard: View {
                         }
                     }
                     if let when = epochDate(loc.dateEpoch) {
-                        Text("\(when) UTC").font(.caption2).foregroundStyle(.secondary)
+                        Text(when).font(.caption2).foregroundStyle(.secondary)
                     }
                 }
                 .accessibilityElement(children: .combine)
@@ -488,7 +488,7 @@ private struct LocationsSheet: View {
                             OperatorAllowance(operatorName: op, dataAllowed: loc.dataAllowed, font: .caption)
                         }
                     }
-                    if let when = epochDate(loc.dateEpoch) { Text("\(when) UTC").font(.caption).foregroundStyle(.secondary) }
+                    if let when = epochDate(loc.dateEpoch) { Text(when).font(.caption).foregroundStyle(.secondary) }
                 }
                 .accessibilityElement(children: .combine)
             }
@@ -533,10 +533,10 @@ private struct SessionsSheet: View {
                         Text(fmtBytes(s.durationBytes)).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                     }
                     if let when = epochDate(s.connectTimeEpoch) {
-                        Text("Connected \(when) UTC").font(.caption2).foregroundStyle(.secondary)
+                        Text("Connected \(when)").font(.caption2).foregroundStyle(.secondary)
                     }
                     if let when = epochDate(s.closeTimeEpoch) {
-                        Text("Closed \(when) UTC").font(.caption2).foregroundStyle(.secondary)
+                        Text("Closed \(when)").font(.caption2).foregroundStyle(.secondary)
                     }
                 }
                 .accessibilityElement(children: .combine)
@@ -649,10 +649,16 @@ private struct LabeledValue: View {
 
 // MARK: - Shared building blocks
 
+/// Formats a server epoch (seconds or milliseconds) as a UTC wall-clock string,
+/// e.g. "Jun 20, 2026 at 2:10 PM UTC". Every backend timestamp is UTC, so we pin
+/// the zone and label it — matching the web admin's `from_timestamp()`. Returning
+/// the " UTC" suffix here keeps it the single source of truth for all call sites.
 private func epochDate(_ e: Double?) -> String? {
     guard let e, e.isFinite, e > 0, e < 1e15 else { return nil }
     let seconds = e > 1_000_000_000_000 ? e / 1000 : e
-    return Date(timeIntervalSince1970: seconds).formatted(date: .abbreviated, time: .shortened)
+    var style = Date.FormatStyle(date: .abbreviated, time: .shortened)
+    style.timeZone = TimeZone(identifier: "UTC")!
+    return Date(timeIntervalSince1970: seconds).formatted(style) + " UTC"
 }
 
 private func fmtGB(_ gb: Double) -> String {
