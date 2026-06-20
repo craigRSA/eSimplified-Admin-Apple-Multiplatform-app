@@ -39,24 +39,28 @@ behind any `date_range` and **no extra param**.
   ],
   "revenue_per_hour_yesterday": [
     { "hour": 0,  "revenue": 95.00 },
-    // ... up to the SAME current hour
-    { "hour": 14, "revenue": 280.00 }
+    // ... the FULL day
+    { "hour": 23, "revenue": 180.00 }
   ]
 }
 ```
 
+The chart always draws a full 24-hour (UTC) x-axis: **yesterday as a complete
+curve, today's curve up to the current hour.** So:
+
 Rules:
 - **`hour`** is `0–23`, integer, **UTC** — the same timezone that defines "today"
   everywhere else in this response.
-- **Both arrays run `0 → current hour`** (up to now). No future hours. Yesterday is
-  truncated to the same current hour so it's an apples-to-apples "yesterday at this
-  time" comparison (it is **not** the full 0–23 day).
+- **`revenue_per_hour_yesterday` is the FULL day, hours `0 → 23`.** (Earlier draft
+  truncated it to the current hour — that's reverted; we want the whole prior day.)
+- **`revenue_per_hour_today` runs `0 → current hour`** (today so far; no future hours).
+  Before the day's first sale it may be empty — that's fine, the chart just shows
+  yesterday.
 - **Per-hour increments**, not cumulative — accumulate client-side for the cumulative
   curve (today solid, yesterday dashed).
 - **USD** (`final_price`), same filters as the headline revenue.
-- **Reconciliation:** the sum of `revenue_per_hour_today` equals `revenue_today`.
-  (The yesterday array sums to *partial* yesterday up to the current hour, by design —
-  so it will be less than the full-day `revenue_yesterday`.)
+- **Reconciliation:** `revenue_per_hour_today` sums to `revenue_today`, and
+  `revenue_per_hour_yesterday` sums to the full-day `revenue_yesterday`.
 - **Tenant scoping** respects the `{tenant}` path segment like everything else.
 - Revenue values serialize the same way the existing `revenue_*` fields do (treat them
   identically to `revenue_today`).

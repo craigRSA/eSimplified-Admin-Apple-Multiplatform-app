@@ -5,12 +5,16 @@ struct OrdersScreen: View {
     let session: Session
     var tenant: String?
 
+    @Environment(\.horizontalSizeClass) private var hSize
     @State private var phase: Phase = .loading
     @State private var orders: [Order] = []
     @State private var total = 0
     @State private var search = ""
 
     enum Phase { case loading, loaded, failed(String) }
+
+    /// iPhone (compact) gets rich rows; Mac/iPad (regular) gets a columnar table.
+    private var useTable: Bool { hSize != .compact }
 
     var body: some View {
         Group {
@@ -22,18 +26,20 @@ struct OrdersScreen: View {
                                        description: Text(message))
             default:
                 let shown = filtered(orders)
-                List {
-                    Section {
-                        ForEach(shown) { OrderRow(order: $0) }
-                    } header: {
-                        OrdersCountHeader(showing: shown.count, total: total, filtering: !search.isEmpty)
-                    }
+                VStack(spacing: 0) {
+                    OrdersCountHeader(showing: shown.count, total: total, filtering: !search.isEmpty)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 16).padding(.vertical, 8)
+                    Divider()
                     if shown.isEmpty {
                         ContentUnavailableView("No matching orders", systemImage: "tray")
-                            .listRowBackground(Color.clear)
+                            .frame(maxHeight: .infinity)
+                    } else if useTable {
+                        OrdersTable(orders: shown)
+                    } else {
+                        List(shown) { OrderRow(order: $0) }.listStyle(.plain)
                     }
                 }
-                .listStyle(.plain)
             }
         }
         .navigationTitle("Order History")
@@ -90,22 +96,63 @@ private struct OrdersCountHeader: View {
     }
 }
 
+/// The web's row colour language (refunded red, complimentary green, agent
+/// purple, voucher cyan, discounted-success orange), shared by the row and table.
+func orderAccent(_ order: Order) -> Color? {
+    if order.paymentStatus.lowercased() == "refunded" { return .red }
+    switch order.paymentMethod {
+    case "complimentary": return .green
+    case "agent_payment": return .purple
+    case "voucher": return .cyan
+    default: break
+    }
+    if order.discountCode != nil && order.paymentStatus.lowercased() == "success" { return .orange }
+    return nil
+}
+
+/// Columnar table for Mac/iPad — mirrors the web's Order History columns.
+private struct OrdersTable: View {
+    let orders: [Order]
+
+    var body: some View {
+        Table(orders) {
+            TableColumn("Tenant") { o in
+                Text(o.tenant).foregroundStyle(orderAccent(o) ?? .primary)
+            }
+            TableColumn("Package") { o in
+                Text(o.packageName).foregroundStyle(orderAccent(o) ?? .primary).lineLimit(1)
+            }
+            TableColumn("Customer") { o in
+                VStack(alignment: .leading, spacing: 1) {
+                    if let n = o.customerName, !n.isEmpty { Text(n).lineLimit(1) }
+                    if let e = o.customerEmail, !e.isEmpty {
+                        Text(e).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                }
+            }
+            TableColumn("Purchased In") { o in
+                Text(o.purchaseCountry ?? "—").foregroundStyle(.secondary)
+            }
+            TableColumn("Type") { o in Text(o.orderType).foregroundStyle(.secondary) }
+            TableColumn("Price") { o in Text(o.usdPriceDisplay).monospacedDigit() }
+            TableColumn("Local") { o in
+                Text(o.localPriceDisplay ?? "").font(.callout.monospacedDigit()).foregroundStyle(.secondary)
+            }
+            TableColumn("Discount") { o in
+                if let code = o.discountCode { Text(code).foregroundStyle(.orange) } else { Text("") }
+            }
+            TableColumn("Status") { o in StatusBadge(status: o.paymentStatus) }
+            TableColumn("Date") { o in
+                Text(shortDate(o.purchaseDate)).font(.callout).foregroundStyle(.secondary).lineLimit(1)
+            }
+        }
+    }
+}
+
 private struct OrderRow: View {
     let order: Order
 
-    /// The web's row colour language, surfaced here on the package name so the
-    /// same at-a-glance signal carries over.
-    private var accent: Color? {
-        if order.paymentStatus.lowercased() == "refunded" { return .red }
-        switch order.paymentMethod {
-        case "complimentary": return .green
-        case "agent_payment": return .purple
-        case "voucher": return .cyan
-        default: break
-        }
-        if order.discountCode != nil && order.paymentStatus.lowercased() == "success" { return .orange }
-        return nil
-    }
+    private var accent: Color? { orderAccent(order) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {

@@ -161,7 +161,9 @@ private struct HeroCard: View {
             Text("vs \(Fmt.money(yesterday)) yesterday")
                 .font(.subheadline).foregroundStyle(.secondary)
 
-            if hourlyToday.count > 1 {
+            if hourlyToday.count > 1 || hourlyYesterday.count > 1 {
+                // Show the intraday chart whenever either day has data — so before
+                // today's first sale you still see yesterday's curve.
                 HourlyComparisonChart(today: hourlyToday, yesterday: hourlyYesterday)
                     .frame(height: 120).padding(.top, 6)
             } else if trend.count > 2 {
@@ -206,9 +208,10 @@ private struct HourlyComparisonChart: View {
             }
         }
         .chartForegroundStyleScale(["Today": Color.accentColor, "Yesterday": Color.gray])
-        .chartXScale(domain: 0...23)
-        .chartXAxis { AxisMarks(values: [0, 6, 12, 18, 23]) { v in
-            AxisValueLabel { if let h = v.as(Int.self) { Text("\(h)h") } }
+        .chartXScale(domain: 0...23) // always the full UTC day
+        .chartXAxis { AxisMarks(values: [0, 8, 16, 23]) { v in
+            AxisGridLine()
+            AxisValueLabel { if let h = v.as(Int.self) { Text(String(format: "%02d:00", h)) } }
         } }
         .chartLegend(position: .top, alignment: .leading, spacing: 8)
     }
