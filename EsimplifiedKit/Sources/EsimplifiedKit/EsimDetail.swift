@@ -95,18 +95,23 @@ public struct EuiccProfile: Decodable, Sendable {
 }
 
 public struct EsimPackage: Decodable, Sendable, Identifiable {
-    public let name: String?
+    public let name: String?            // internal template name — NOT for display
     public let status: String?
     public let dataAllowanceGB: Decimal?
     public let dateCreatedEpoch: Double?
     public let supportedCountries: [String]
+    public let packageCountryName: String?
+    public let timeAllowanceDays: Int?
+    public let nestedPackageName: String?   // package.name — used for Unlimited detection
     public var id: String { "\(name ?? "?")-\(dateCreatedEpoch ?? 0)" }
 
     private enum K: String, CodingKey {
-        case name, status
+        case name, status, package
         case dataAllowanceGB = "data_allowance_gigabytes"
         case dateCreatedEpoch = "date_created_epoch"
         case supportedCountries = "supported_countries"
+        case packageCountryName = "package_country_name"
+        case timeAllowanceDays = "time_allowance_days"
     }
     private struct Named: Decodable { let name: String? }
 
@@ -116,6 +121,9 @@ public struct EsimPackage: Decodable, Sendable, Identifiable {
         status = try c.decodeIfPresent(String.self, forKey: .status)
         dataAllowanceGB = (try? c.decodeIfPresent(FlexibleDecimal.self, forKey: .dataAllowanceGB))??.value
         dateCreatedEpoch = try c.decodeIfPresent(Double.self, forKey: .dateCreatedEpoch)
+        packageCountryName = try? c.decodeIfPresent(String.self, forKey: .packageCountryName)
+        timeAllowanceDays = try? c.decodeIfPresent(Int.self, forKey: .timeAllowanceDays)
+        nestedPackageName = (try? c.decodeIfPresent(Named.self, forKey: .package))??.name
         // supported_countries may be [String] or [{name}]
         if let names = try? c.decodeIfPresent([String].self, forKey: .supportedCountries) {
             supportedCountries = names
@@ -124,6 +132,29 @@ public struct EsimPackage: Decodable, Sendable, Identifiable {
         } else {
             supportedCountries = []
         }
+    }
+
+    /// The user-facing package label. The API has no display-ready name, so this
+    /// is composed exactly like the web's `packageName()`:
+    /// `<country> <allowance|Unlimited> <days> Day(s)`.
+    public var displayName: String {
+        let country = packageCountryName ?? ""
+        let days = timeAllowanceDays ?? 0
+        let dayUnit = days == 1 ? "Day" : "Days"
+        let gb = dataAllowanceGB ?? 0
+        let isUnlimited = (nestedPackageName?.contains("Unlimited") ?? false) || gb < 0
+        let allowance = isUnlimited ? "Unlimited" : Self.formatDataGB(gb)
+        return "\(country) \(allowance) \(days) \(dayUnit)"
+            .trimmingCharacters(in: .whitespaces)
+    }
+
+    /// Port of the web `format_data_gb`: parseInt truncates toward zero, then
+    /// `< 0` → "Unlimited", `< 1` → MB (always "0 MB" once non-negative), else GB.
+    static func formatDataGB(_ gb: Decimal) -> String {
+        let dataInt = NSDecimalNumber(decimal: gb).intValue   // truncate toward zero, like parseInt
+        if dataInt < 0 { return "Unlimited" }
+        if dataInt < 1 { return "\(dataInt / 1024) MB" }
+        return "\(dataInt) GB"
     }
 }
 
@@ -196,13 +227,17 @@ public struct EsimSession: Decodable, Sendable, Identifiable {
     public let type: String?
     public let countryName: String?
     public let connectTimeEpoch: Double?
-    public let durationGb: Double?
+    public let closeTimeEpoch: Double?
+    public let durationBytes: Double?    // raw bytes ("duration") — the displayed usage
+    public let durationGb: Double?       // present in the API but NOT used for the usage cell
     public var id: String { "\(connectTimeEpoch ?? 0)-\(type ?? "")" }
 
     private enum K: String, CodingKey {
         case type
         case countryName = "country_name"
         case connectTimeEpoch = "connect_time_epoch"
+        case closeTimeEpoch = "close_time_epoch"
+        case durationBytes = "duration"
         case durationGb = "duration_gb"
     }
     public init(from decoder: Decoder) throws {
@@ -210,6 +245,8 @@ public struct EsimSession: Decodable, Sendable, Identifiable {
         type = try? c.decode(String.self, forKey: .type)
         countryName = try? c.decode(String.self, forKey: .countryName)
         connectTimeEpoch = try? c.decode(Double.self, forKey: .connectTimeEpoch)
+        closeTimeEpoch = try? c.decode(Double.self, forKey: .closeTimeEpoch)
+        durationBytes = try? c.decode(Double.self, forKey: .durationBytes)
         durationGb = try? c.decode(Double.self, forKey: .durationGb)
     }
 }
