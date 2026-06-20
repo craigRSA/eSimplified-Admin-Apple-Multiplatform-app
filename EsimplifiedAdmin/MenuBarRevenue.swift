@@ -15,9 +15,22 @@ final class MenuBarRevenue {
     /// delta compares against (nil before the hourly series ships).
     private(set) var yesterdayToDate: Decimal?
     private(set) var deltaPercent: Decimal?
+    private(set) var hourlyToday: [HourPoint] = []
+    private(set) var hourlyYesterday: [HourPoint] = []
     private(set) var updatedAt: Date?
+    @ObservationIgnored private var inFlight: Task<Void, Never>?
 
+    /// Coalesces concurrent callers — the label's lifetime loop, the panel's `.task`,
+    /// and the Refresh button can all fire at once — into a single in-flight fetch.
     func load(session: Session?, provider: any AccessTokenProviding) async {
+        if let inFlight { return await inFlight.value }
+        let task = Task { await self.performLoad(session: session, provider: provider) }
+        inFlight = task
+        await task.value
+        inFlight = nil
+    }
+
+    private func performLoad(session: Session?, provider: any AccessTokenProviding) async {
         guard let session else { phase = .signedOut; return }
         if phase != .loaded { phase = .loading }
         do {
@@ -30,6 +43,8 @@ final class MenuBarRevenue {
             let toDate = s.revenueYesterdayThroughHour(utcHourNow())
             yesterdayToDate = toDate
             deltaPercent = AdminDashboardStats.change(today, vs: toDate ?? yesterday)
+            hourlyToday = s.revenuePerHourToday
+            hourlyYesterday = s.revenuePerHourYesterday
             updatedAt = Date()
             phase = .loaded
         } catch is CancellationError {
@@ -40,12 +55,19 @@ final class MenuBarRevenue {
     }
 }
 
-/// The text shown in the menu bar itself.
+/// The text shown in the menu bar itself — today's figure with its to-date delta.
 struct MenuBarLabel: View {
     let revenue: MenuBarRevenue
     var body: some View {
         if revenue.phase == .loaded || revenue.today != 0 {
-            Text(Fmt.money(revenue.today))
+            HStack(spacing: 3) {
+                Text(Fmt.money(revenue.today))
+                if let d = revenue.deltaPercent {
+                    Label("\(d.formatted(.number.precision(.fractionLength(0))))%",
+                          systemImage: d >= 0 ? "arrow.up" : "arrow.down")
+                        .labelStyle(.titleAndIcon)
+                }
+            }
         } else {
             Image(systemName: "dollarsign.circle")
         }
@@ -94,6 +116,11 @@ struct MenuBarPanel: View {
                         Text("Updated \(at.formatted(date: .omitted, time: .shortened))")
                             .font(.caption2).foregroundStyle(.tertiary)
                     }
+                }
+                // The same cumulative today-vs-yesterday chart as the dashboard hero.
+                if revenue.hourlyToday.count > 1 || revenue.hourlyYesterday.count > 1 {
+                    HourlyComparisonChart(today: revenue.hourlyToday, yesterday: revenue.hourlyYesterday)
+                        .frame(height: 120)
                 }
             }
             Divider()

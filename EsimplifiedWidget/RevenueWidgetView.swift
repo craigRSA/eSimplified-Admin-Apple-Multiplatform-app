@@ -121,8 +121,9 @@ private struct DeltaLabel: View {
 }
 
 /// Cumulative sales through the day (same as the app's hero): yesterday dashed,
-/// today solid with a dot so a single early-day value still shows. Per-hour
-/// increments are accumulated and plotted at each hour's end, with a 0 start.
+/// today solid, today's line stopping at the current UTC hour. Cumulative points
+/// come from EsimplifiedKit's `cumulativeHourly`, so the curve matches the app's
+/// charts exactly — one shared implementation, nothing to keep in sync.
 private struct HourlyChart: View {
     let today: [HourPoint]
     let yesterday: [HourPoint]
@@ -134,21 +135,21 @@ private struct HourlyChart: View {
     private static let brand = Color(red: 0.231, green: 0.510, blue: 0.965)
 
     var body: some View {
-        let t = points(today)
-        let y = points(yesterday)
+        let t = cumulativeHourly(today, cappedAt: utcHourFractionNow())
+        let y = cumulativeHourly(yesterday)
         Chart {
-            ForEach(y, id: \.x) { p in
-                LineMark(x: .value("Hour", p.x), y: .value("Sales", p.v),
+            ForEach(y, id: \.hour) { p in
+                LineMark(x: .value("Hour", p.hour), y: .value("Sales", p.total),
                          series: .value("Day", "Yesterday"))
                     .foregroundStyle(.gray).lineStyle(StrokeStyle(lineWidth: 1.5, dash: [3, 2]))
             }
-            ForEach(t, id: \.x) { p in
-                LineMark(x: .value("Hour", p.x), y: .value("Sales", p.v),
+            ForEach(t, id: \.hour) { p in
+                LineMark(x: .value("Hour", p.hour), y: .value("Sales", p.total),
                          series: .value("Day", "Today"))
                     .foregroundStyle(Self.brand).lineStyle(StrokeStyle(lineWidth: 2))
             }
         }
-        .chartXScale(domain: 0...24)
+        .chartXScale(domain: 0.0...24.0)
         .chartXAxis(.hidden).chartYAxis(.hidden)
         // The individual line marks are decorative; collapse the chart into one
         // element with a spoken summary instead of letting VoiceOver wade
@@ -159,10 +160,11 @@ private struct HourlyChart: View {
 
     /// Speaks the chart's takeaway: today's cumulative total and how it compares
     /// to yesterday's at the same point.
-    private func summary(_ t: [(x: Int, v: Double)], _ y: [(x: Int, v: Double)]) -> String {
-        let todayTotal = t.last?.v ?? 0
-        let hoursIn = max((t.count) - 1, 0)
-        let yesterdaySoFar = y.first(where: { $0.x == t.last?.x })?.v ?? y.last?.v ?? 0
+    private func summary(_ t: [CumulativeHourPoint], _ y: [CumulativeHourPoint]) -> String {
+        let todayTotal = t.last?.total ?? 0
+        let hoursIn = max(t.count - 1, 0)
+        let cap = t.last?.hour ?? 24
+        let yesterdaySoFar = y.last(where: { $0.hour <= cap })?.total ?? y.last?.total ?? 0
         let trend: String
         if yesterdaySoFar == 0 {
             trend = ""
@@ -173,16 +175,6 @@ private struct HourlyChart: View {
         }
         let total = todayTotal.formatted(.number.precision(.fractionLength(0)))
         return "Cumulative sales chart. Today \(total) through \(hoursIn) hours\(trend)."
-    }
-
-    private func points(_ src: [HourPoint]) -> [(x: Int, v: Double)] {
-        var out: [(x: Int, v: Double)] = [(0, 0)]
-        var running = 0.0
-        for p in src.sorted(by: { $0.hour < $1.hour }) {
-            running += (p.revenue as NSDecimalNumber).doubleValue
-            out.append((p.hour + 1, running))
-        }
-        return out
     }
 }
 

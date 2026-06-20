@@ -61,9 +61,12 @@ struct RevenueProvider: TimelineProvider {
         let client = LiveAPIClient(host: session.host, tokenProvider: manager)
         do {
             let stats = try await client.get("/api/statistics/", query: [:], as: AdminDashboardStats.self)
+            // Compare today-so-far against yesterday through the same UTC hour — the
+            // dashboard hero's "to date" basis — falling back to the full-day delta.
+            let delta = stats.deltaPercentToDate(currentHour: utcHourNow()) ?? stats.deltaPercent
             return RevenueEntry(date: Date(),
                                 content: .revenue(today: stats.revenueToday,
-                                                  deltaPercent: stats.deltaPercent,
+                                                  deltaPercent: delta,
                                                   hourlyToday: stats.revenuePerHourToday,
                                                   hourlyYesterday: stats.revenuePerHourYesterday))
         } catch APIError.authExpired {

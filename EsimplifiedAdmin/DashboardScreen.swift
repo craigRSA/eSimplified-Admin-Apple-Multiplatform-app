@@ -207,24 +207,8 @@ private struct LoadingSkeleton: View {
     }
 }
 
-/// Current hour (0–23) in UTC — the dashboard's time basis (matches the UTC status
-/// clock and the UTC hourly series), so "to date" lines up with `revenue_per_hour_*`.
-/// Shared with the menu-bar item so its "to date" comparison matches the hero.
-func utcHourNow() -> Int {
-    var cal = Calendar(identifier: .gregorian)
-    cal.timeZone = TimeZone(identifier: "UTC") ?? .gmt
-    return cal.component(.hour, from: Date())
-}
-
-/// Current UTC time-of-day as a fractional hour (08:30 → 8.5) — where "now" sits on
-/// the hourly chart's 0…24 axis, so today's line stops partway through the current
-/// hour instead of running to its end.
-private func utcHourFractionNow() -> Double {
-    var cal = Calendar(identifier: .gregorian)
-    cal.timeZone = TimeZone(identifier: "UTC") ?? .gmt
-    let c = cal.dateComponents([.hour, .minute, .second], from: Date())
-    return Double(c.hour ?? 0) + (Double(c.minute ?? 0) * 60 + Double(c.second ?? 0)) / 3600
-}
+// utcHourNow() / utcHourFractionNow() now live in EsimplifiedKit (HourlyRevenue.swift),
+// shared with the widget and menu bar so the UTC "to date" reckoning can't drift.
 
 // MARK: - Building blocks
 
@@ -304,26 +288,29 @@ private struct Eyebrow: View {
 /// Backend sends per-hour increments; we accumulate them into a running total
 /// and plot at the end of each hour (hour 0 → the `1` mark), with a 0 start so
 /// a single hour still draws a line up to its value.
-private struct HourlyComparisonChart: View {
+/// Cumulative today-vs-yesterday sales curve. Shared by the dashboard hero and the
+/// macOS menu-bar panel; the cumulative points come from EsimplifiedKit's
+/// `cumulativeHourly` so the curve matches the widget too.
+struct HourlyComparisonChart: View {
     let today: [HourPoint]
     let yesterday: [HourPoint]
     @State private var selectedX: Double?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        // Today's line stops at the elapsed fraction of the current hour (08:30 → 8.5);
-        // yesterday is a complete day, so it draws across the full axis.
-        let t = Self.points(today, cappedAt: utcHourFractionNow())
-        let y = Self.points(yesterday)
+        // Today's line stops at the elapsed fraction of the current UTC hour (08:30 →
+        // 8.5); yesterday is a complete day, so it draws across the full axis.
+        let t = cumulativeHourly(today, cappedAt: utcHourFractionNow())
+        let y = cumulativeHourly(yesterday)
         Chart {
-            ForEach(y, id: \.x) { p in
-                LineMark(x: .value("Hour", p.x), y: .value("Sales", p.v),
+            ForEach(y, id: \.hour) { p in
+                LineMark(x: .value("Hour", p.hour), y: .value("Sales", p.total),
                          series: .value("Day", "Yesterday"))
                     .foregroundStyle(.gray)
                     .lineStyle(StrokeStyle(lineWidth: 2, dash: [4, 3]))
             }
-            ForEach(t, id: \.x) { p in
-                LineMark(x: .value("Hour", p.x), y: .value("Sales", p.v),
+            ForEach(t, id: \.hour) { p in
+                LineMark(x: .value("Hour", p.hour), y: .value("Sales", p.total),
                          series: .value("Day", "Today"))
                     .foregroundStyle(Color.accentColor)
                     .lineStyle(StrokeStyle(lineWidth: 2))
@@ -357,24 +344,9 @@ private struct HourlyComparisonChart: View {
         )
     }
 
-    /// Running total plotted at the end of each hour, prefixed with a 0 origin.
-    /// `cappedAt` (today only) is the current UTC time as a fractional hour: the
-    /// in-progress hour stops there (08:30 → x = 8.5) instead of running to its end.
-    /// Yesterday passes nil and draws each hour through its full end-of-hour mark.
-    static func points(_ src: [HourPoint], cappedAt now: Double? = nil) -> [(x: Double, v: Double)] {
-        var out: [(x: Double, v: Double)] = [(0, 0)]
-        var running = 0.0
-        for p in src.sorted(by: { $0.hour < $1.hour }) {
-            running += dbl(p.revenue)
-            let endOfHour = Double(p.hour + 1)
-            out.append((now.map { min(endOfHour, $0) } ?? endOfHour, running))
-        }
-        return out
-    }
-
     /// Cumulative value at or before the selected hour mark.
-    static func valueAt(_ pts: [(x: Double, v: Double)], _ x: Double) -> Double {
-        pts.last(where: { $0.x <= x })?.v ?? 0
+    static func valueAt(_ pts: [CumulativeHourPoint], _ x: Double) -> Double {
+        pts.last(where: { $0.hour <= x })?.total ?? 0
     }
 }
 
@@ -465,11 +437,16 @@ private struct MetricGrid: View {
     var body: some View {
         LazyVGrid(columns: gridColumns, spacing: Spacing.md) {
             ForEach(items) { item in
-                VStack(alignment: .leading, spacing: Spacing.sm) {
-                    Text(item.value).font(.title3.weight(.semibold).monospacedDigit()).lineLimit(1).minimumScaleFactor(0.55)
-                    Text(item.title).font(.caption).foregroundStyle(.secondary)
-                    if let delta = item.delta {
-                        TrendDelta(percent: delta, font: .caption.weight(.semibold))
+                // Match the hero: eyebrow label on top, then the value with its delta
+                // inline beside it, then the optional context line — no 4-line stack.
+                VStack(alignment: .leading, spacing: Spacing.xs) {
+                    Text(item.title.uppercased()).eyebrow()
+                    HStack(alignment: .firstTextBaseline, spacing: Spacing.sm) {
+                        Text(item.value).font(.title3.weight(.semibold).monospacedDigit())
+                            .lineLimit(1).minimumScaleFactor(0.55)
+                        if let delta = item.delta {
+                            TrendDelta(percent: delta, font: .caption.weight(.semibold))
+                        }
                     }
                     if let sub = item.sub { Text(sub).font(.caption2).foregroundStyle(.secondary) }
                 }
