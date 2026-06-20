@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 // MARK: - Backdrop
 
@@ -318,11 +319,52 @@ struct RefreshIntervalMenu: View {
             }
             .pickerStyle(.inline)
         } label: {
-            Label(seconds == 0 ? "Auto-refresh" : "Every \(RefreshInterval.label(seconds))",
-                  systemImage: seconds == 0 ? "timer" : "timer.circle.fill")
+            if seconds > 0 {
+                CountdownIcon(seconds: seconds)
+            } else {
+                Label("Auto-refresh", systemImage: "timer")
+            }
         }
         .accessibilityLabel("Auto-refresh")
         .accessibilityValue(seconds == 0 ? "Off" : "Every \(RefreshInterval.label(seconds))")
+    }
+}
+
+/// The toolbar auto-refresh glyph drawn as a ring that empties as the next refresh
+/// approaches — a glanceable countdown without a separate clock.
+///
+/// It runs its own 1 Hz `Timer` (a `TimelineView` schedule does not fire inside a
+/// toolbar `Menu` label on macOS, but `onReceive` of a Timer publisher does) and
+/// tracks elapsed time within the interval. No shared state with the refresh loop:
+/// both use the same period and reset together when the cadence changes, so the
+/// ring stays in step without any coupling.
+private struct CountdownIcon: View {
+    let seconds: Int
+    @State private var anchor = Date()
+    @State private var now = Date()
+    private let ticker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+
+    /// Fraction of the current interval still to go (1 → 0 each cycle).
+    private var remaining: Double {
+        let period = Double(seconds)
+        guard period > 0 else { return 0 }
+        let elapsed = now.timeIntervalSince(anchor).truncatingRemainder(dividingBy: period)
+        return min(1, max(0, 1 - elapsed / period))
+    }
+
+    var body: some View {
+        ZStack {
+            Circle().stroke(Color.secondary.opacity(0.3), lineWidth: 2)
+            Circle()
+                .trim(from: 0, to: remaining)
+                .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+            Image(systemName: "timer").font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary)
+        }
+        .frame(width: 16, height: 16)
+        .onReceive(ticker) { now = $0 }
+        .onChange(of: seconds) { anchor = Date(); now = Date() }
+        .accessibilityHidden(true)
     }
 }
 
