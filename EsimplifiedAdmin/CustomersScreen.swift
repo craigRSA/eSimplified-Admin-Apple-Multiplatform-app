@@ -14,17 +14,24 @@ struct CustomersScreen: View {
 
     var body: some View {
         Group {
-            switch phase {
-            case .loading:
-                ProgressView().controlSize(.large).frame(maxWidth: .infinity, maxHeight: .infinity)
-            case let .failed(message):
-                ContentUnavailableView("Couldn't load customers", systemImage: "exclamationmark.triangle",
-                                       description: Text(message))
-            case let .loaded(customers):
-                if customers.isEmpty {
-                    ContentUnavailableView("No customers", systemImage: "person.2.slash")
-                } else {
-                    List(customers) { CustomerRow(customer: $0) }
+            if tenant == nil {
+                // The customers list is tenant-scoped (the web doesn't fetch
+                // without one). Prompt instead of hitting the unscoped endpoint.
+                ContentUnavailableView("Pick a tenant", systemImage: "building.2",
+                                       description: Text("Choose a tenant in the toolbar to view its customers."))
+            } else {
+                switch phase {
+                case .loading:
+                    ProgressView().controlSize(.large).frame(maxWidth: .infinity, maxHeight: .infinity)
+                case let .failed(message):
+                    ContentUnavailableView("Couldn't load customers", systemImage: "exclamationmark.triangle",
+                                           description: Text(message))
+                case let .loaded(customers):
+                    if customers.isEmpty {
+                        ContentUnavailableView("No customers", systemImage: "person.2.slash")
+                    } else {
+                        List(customers) { CustomerRow(customer: $0) }
+                    }
                 }
             }
         }
@@ -60,9 +67,11 @@ struct CustomersScreen: View {
     }
 
     private func load() async {
+        // Tenant-scoped: don't fetch the unscoped endpoint (it returns nothing).
+        guard let tenant else { return }
         do {
             let client = LiveAPIClient(host: session.host, accessToken: session.accessToken)
-            let path = tenant.map { "/api/customers/\($0)/" } ?? "/api/customers/"
+            let path = "/api/customers/\(tenant)/"
             // Default is Active (matches the web server-side default); the toolbar
             // filter can switch to Inactive or All (which omits is_active).
             var query = ["limit": "500"]

@@ -108,6 +108,9 @@ final class AdminAppModel {
         if let page = try? await client.get("/api/tenants/", query: ["limit": "1000", "order_by": "name"],
                                             as: TenantsPage.self) {
             tenants = page.tenants
+            // Mirror the web: with exactly one tenant, scope to it automatically so
+            // tenant-gated screens (Customers, customer search) work immediately.
+            if selectedTenant == nil, tenants.count == 1 { selectedTenant = tenants.first }
         }
     }
 
