@@ -18,13 +18,17 @@ public protocol TwoFactorClient: Sendable {
 
 public final class LiveTwoFactorClient: TwoFactorClient {
     private let host: String
-    private let accessToken: String
+    private let tokenProvider: AccessTokenProviding
     private let session: URLSession
 
-    public init(host: String, accessToken: String, session: URLSession = .shared) {
+    public init(host: String, tokenProvider: AccessTokenProviding, session: URLSession = .shared) {
         self.host = host
-        self.accessToken = accessToken
+        self.tokenProvider = tokenProvider
         self.session = session
+    }
+
+    public convenience init(host: String, accessToken: String, session: URLSession = .shared) {
+        self.init(host: host, tokenProvider: StaticTokenProvider(accessToken), session: session)
     }
 
     public func status() async throws -> Bool {
@@ -51,13 +55,15 @@ public final class LiveTwoFactorClient: TwoFactorClient {
 
     // Endpoints take a JSON body with `{ "code": ... }` (matches the web app).
     private func send(_ method: String, _ path: String, json: [String: Any]?) async throws -> [String: Any] {
+        let token = try await tokenProvider.validAccessToken()
+
         guard var components = URLComponents(string: host) else { throw APIError.unreachable }
         components.path = path
         guard let url = components.url else { throw APIError.unreachable }
 
         var request = URLRequest(url: url)
         request.httpMethod = method
-        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if let json {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")

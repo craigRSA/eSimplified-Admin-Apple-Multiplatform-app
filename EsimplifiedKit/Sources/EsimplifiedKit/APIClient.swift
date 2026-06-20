@@ -6,16 +6,35 @@ public protocol APIClient: Sendable {
 
 public final class LiveAPIClient: APIClient {
     private let host: String
-    private let accessToken: String
+    private let tokenProvider: AccessTokenProviding
     private let session: URLSession
 
-    public init(host: String, accessToken: String, session: URLSession = .shared) {
+    public init(host: String, tokenProvider: AccessTokenProviding, session: URLSession = .shared) {
         self.host = host
-        self.accessToken = accessToken
+        self.tokenProvider = tokenProvider
         self.session = session
     }
 
+    /// Preserves the prior fixed-token call sites (and tests). A 401 surfaces as
+    /// `authExpired` with no retry, exactly as before.
+    public convenience init(host: String, accessToken: String, session: URLSession = .shared) {
+        self.init(host: host, tokenProvider: StaticTokenProvider(accessToken), session: session)
+    }
+
     public func get<T: Decodable>(_ path: String, query: [String: String], as type: T.Type) async throws -> T {
+        let token = try await tokenProvider.validAccessToken()
+        do {
+            return try await perform(path, query: query, token: token, as: type)
+        } catch APIError.authExpired {
+            // Clock-skew / server-side expiry: refresh once and retry. A second
+            // 401 (refresh token dead) propagates as authExpired.
+            let fresh = try await tokenProvider.refreshedAccessToken(after: token)
+            return try await perform(path, query: query, token: fresh, as: type)
+        }
+    }
+
+    private func perform<T: Decodable>(_ path: String, query: [String: String],
+                                       token: String, as type: T.Type) async throws -> T {
         guard var components = URLComponents(string: host) else { throw APIError.unreachable }
         components.path = path
         if !query.isEmpty {
@@ -27,7 +46,7 @@ public final class LiveAPIClient: APIClient {
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
         let data: Data
@@ -54,8 +73,8 @@ public final class LiveAPIClient: APIClient {
         case 404:
             throw APIError.notFound
         default:
-            // Surface the real status + server reason (401/403 with the actual
-            // body) rather than masking everything as "session expired".
+            // Surface the real status + server reason rather than masking
+            // everything as "session expired".
             let body = String(data: data, encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             let message = (body?.isEmpty == false) ? String(body!.prefix(300)) : nil
