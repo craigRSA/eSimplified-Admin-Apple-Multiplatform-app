@@ -52,7 +52,8 @@ struct SearchScreen: View {
     }
     private var canSearch: Bool {
         let t = term.trimmingCharacters(in: .whitespaces)
-        return mode == .iccid ? t.count >= 6 : (t.count >= 3 && tenant != nil)
+        // ICCID: any non-empty term (matches the web, which only checks for empty).
+        return mode == .iccid ? !t.isEmpty : (t.count >= 3 && tenant != nil)
     }
 
     @ViewBuilder private var resultArea: some View {

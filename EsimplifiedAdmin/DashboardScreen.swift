@@ -87,7 +87,7 @@ struct DashboardScreen: View {
                 ])
                 if !s.current.revenuePerDate.isEmpty {
                     ComparisonAreaChart(current: s.current.revenuePerDate, previous: s.comparison.revenuePerDate,
-                                        monthly: range == .yearToDate)
+                                        monthly: range.isYearScale)
                         .frame(height: 220)
                 }
             }
@@ -493,23 +493,40 @@ private struct TopList: View {
 
 private func dbl(_ d: Decimal) -> Double { (d as NSDecimalNumber).doubleValue }
 
-/// Dashboard date-range options (sent as `?date_range=`). `year_to_date` is the
-/// new value the backend added alongside the existing ones.
+/// Dashboard date-range options (sent as `?date_range=`), in the web's display
+/// order. All values except `year_to_date` are live on the backend today;
+/// `year_to_date` is a documented pending addition
+/// (docs/backend/2026-06-19-statistics-hourly-and-ytd.md) that no-ops until the
+/// backend ships it. Raw values must match the web's `date_range` strings exactly.
 enum DashRange: String, CaseIterable, Identifiable {
     case today
-    case last7 = "last_7_days"
+    case thisWeek = "this_week"
+    case thisMonth = "this_month"
+    case lastMonth = "last_month"
     case monthToDate = "month_to_date"
+    case last7 = "last_7_days"
+    case last30 = "last_30_days"
+    case thisYear = "this_year"
     case yearToDate = "year_to_date"
 
     var id: String { rawValue }
     var label: String {
         switch self {
         case .today: "Today"
-        case .last7: "Last 7 days"
-        case .monthToDate: "Month to date"
-        case .yearToDate: "Year to date"
+        case .thisWeek: "This Week"
+        case .thisMonth: "This Month"
+        case .lastMonth: "Last Month"
+        case .monthToDate: "Month to Date"
+        case .last7: "Last 7 Days"
+        case .last30: "Last 30 Days"
+        case .thisYear: "This Year"
+        case .yearToDate: "Year to Date"
         }
     }
+
+    /// Year-scale ranges whose comparison chart reads better with month labels
+    /// than day-index labels.
+    var isYearScale: Bool { self == .thisYear || self == .yearToDate }
 }
 
 enum Fmt {
