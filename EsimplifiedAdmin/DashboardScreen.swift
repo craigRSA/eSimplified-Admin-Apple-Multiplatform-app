@@ -208,10 +208,16 @@ private struct HourlyComparisonChart: View {
                     .foregroundStyle(Color.accentColor)
                     .lineStyle(StrokeStyle(lineWidth: 2)).interpolationMethod(.catmullRom)
             }
-            // Dot on today's latest point so a single early-day value still shows.
+            // Dot + label on today's latest point so the current value reads
+            // clearly even when it's low against yesterday's full-day scale.
             if let last = Self.cumulative(today).last {
                 PointMark(x: .value("Hour", last.hour), y: .value("Revenue", last.total))
-                    .foregroundStyle(Color.accentColor).symbolSize(28)
+                    .foregroundStyle(Color.accentColor).symbolSize(30)
+                    .annotation(position: .topTrailing, spacing: 2) {
+                        Text(Fmt.money(Decimal(last.total)))
+                            .font(.caption2.weight(.semibold).monospacedDigit())
+                            .foregroundStyle(Color.accentColor)
+                    }
             }
         }
         .chartForegroundStyleScale(["Today": Color.accentColor, "Yesterday": Color.gray])
