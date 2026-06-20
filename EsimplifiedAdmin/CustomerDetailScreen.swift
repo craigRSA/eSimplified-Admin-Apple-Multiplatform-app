@@ -333,9 +333,7 @@ private struct EsimDetailCard: View {
     /// eyebrow register of `SectionHeader` so the type system reads as one family.
     private func sectionHeader(_ title: String, view: EsimDetailSheet?) -> some View {
         HStack(alignment: .firstTextBaseline) {
-            Text(title.uppercased())
-                .font(.caption2.weight(.semibold)).tracking(0.8)
-                .foregroundStyle(.secondary)
+            Text(title.uppercased()).eyebrow()
                 .accessibilityAddTraits(.isHeader)
             Spacer()
             if let view { viewButton("View all", view) }

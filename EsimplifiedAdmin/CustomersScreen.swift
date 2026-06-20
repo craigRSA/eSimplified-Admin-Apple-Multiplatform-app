@@ -8,7 +8,6 @@ struct CustomersScreen: View {
     @Environment(\.tokenProvider) private var tokenProvider
     @State private var phase: Phase = .loading
     @State private var search = ""
-    @State private var searchTask: Task<Void, Never>?
     @State private var activeFilter: CustomerFilter = .active
 
     enum Phase { case loading, loaded([Customer]), failed(String) }
@@ -61,7 +60,7 @@ struct CustomersScreen: View {
             .navigationDestination(for: CustomerRef.self) { CustomerDetailScreen(session: session, ref: $0) }
             .navigationTitle("Customers")
             .searchable(text: $search, prompt: "Name, email, phone")
-            .onChange(of: search) { _, _ in debouncedSearch() }
+            .debouncedSearch(of: search) { await load() }
             .toolbar {
                 ToolbarItem {
                     Menu {
@@ -78,17 +77,6 @@ struct CustomersScreen: View {
             .refreshable { await load() }
             .autoRefresh { await load() }
             .refreshCommand { Task { await load() } }
-        }
-    }
-
-    /// Debounce keystrokes, then reload from the server (the web searches
-    /// server-side; a local filter would only see the already-loaded rows).
-    private func debouncedSearch() {
-        searchTask?.cancel()
-        searchTask = Task {
-            try? await Task.sleep(for: .milliseconds(300))
-            if Task.isCancelled { return }
-            await load()
         }
     }
 

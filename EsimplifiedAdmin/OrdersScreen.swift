@@ -11,7 +11,6 @@ struct OrdersScreen: View {
     @State private var orders: [Order] = []
     @State private var total = 0
     @State private var search = ""
-    @State private var searchTask: Task<Void, Never>?
     @State private var path = NavigationPath()
 
     enum Phase { case loading, loaded, failed(String) }
@@ -72,22 +71,12 @@ struct OrdersScreen: View {
             .refreshCommand { Task { await load() } }
         }
         .searchable(text: $search, prompt: "Package, customer, email, order #")
-        .onChange(of: search) { _, _ in debouncedSearch() }
+        // Server-side search (the web searches server-side; a local filter would only
+        // see the rows already loaded and silently miss matches beyond the page).
+        .debouncedSearch(of: search) { await load() }
         .reload(on: tenant) { await load() }
         .refreshable { await load() }
         .autoRefresh { await load() }
-    }
-
-    /// Debounce keystrokes, then reload from the server so search spans the whole
-    /// dataset — the web searches server-side; a local filter would only see the
-    /// rows already loaded (and silently miss matches beyond the page).
-    private func debouncedSearch() {
-        searchTask?.cancel()
-        searchTask = Task {
-            try? await Task.sleep(for: .milliseconds(300))
-            if Task.isCancelled { return }
-            await load()
-        }
     }
 
     private func load() async {

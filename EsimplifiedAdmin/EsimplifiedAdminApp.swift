@@ -130,8 +130,6 @@ final class AdminAppModel {
 
     func authClient() -> LiveAuthClient { LiveAuthClient(clientID: clientID, clientSecret: clientSecret) }
 
-    func apiClient() -> LiveAPIClient { LiveAPIClient(host: host, tokenProvider: sessionManager) }
-
     func adopt(_ session: Session) {
         Task { await sessionManager.adopt(session) }   // persists + fires onChange → sets self.session
     }
@@ -167,7 +165,7 @@ final class AdminAppModel {
 
     func loadTenants() async {
         guard let session, tenants.isEmpty else { return }
-        let client = apiClient()
+        let client = LiveAPIClient(host: session.host, tokenProvider: sessionManager)
         if let page = try? await client.get("/api/tenants/", query: ["limit": "1000", "order_by": "name"],
                                             as: TenantsPage.self) {
             tenants = page.tenants

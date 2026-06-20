@@ -136,9 +136,7 @@ private struct Overline: View {
     let text: String
     init(_ text: String) { self.text = text }
     var body: some View {
-        Text(text.uppercased())
-            .font(.caption2.weight(.semibold)).tracking(0.8)
-            .foregroundStyle(.secondary)
+        Text(text.uppercased()).eyebrow()
             .accessibilityHidden(true)
     }
 }

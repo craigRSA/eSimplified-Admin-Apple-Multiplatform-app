@@ -215,12 +215,19 @@ struct SectionHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             if let eyebrow {
-                Text(eyebrow.uppercased())
-                    .font(.caption2.weight(.semibold)).tracking(0.8)
-                    .foregroundStyle(.secondary)
+                Text(eyebrow.uppercased()).eyebrow()
             }
             Text(title).font(.title3.weight(.semibold))
         }
+    }
+}
+
+extension Text {
+    /// The app's uppercase eyebrow/overline register — caption2, semibold, tracked,
+    /// secondary. One definition so every overline (this header, the dashboard
+    /// Eyebrow, the menu-bar Overline, the eSIM section headers) stays in lockstep.
+    func eyebrow() -> some View {
+        font(.caption2.weight(.semibold)).tracking(0.8).foregroundStyle(.secondary)
     }
 }
 
@@ -281,6 +288,32 @@ extension View {
     /// cancellation that iPhone `NavigationSplitView` triggers on navigation.
     func reload<ID: Equatable>(on id: ID, _ action: @escaping () async -> Void) -> some View {
         modifier(ReloadTrigger(id: id, action: action))
+    }
+}
+
+/// Debounces `query` changes by 300ms then runs `action`, cancelling the pending
+/// run on each keystroke — the server-side search debounce shared by the list
+/// screens so neither re-implements the timing or the cancellable Task.
+private struct DebouncedSearch: ViewModifier {
+    let query: String
+    let action: () async -> Void
+    @State private var task: Task<Void, Never>?
+    func body(content: Content) -> some View {
+        content.onChange(of: query) { _, _ in
+            task?.cancel()
+            task = Task {
+                try? await Task.sleep(for: .milliseconds(300))
+                if Task.isCancelled { return }
+                await action()
+            }
+        }
+    }
+}
+
+extension View {
+    /// Reloads via `action` shortly after `query` stops changing (server-side search).
+    func debouncedSearch(of query: String, _ action: @escaping () async -> Void) -> some View {
+        modifier(DebouncedSearch(query: query, action: action))
     }
 }
 
