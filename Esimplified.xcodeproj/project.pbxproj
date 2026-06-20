@@ -21,6 +21,7 @@
 		A3000000000000000000051 /* AdminTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000050 /* AdminTheme.swift */; };
 		A3000000000000000000053 /* MenuBarRevenue.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000052 /* MenuBarRevenue.swift */; };
 		A3000000000000000000055 /* CustomerDetailScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000054 /* CustomerDetailScreen.swift */; };
+		A3000000000000000000057 /* AdminSiri.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000056 /* AdminSiri.swift */; };
 		A3000000000000000000029 /* CustomersScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000019 /* CustomersScreen.swift */; };
 		A300000000000000000002A /* InventoryScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A300000000000000000001A /* InventoryScreen.swift */; };
 		A300000000000000000002B /* ProfileScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A300000000000000000001B /* ProfileScreen.swift */; };
@@ -74,6 +75,7 @@
 		A3000000000000000000050 /* AdminTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminTheme.swift; sourceTree = "<group>"; };
 		A3000000000000000000052 /* MenuBarRevenue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarRevenue.swift; sourceTree = "<group>"; };
 		A3000000000000000000054 /* CustomerDetailScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomerDetailScreen.swift; sourceTree = "<group>"; };
+		A3000000000000000000056 /* AdminSiri.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminSiri.swift; sourceTree = "<group>"; };
 		A3000000000000000000019 /* CustomersScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomersScreen.swift; sourceTree = "<group>"; };
 		A300000000000000000001A /* InventoryScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InventoryScreen.swift; sourceTree = "<group>"; };
 		A300000000000000000001B /* ProfileScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileScreen.swift; sourceTree = "<group>"; };
@@ -147,6 +149,7 @@
 				A3000000000000000000050 /* AdminTheme.swift */,
 				A3000000000000000000052 /* MenuBarRevenue.swift */,
 				A3000000000000000000054 /* CustomerDetailScreen.swift */,
+				A3000000000000000000056 /* AdminSiri.swift */,
 				A3000000000000000000019 /* CustomersScreen.swift */,
 				A300000000000000000001A /* InventoryScreen.swift */,
 				A300000000000000000001B /* ProfileScreen.swift */,
@@ -276,6 +279,7 @@
 				A3000000000000000000051 /* AdminTheme.swift in Sources */,
 				A3000000000000000000053 /* MenuBarRevenue.swift in Sources */,
 				A3000000000000000000055 /* CustomerDetailScreen.swift in Sources */,
+				A3000000000000000000057 /* AdminSiri.swift in Sources */,
 				A3000000000000000000029 /* CustomersScreen.swift in Sources */,
 				A300000000000000000002A /* InventoryScreen.swift in Sources */,
 				A300000000000000000002B /* ProfileScreen.swift in Sources */,
