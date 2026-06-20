@@ -119,7 +119,7 @@ final class AdminAppModel {
         Task { await mgr.setOnChange { [weak self] newSession in
             Task { @MainActor in
                 self?.session = newSession
-                if newSession == nil { self?.tenants = []; self?.selectedTenant = nil }
+                if newSession == nil { self?.tenants = []; self?.tenantLogos = [:]; self?.selectedTenant = nil }
             }
         } }
         // Wire up the real isEnabled closure now that self is fully initialised.
@@ -161,12 +161,18 @@ final class AdminAppModel {
     /// The schema name to scope queries by, or nil for all tenants.
     var tenantScope: String? { selectedTenant?.schemaName }
 
+    /// `schema_name → small logo URL`, built once from the loaded tenants so order
+    /// rows can show each tenant's logo without a per-row lookup.
+    private(set) var tenantLogos: [String: URL] = [:]
+
     func loadTenants() async {
         guard let session, tenants.isEmpty else { return }
         let client = apiClient()
         if let page = try? await client.get("/api/tenants/", query: ["limit": "1000", "order_by": "name"],
                                             as: TenantsPage.self) {
             tenants = page.tenants
+            tenantLogos = Dictionary(page.tenants.compactMap { t in t.logoSmall.map { (t.schemaName.lowercased(), $0) } },
+                                     uniquingKeysWith: { first, _ in first })
             // Mirror the web: with exactly one tenant, scope to it automatically so
             // tenant-gated screens (Customers, customer search) work immediately.
             if selectedTenant == nil, tenants.count == 1 { selectedTenant = tenants.first }
@@ -184,6 +190,17 @@ final class AdminAppModel {
     }
 }
 
+private struct TenantLogosKey: EnvironmentKey {
+    static let defaultValue: [String: URL] = [:]
+}
+extension EnvironmentValues {
+    /// `schema_name → small logo URL` for the order rows' tenant tiles.
+    var tenantLogos: [String: URL] {
+        get { self[TenantLogosKey.self] }
+        set { self[TenantLogosKey.self] = newValue }
+    }
+}
+
 struct AdminRootView: View {
     @Bindable var model: AdminAppModel
 
@@ -195,6 +212,7 @@ struct AdminRootView: View {
             let kind = BiometryKind.cached
             AdminShell(model: model)
                 .environment(\.tokenProvider, model.sessionManager)
+                .environment(\.tenantLogos, model.tenantLogos)
                 .modifier(LockContainer(controller: model.lock, onUsePassword: { model.logout() }))
                 .alert("Enable \(kind.label)?", isPresented: $model.offerBiometricEnrollment) {
                     Button("Enable") { model.setBiometricEnabled(true) }
@@ -205,6 +223,7 @@ struct AdminRootView: View {
             #else
             AdminShell(model: model)
                 .environment(\.tokenProvider, model.sessionManager)
+                .environment(\.tenantLogos, model.tenantLogos)
             #endif
         }
     }

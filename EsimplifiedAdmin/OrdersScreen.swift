@@ -240,7 +240,10 @@ private struct OrdersTable: View {
     var body: some View {
         Table(shown, selection: $selectedID, sortOrder: $sortOrder) {
             TableColumn("Tenant", value: \.tenant) { o in
-                Text(o.tenant).foregroundStyle(orderAccent(o) ?? .primary)
+                HStack(spacing: Spacing.sm) {
+                    TenantAvatar(tenant: o.tenant, size: 22)
+                    Text(o.tenant).foregroundStyle(orderAccent(o) ?? .primary).lineLimit(1)
+                }
             }
             TableColumn("Package", value: \.packageName) { o in
                 HStack(spacing: Spacing.sm) {
@@ -265,6 +268,7 @@ private struct OrdersTable: View {
                 Text(shortDate(o.purchaseDate)).font(.callout).foregroundStyle(.secondary).lineLimit(1)
             }
         }
+        .scrollContentBackground(.hidden)   // let the app gradient show instead of the Table's opaque black
         .contextMenu(forSelectionType: Order.ID.self) { ids in
             if let id = ids.first, let o = shown.first(where: { $0.id == id }) {
                 if let ref = o.customerRef {
@@ -293,11 +297,10 @@ private struct OrdersTable: View {
     }
 }
 
-/// iPhone order row — a transaction-ledger cell (à la Wallet): a leading status
-/// medallion carries the one color signal (status + category, color-blind-safe via
-/// its glyph), a three-tier text hierarchy reads what / how / who, and prices sit
-/// right-aligned and monospaced. No competing pills — the medallion and the tinted
-/// title encode category, so promo/voucher need no separate tag.
+/// iPhone order row — a transaction-ledger cell (à la Wallet): the tenant's logo
+/// leads (glass tile, monogram fallback), a three-tier hierarchy reads package /
+/// status·date / customer, and prices sit right-aligned and monospaced. The tinted
+/// title still encodes category (promo/voucher) without a separate tag.
 private struct OrderRow: View {
     let order: Order
 
@@ -307,7 +310,7 @@ private struct OrderRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: Spacing.md) {
-            medallion
+            TenantAvatar(tenant: order.tenant)
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .font(.headline).foregroundStyle(accent ?? .primary).lineLimit(1)
@@ -344,43 +347,14 @@ private struct OrderRow: View {
         .accessibilityLabel(accessibilityLabel)
     }
 
-    /// The leading medallion: one tinted glyph standing in for the whole pill row.
-    private var medallion: some View {
-        Image(systemName: medallionGlyph)
-            .font(.system(size: 15, weight: .semibold))
-            .foregroundStyle(medallionColor)
-            .frame(width: 38, height: 38)
-            .background(medallionColor.opacity(0.15), in: Circle())
-            .overlay(Circle().strokeBorder(medallionColor.opacity(0.22), lineWidth: 0.5))
-            .accessibilityHidden(true)
-    }
-
-    private var medallionColor: Color { accent ?? StatusStyle.color(order.paymentStatus) }
-
-    /// The category glyph when the order has one (refund/voucher/comp/agent/promo);
-    /// otherwise a glyph for the payment status.
-    private var medallionGlyph: String {
-        if let cat = OrderCategory(order) { return cat.glyph }
-        switch order.paymentStatus.lowercased() {
-        case "success", "approved", "active", "released": return "checkmark"
-        case "pending", "requested", "awaiting_s2s": return "clock"
-        case "refunded", "cancelled", "canceled": return "arrow.uturn.backward"
-        case "error", "failed": return "exclamationmark"
-        default: return "creditcard"
-        }
-    }
-
-    /// Second line — the prominent metadata tier: a non-success status (so
-    /// refunds/pending aren't color-only), the tenant the sale ran through (which
-    /// matters more than the order type — the medallion/title color already encodes
-    /// category), and the date.
+    /// Second line — a non-success status (so refunds/pending aren't color-only) and
+    /// the date. The tenant is the leading logo, so it isn't repeated here.
     private var detailLine: String {
         var parts: [String] = []
         let s = order.paymentStatus.lowercased()
         if !(s == "success" || s == "approved" || s == "active" || s == "released") {
             parts.append(order.paymentStatus.capitalized)
         }
-        if let t = tenantName { parts.append(t) }
         parts.append(shortDate(order.purchaseDate))
         return parts.joined(separator: " · ")
     }
@@ -404,6 +378,65 @@ private struct OrderRow: View {
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
     private var tenantName: String? { order.tenant.isEmpty ? nil : order.tenant }
+}
+
+/// The tenant's brand logo filled into a rounded glass tile (the app's Liquid Glass),
+/// with a monogram fallback (initial in a stable per-tenant tint) for tenants with no
+/// logo on file. Size-configurable so the iPhone row and the Mac table share it.
+struct TenantAvatar: View {
+    let tenant: String
+    var size: CGFloat = 38
+    @Environment(\.tenantLogos) private var logos
+
+    private var radius: CGFloat { size * 0.26 }
+
+    var body: some View {
+        content
+            .frame(width: size, height: size)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.16), lineWidth: 0.5))
+            .accessibilityHidden(true)
+    }
+
+    @ViewBuilder private var content: some View {
+        if let url = logos[tenant.lowercased()] {
+            AsyncImage(url: url) { phase in
+                if let image = phase.image {
+                    image.resizable().aspectRatio(contentMode: .fill)
+                } else {
+                    monogram   // loading or failed → monogram
+                }
+            }
+        } else {
+            monogram
+        }
+    }
+
+    private var monogram: some View {
+        Text(Self.initials(tenant))
+            .font(.system(size: size * 0.37, weight: .bold, design: .rounded))
+            .foregroundStyle(Self.tint(tenant))
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// First letters of the first two words, else the first letter (uppercased).
+    private static func initials(_ s: String) -> String {
+        let words = s.split { " -_".contains($0) }.filter { !$0.isEmpty }
+        guard let first = words.first?.first else { return "?" }
+        if words.count >= 2, let second = words[1].first {
+            return (String(first) + String(second)).uppercased()
+        }
+        return String(first).uppercased()
+    }
+
+    /// A stable tint per tenant so the same brand always gets the same monogram color.
+    private static func tint(_ s: String) -> Color {
+        let palette: [Color] = [.blue, .teal, .indigo, .purple, .pink, .orange, .green, .cyan, .mint]
+        let h = s.unicodeScalars.reduce(0) { $0 &+ Int($1.value) }
+        return palette[h % max(palette.count, 1)]
+    }
 }
 
 /// Shared mapping from an APIError to a user-facing message (used by admin screens).
