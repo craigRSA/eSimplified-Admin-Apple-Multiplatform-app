@@ -3,6 +3,24 @@ import SwiftUI
 import LocalAuthentication
 import EsimplifiedKit
 
+/// Resolves the device's actual biometry flavour at runtime so copy and icons
+/// match (Face ID on modern iPhones, Touch ID on home-button iPads/iPhones,
+/// Optic ID on Apple Vision Pro, fallback for devices without biometrics).
+struct BiometryKind {
+    let label: String       // "Face ID" / "Touch ID" / "Optic ID" / "biometrics"
+    let systemImage: String // "faceid" / "touchid" / "opticid" / "lock"
+    static var current: BiometryKind {
+        let ctx = LAContext()
+        _ = ctx.canEvaluatePolicy(.deviceOwnerAuthentication, error: nil) // REQUIRED: populates biometryType
+        switch ctx.biometryType {
+        case .faceID:  return .init(label: "Face ID",  systemImage: "faceid")
+        case .touchID: return .init(label: "Touch ID", systemImage: "touchid")
+        case .opticID: return .init(label: "Optic ID", systemImage: "opticid")
+        default:       return .init(label: "biometrics", systemImage: "lock")
+        }
+    }
+}
+
 /// Abstracts LocalAuthentication so the controller is testable and the policy
 /// choice is centralized. Uses `.deviceOwnerAuthentication` (biometrics WITH
 /// passcode fallback) — required so a biometric lockout can recover via passcode.
@@ -77,17 +95,18 @@ final class AppLockController {
     }
 }
 
-/// Full-screen lock UI: auto-prompts Face ID, retry on failure, and a password
+/// Full-screen lock UI: auto-prompts biometrics, retry on failure, and a password
 /// escape hatch that signs out (drops to the login screen).
 struct LockScreen: View {
     let controller: AppLockController
     var onUsePassword: () -> Void
 
     var body: some View {
+        let kind = BiometryKind.current
         ZStack {
             AppBackground()
             VStack(spacing: Spacing.lg) {
-                Image(systemName: "faceid").font(.system(size: 56)).foregroundStyle(Color.accentColor)
+                Image(systemName: kind.systemImage).font(.system(size: 56)).foregroundStyle(Color.accentColor)
                     .accessibilityHidden(true)
                 Text("eSimplified Admin").font(.title2.weight(.semibold))
                 Text("Locked").font(.subheadline).foregroundStyle(.secondary)

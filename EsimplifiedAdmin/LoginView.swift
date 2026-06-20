@@ -1,5 +1,6 @@
 import SwiftUI
 import EsimplifiedKit
+import LocalAuthentication
 
 struct LoginView: View {
     @Bindable var model: AdminAppModel
@@ -170,5 +171,10 @@ struct LoginView: View {
             return
         }
         model.adopt(session)
+        #if os(iOS)
+        if !model.biometricEnabled, LAContext().canEvaluatePolicy(.deviceOwnerAuthentication, error: nil) {
+            model.offerBiometricEnrollment = true
+        }
+        #endif
     }
 }

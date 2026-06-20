@@ -7,6 +7,8 @@ import UIKit
 struct ProfileScreen: View {
     let session: Session
     var onLogout: () -> Void
+    var biometricEnabled: Bool = false
+    var setBiometricEnabled: (Bool) -> Void = { _ in }
 
     /// Honest tri-state: we only know 2FA is on/off when the status call returns.
     /// A failed fetch leaves us in `.unknown`, never coerced to "off".
@@ -64,6 +66,19 @@ struct ProfileScreen: View {
                 securityContent
                 statusRow
             }
+
+            #if os(iOS)
+            Section("App lock") {
+                let kind = BiometryKind.current
+                Toggle("Require \(kind.label) to open", isOn: Binding(
+                    get: { biometricEnabled },
+                    set: { setBiometricEnabled($0) }))
+                if biometricEnabled {
+                    Text("The app locks on launch and after a few minutes in the background. Your session refreshes in the background.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+            }
+            #endif
 
             Section {
                 Button("Log out", role: .destructive) { confirmLogout = true }

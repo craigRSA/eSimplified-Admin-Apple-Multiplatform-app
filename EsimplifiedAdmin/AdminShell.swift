@@ -91,7 +91,11 @@ struct AdminShell: View {
         case .agentApprovals:
             if let session = model.session { AgentApprovalsScreen(session: session, tenant: scope) }
         case .profile:
-            if let session = model.session { ProfileScreen(session: session, onLogout: { model.logout() }) }
+            if let session = model.session {
+                ProfileScreen(session: session, onLogout: { model.logout() },
+                              biometricEnabled: model.biometricEnabled,
+                              setBiometricEnabled: { model.setBiometricEnabled($0) })
+            }
         case .some(let section):
             PlaceholderDetail(title: section.title)
         case nil:

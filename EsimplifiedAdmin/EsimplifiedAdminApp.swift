@@ -149,7 +149,9 @@ final class AdminAppModel {
     }
 
     #if os(iOS)
+    /// Placeholder replaced by the real controller (wired to `biometricEnabled`) in `init()`.
     private(set) var lock: AppLockController = AppLockController(isEnabled: { false })
+    var offerBiometricEnrollment = false
     #endif
 
     /// The schema name to scope queries by, or nil for all tenants.
@@ -186,9 +188,16 @@ struct AdminRootView: View {
             LoginView(model: model)
         } else {
             #if os(iOS)
+            let kind = BiometryKind.current
             AdminShell(model: model)
                 .environment(\.tokenProvider, model.sessionManager)
                 .modifier(LockContainer(controller: model.lock, onUsePassword: { model.logout() }))
+                .alert("Enable \(kind.label)?", isPresented: $model.offerBiometricEnrollment) {
+                    Button("Enable") { model.setBiometricEnabled(true) }
+                    Button("Not Now", role: .cancel) {}
+                } message: {
+                    Text("Require \(kind.label) each time you open the app. Your session stays signed in in the background.")
+                }
             #else
             AdminShell(model: model)
                 .environment(\.tokenProvider, model.sessionManager)
