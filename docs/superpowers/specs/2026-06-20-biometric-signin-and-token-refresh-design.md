@@ -88,7 +88,8 @@ public actor SessionManager {
          refreshPolicy: RefreshPolicy)
 
     func currentSession() -> Session?
-    func validAccessToken() async throws -> String   // refreshes if needed
+    func validAccessToken() async throws -> String   // refreshes if near/past expiry
+    func refreshedAccessToken(after staleToken: String) async throws -> String  // 401 path
     func adopt(_ session: Session)                    // after login / 2FA
     func clear()
 }
@@ -131,6 +132,17 @@ public protocol AccessTokenProviding: Sendable { func validAccessToken() async t
 So the freshness check happens on **every** request automatically — present and future
 call sites included — rather than each screen remembering to check.
 
+**401 safety net (clock-skew defense).** A local `expiresAt` check is not authoritative —
+device clock skew can make a token the check believes is valid already expired
+server-side. So `LiveAPIClient` also treats a **401** as a refresh trigger: on
+`APIError.authExpired`, it calls `SessionManager.refreshedAccessToken(after:)` with the
+token it just used and **retries the request once** with the fresh token; only if the
+retry still 401s does it surface `authExpired` (→ sign out). `refreshedAccessToken(after:)`
+is policy-gated (throws immediately when refresh is disallowed — iOS + biometric off) and
+shares the same single-flight `Task`, and it takes the stale token so that concurrent
+401s coalesce into one refresh and late callers get the already-refreshed token instead of
+triggering a second refresh. Retry is capped at one to avoid loops.
+
 **Reuse across surfaces.** The widget (`RevenueProvider`) and Siri (`AdminSiri`) currently
 hand-roll `if session.expiresAt <= Date() { refresh }`. They adopt `SessionManager` too,
 removing the duplicated logic. Their `RefreshPolicy` always allows refresh (a widget/Siri
@@ -149,9 +161,20 @@ running implies the user opted into a persistent session, and they have no UI to
   the kit — see Testing.)
 - **Unlock:** `LAContext.evaluatePolicy(.deviceOwnerAuthentication, ...)` — Face ID /
   Touch ID **with device-passcode fallback**, so a failed/unenrolled biometric still has a
-  path in. Auto-prompts on the lock screen; offers a "Use password instead" escape hatch
-  that drops to the login screen (clears the session), and on success runs the
-  ensure-valid-session steps above.
+  path in. The passcode fallback is also the **only** recovery from `LAError.biometryLockout`
+  (triggered after 5 failed biometric attempts); `.deviceOwnerAuthenticationWithBiometrics`
+  would strand a locked-out user, so it is deliberately not used. Auto-prompts on the lock
+  screen; offers a "Use password instead" escape hatch that drops to the login screen
+  (clears the session), and on success runs the ensure-valid-session steps above.
+- **LAContext usage:** a **fresh `LAContext` per evaluation** (don't reuse an
+  evaluated/invalidated context). Call `canEvaluatePolicy` to drive UI, but **treat its
+  result as volatile** (the user can disable biometrics at any time) — never persist it,
+  always handle the `evaluatePolicy` failure path. Branch on `LAError` cases:
+  `biometryNotAvailable`, `biometryNotEnrolled`, `biometryLockout`, `userCancel`,
+  `authenticationFailed`.
+- **Info.plist:** `NSFaceIDUsageDescription` is **mandatory** (a short reason; must not
+  include the app name — the system adds it) or authorization requests fail. Added to the
+  Admin target's `Info.plist`.
 - **Privacy cover:** when `scenePhase` is `.inactive`/`.background`, show an opaque cover
   so revenue figures don't appear in the iOS app-switcher snapshot.
 - **Graceful degrade:** if `LAContext.canEvaluatePolicy` is false (no biometrics *and* no
@@ -211,6 +234,11 @@ Pure / unit-testable in `EsimplifiedKit` (with fakes for `AuthClient` and an in-
   buffer; throws `authExpired` when policy disallows refresh on an expired token.
 - Concurrent `validAccessToken` calls on an expired token trigger **exactly one** refresh
   (single-flight coalescing).
+- `refreshedAccessToken(after:)` (401 path): concurrent calls with the same stale token
+  coalesce into one refresh; a call whose stale token was already replaced returns the
+  current token without refreshing again; it throws `authExpired` when policy disallows
+  refresh. `LiveAPIClient` retries once on 401 and gives up (surfaces `authExpired`) on a
+  second 401.
 - Refresh-token carry-forward: a refresh response omitting `refresh_token` keeps the prior
   one; one containing a new token rotates to it.
 - The re-lock decision (`shouldRelock(backgroundedAt:now:grace:)`) is a pure function with
@@ -222,8 +250,11 @@ shells verified by build + run on Mac and iOS Simulator/device.
 
 ## Out of scope (YAGNI)
 
-- A 401→refresh→retry wrapper around API responses. Refresh-on-use (checking before each
-  request) is sufficient for the reported symptom; a response-side retry is not added.
 - Per-screen or configurable grace interval. Fixed at 3 minutes.
 - Biometric gate on macOS.
 - Storing credentials/password for re-login.
+- **Migrating off the OAuth2 password grant.** The research flagged that the ROPC
+  password grant the app/web both use is a `MUST NOT` under RFC 9700 §2.4 / OAuth 2.1
+  (native apps should use auth-code + PKCE via RFC 8252). This is a backend + web
+  architecture decision well beyond this feature; recorded here as a known finding, not
+  addressed by this work.
