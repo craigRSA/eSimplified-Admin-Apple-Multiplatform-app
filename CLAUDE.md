@@ -1,112 +1,144 @@
-# eSimplified
+# eSimplified Admin
 
-This repo holds two native Apple products over one shared engine (`EsimplifiedKit`):
+A native Apple (Mac / iPad / iPhone) reimplementation of a curated subset of the
+eSimplified web admin front end, plus a WidgetKit widget, over one shared engine
+(`EsimplifiedKit`). Read-mostly client of the existing eSimplified backend.
 
-1. **eSimplified** — a glanceable view of **today's consolidated eSimplified
-   revenue** (number + delta vs yesterday + 7-day trend), as a multiplatform app
-   (macOS floating window / iOS screen) plus a WidgetKit widget. Read-only.
-2. **eSimplified Admin** — a native (Mac/iPad/iPhone) reimplementation of a curated
-   subset of the web admin front end (in progress).
-
-Both are read-mostly clients of the existing eSimplified backend — no backend changes.
-
-> Folder/scheme note: the historical names live on in a few places — the git repo
-> directory is still `eSimPulse/` and some older docs/plans say "eSim Pulse". The
-> Xcode project is `Esimplified.xcodeproj`; the glance app/target is `Esimplified`.
-
-## What it does
-
-Reproduces this query as a glanceable number, plus a delta vs yesterday:
-
-```sql
-SELECT SUM(final_price) FROM public.consolidated_orderhistory_data
-WHERE payment_status = 'success'
-  AND (schema_name_col <> 'esimplified' OR schema_name_col IS NULL)
-  AND purchase_date >= today;
-```
-
-It gets this from the existing **Admin Dashboard** endpoint — no SQL or DB
-connection in the app:
-
-- `GET {adminHost}/api/statistics/?date_range=last_7_days`
-- Auth: `Authorization: Bearer <token>` (scope `statistics:read`)
-- Fields used: `revenue_today`, `revenue_yesterday`, `current.revenue_per_date[]`,
-  `current.success_orders`
-- The endpoint already excludes the `esimplified` schema and filters
-  `payment_status='success'`.
+> History: the repo began as "eSim Pulse" — a small read-only revenue *glance*
+> app + widget. That glance app has been **removed**; the **Admin app is now the
+> single product**, and the widget is embedded inside it. A few historical names
+> linger (git dir is still `eSimPulse/`; the Xcode project is
+> `Esimplified.xcodeproj`). Older docs under `docs/specs` / `docs/plans` describe
+> the retired glance app — treat this file as the source of truth.
 
 ## Structure
 
 ```
-EsimplifiedKit/   ← local Swift package: ALL testable logic, CLI-testable via `swift test`
-  Credentials / CredentialStore / KeychainCredentialStore
-  DashboardStats (tolerant decimal decoding)
-  StatisticsClient / LiveStatisticsClient / StatsError / DateRange
-  DashboardViewModel (@Observable state machine)
-Esimplified/      ← ONE multiplatform SwiftUI app target (macOS + iPadOS + iOS), imports EsimplifiedKit
-EsimplifiedWidget/← ONE multiplatform WidgetKit extension, embedded in the app
-docs/specs/       ← approved designs (app + widget)
-docs/plans/       ← implementation plans (executed task-by-task, TDD)
+EsimplifiedKit/    ← local Swift package: ALL testable logic (swift test, no Xcode)
+EsimplifiedAdmin/  ← the app target (Mac + iPad + iPhone), imports EsimplifiedKit
+EsimplifiedWidget/ ← WidgetKit extension, EMBEDDED in the Admin app
+docs/backend/      ← read-only API additions requested from the backend team
+docs/specs|plans/  ← historical (glance app + admin foundations)
 ```
 
-Two targets over one engine: the **Esimplified** app (Supported Destinations =
-Mac + iPhone + iPad; adaptive UI — `MacViews.swift` floating window on macOS,
-`PhoneViews.swift` on iOS, `RevenueViews.swift` shared) and the **EsimplifiedWidget**
-extension (embedded in the app, same sources on every platform). `EsimplifiedKit`
-supports `.macOS(.v14)` and `.iOS(.v17)`.
+Two targets over one engine. The widget is embedded in the Admin app's "Embed App
+Extensions" phase (bundle id `io.esimplified.admin.widget` inside
+`io.esimplified.admin`). Logic lives in the package so it has real unit tests;
+the app/widget are UI shells verified by build + run.
 
-The split is deliberate: logic lives in the package so it has true unit tests
-runnable from the command line without opening Xcode; the app and widget targets
-are thin UI shells verified by build + manual run.
+### Engine (`EsimplifiedKit`) — key types
+- `Session` / `SessionStore` / `KeychainSessionStore` — OAuth session (access +
+  refresh token, `expiresAt`, scopes) in the Keychain.
+- `AuthClient` / `LiveAuthClient` — OAuth2 password grant, refresh, 2FA verify.
+- `APIClient` / `LiveAPIClient` — `GET {host}/api/…` with Bearer auth.
+- `APIError` — `authExpired` (401), `notFound` (404), `requestFailed(status,
+  serverMessage)` (everything else, incl. 403 — carries the server's reason),
+  `unreachable`, `decoding`. (Genuine task cancellation throws `CancellationError`,
+  not `.unreachable`.)
+- `AdminDashboardStats` (+ `StatsPeriod`, `HourPoint`, `LabeledCount`,
+  `MonthRevenue`, `TenantRevenueSlice`) — the `/api/statistics/` response.
+- `Order`/`OrdersPage`, `Customer`/`CustomersPage`, `EsimSummary`/`EsimDetail`
+  (+ `EuiccProfile`, `EsimPackage`, `OpenDataSession`, `EsimLocation`,
+  `Whitelist`, `EsimSession`), `Inventory`, `MeUser`, `Tenant`, `TwoFactorClient`.
+- `FlexibleDecimal` — decodes money fields that arrive as JSON string OR number.
+- Legacy glance-era types still present but UNUSED by any shipping target:
+  `Credentials`, `KeychainCredentialStore`, `DashboardStats`,
+  `StatisticsClient`/`LiveStatisticsClient`, `DashboardViewModel` (kept only
+  because their tests still run; safe to delete with their tests).
 
-> A second product, **eSimplified Admin** (the native admin app), is being built
-> in `EsimplifiedAdmin/` over the same `EsimplifiedKit` engine. Design:
-> `docs/specs/2026-06-19-esimplified-admin-native-design.md`.
+### App (`EsimplifiedAdmin`)
+- `AdminShell` — `NavigationSplitView`; sidebar sections gated by token scopes;
+  tenant picker + auto-refresh menu in the toolbar; macOS bottom status bar with
+  a UTC clock; macOS menu-bar revenue item (`MenuBarRevenue`).
+- Screens: `DashboardScreen` (hero "today's gross volume", hourly
+  today-vs-yesterday chart, date-range dropdown incl. `year_to_date`,
+  "X vs previous" card, per-tenant/per-month bars — all with tap tooltips),
+  `OrdersScreen` (columnar `Table` on Mac/iPad, rich rows on iPhone; whole row
+  deep-links to the customer), `CustomersScreen`, `SearchScreen` (Customer +
+  ICCID modes), `CustomerDetailScreen` (profile, eSIM list, full eSIM panel +
+  View Locations/Packages/Sessions/Whitelist sheets, orders), `InventoryScreen`,
+  `AgentApprovalsScreen`, `ProfileScreen` (2FA enable/disable).
+- `AdminSiri.swift` — App Intents (`TodaysRevenueIntent`,
+  `YesterdayRevenueIntent`, `RevenueVsYesterdayIntent`) + `AppShortcutsProvider`.
+  Must live in the **app target** (not the package) for App Intents metadata
+  extraction to discover them.
 
-The **widget** runs its own `TimelineProvider` (~20-min refresh), reads the token
-from a shared Keychain access group, and fetches via the same `LiveStatisticsClient`
-— so it stays current with the app closed. The app is the companion/config surface
-(where you enter host + token) and the required container the widget ships inside.
+## Conventions / gotchas
 
-## Conventions
+- **Platform floor: iOS 26 / macOS 26** for the Admin target (Liquid Glass —
+  `.glassEffect`, `.glassProminent`). The widget target is iOS 17 / macOS 14; the
+  kit is `.iOS(.v17)` / `.macOS(.v14)`. Swift 5.9+.
+- **Money is always `Decimal`**; API decimals may be strings or numbers →
+  `FlexibleDecimal`. Guard chart values for NaN/inf (`ProgressView`/Charts crash
+  on non-finite).
+- **No third-party dependencies** — Foundation / SwiftUI / AppKit / Charts /
+  AppIntents / XCTest only.
+- **Secrets:** OAuth client id/secret come from a **gitignored**
+  `EsimplifiedAdmin/Secrets.xcconfig` (`ESP_CLIENT_ID` / `ESP_CLIENT_SECRET`),
+  surfaced via `Info.plist` `$(ESP_CLIENT_ID)` etc. Never commit real creds; the
+  committed `Info.plist` only has `$()` placeholders + `Secrets.example.xcconfig`.
+- **Host is configured, not asked:** `Info.plist` `ESPHost =
+  https://live.esimplified.io` (the ROOT — the app appends `/api/…` and
+  `/auth/…`). No host field in the UI.
+- **Auth lives in the Keychain** (never UserDefaults). App ↔ widget share the
+  session via a sole Keychain access group
+  `$(AppIdentifierPrefix)io.esimplified.admin.shared` (in both entitlements). The
+  app refreshes the token near `expiresAt` (token lasts ~9h); the widget refreshes
+  on its own.
+- **Trailing slashes matter:** Django 301-redirects slash-less paths and
+  URLSession drops the `Authorization` header on the redirect → 401. Always hit
+  the canonical `/…/` form (e.g. `/api/customers/{tenant}/{id}/`,
+  `/api/esim/{iccid}/`).
+- **iPhone nav cancels `.task`:** `NavigationSplitView` collapses on iPhone and
+  cancels a detail screen's `.task` on navigation. Load via the `.reload(on:)`
+  modifier (unstructured Task) — not `.task(id:)`.
+- **Siri:** App Shortcut phrases must contain `\(.applicationName)`. Display name
+  is "eSimplified Admin"; `CFBundleSpokenName` + `INAlternativeAppNames` add
+  "eSimplified" as a spoken alias (re-indexes on launch, may need a reboot).
+- **DEVELOPMENT_TEAM = 8GVFL9KS7M.** `project.pbxproj` is hand-authored (no Xcode
+  GUI) — UUID prefixes A0=project, A2=widget, A3=admin app. Adding a file = 4
+  edits (PBXBuildFile, PBXFileReference, group children, Sources phase).
+- **`git push` is denied** in `.claude/settings.local.json`. Commit per change
+  with the `Co-Authored-By: Claude` trailer; never push without explicit ask.
+- Ground every API contract in the web source at
+  `/Users/craig/WebstormProjects/admin_front_end/` (`src/app/actions/index.ts`,
+  `src/lib/api.ts`, `src/types/index.ts`). Don't invent shapes.
 
-- **Platform floor macOS 14.0** (`@Observable` macro). Swift tools 5.9+.
-- **Money is always `Decimal`** — never `Double`/`Float` for storage or comparison.
-- API decimal fields may be JSON **strings** (Django DRF default) **or** numbers —
-  `FlexibleDecimal` handles both.
-- No third-party dependencies — Foundation / SwiftUI / AppKit / XCTest only.
-- The Bearer token + admin host live in the **macOS Keychain**, never in
-  `UserDefaults` or plaintext.
-- App and widget share the token via a shared Keychain access group
-  (`$(AppIdentifierPrefix)io.esimplified.glance.shared`, declared in both
-  targets' entitlements). Both targets are sandboxed with `network.client`.
-  App bundle id `io.esimplified.glance`; widget `io.esimplified.glance.widget`.
-- TDD: write the failing test, see it fail, implement, see it pass, commit.
+## Auth flow
+OAuth2 password grant: `POST {host}/auth/token/` (form-encoded + `Authorization:
+Basic base64(clientID:clientSecret)`). 2FA challenge: `POST {host}/auth/token/2fa/`
+(**JSON** `{two_fa_token, code, remember_device}`, no Basic auth). 2FA mgmt:
+`/2fa/status|setup|verify|disable/` (JSON). The user's password may have a leading
+space — never trim it.
 
 ## Commands
 
 ```bash
-cd EsimplifiedKit && swift test          # run the core unit tests
-cd EsimplifiedKit && swift build         # compile the package
-xcodebuild -project Esimplified.xcodeproj -scheme Esimplified build   # build app + embedded widget
+cd EsimplifiedKit && swift test          # core unit tests (47)
+cd EsimplifiedKit && swift build         # compile the engine
+# Build the app (embeds the widget). CODE_SIGNING_ALLOWED=NO for CI/sim checks.
+xcodebuild -project Esimplified.xcodeproj -scheme EsimplifiedAdmin \
+  -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO build
+xcodebuild -project Esimplified.xcodeproj -scheme EsimplifiedAdmin \
+  -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
 ```
 
-> The widget builds as part of the `Esimplified` scheme (embedded via an "Embed App
-> Extensions" phase). The shared-Keychain capability requires the build machine to
-> be registered in the signing team's developer account.
+> Running on a physical device needs both targets signed (the shared-Keychain
+> capability requires the build machine in the signing team's account). If an
+> incremental build reports a stale type, `xcodebuild clean` the scheme.
 
-## Status / roadmap
+## Status
 
-- **Phase 1 (MVP, done):** today's revenue + delta vs yesterday, Keychain token,
-  floating window. Plan: `docs/plans/2026-06-17-esim-pulse-phase1.md`.
-- **Desktop widget (done):** WidgetKit small + medium (medium adds the 7-day
-  sparkline), self-updating, shared-Keychain token.
-  Design: `docs/specs/2026-06-17-esim-pulse-widget-design.md`.
-- **iPhone app + widget (done, simulator-verified):** iOS app is a settings
-  screen + today preview; the iOS widget reuses the shared widget sources.
-  Builds for the iOS Simulator without signing; running on a physical device
-  needs the iOS targets signed in Xcode (your Apple ID / device registration).
-- **Phase 3:** launch-at-login, configurable refresh interval + currency symbol.
+Built & green (Mac + iOS): auth + 2FA, Dashboard (hero/hourly/date-range/charts),
+Order History, Customers, Search, **full Customer Details** (eSIM panel + View
+Locations/Packages/Sessions/Whitelist), Inventory, Agent Approvals, Profile,
+embedded self-refreshing widget (hourly chart), macOS menu-bar item, and Siri
+voice intents.
 
-Note: the 7-day sparkline (originally Phase 2) shipped in the widget. Today's
-order count remains future work.
+**Pending backend (read-only additions):** hourly today/yesterday series +
+`year_to_date` date range — spec in
+`docs/backend/2026-06-19-statistics-hourly-and-ytd.md`. The client already decodes
+them and lights up when they ship.
+
+**Deliberately not built:** write actions from the web customer_details page
+(refund request, resend confirmation email) — the app is read-mostly.

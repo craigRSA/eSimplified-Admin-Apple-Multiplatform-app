@@ -1,5 +1,11 @@
 # eSimplified Admin — Native Apple App design
 
+> **As-built note (later):** this is the original design doc. The app has since
+> shipped well beyond it (it's now the single product, with the widget embedded,
+> Siri intents, a macOS menu-bar item, full Customer Details, etc.), and the
+> platform floor was raised to iOS 26 / macOS 26. See the repo `CLAUDE.md` for the
+> current source of truth; read this only for original intent.
+
 A native **SwiftUI multiplatform** app (macOS 14 / iPadOS 17 / iOS 17) that
 reimplements a **curated subset** of the existing Next.js admin front end
 (`~/WebstormProjects/admin_front_end/`), over the shared `EsimplifiedKit` engine
