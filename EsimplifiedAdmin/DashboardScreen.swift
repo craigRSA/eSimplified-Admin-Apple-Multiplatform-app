@@ -185,56 +185,46 @@ private struct HeroCard: View {
     }
 }
 
-/// Cumulative gross sales by hour (UTC): today solid, yesterday dashed.
+/// Sales per hour (UTC), exactly as the backend sends them — today solid,
+/// yesterday dashed. Each hour's value is plotted at the end of that hour
+/// (hour 0 covers 00:00–01:00 → the `1` mark), with a 0 start so a single
+/// hour still draws a line up to its value.
 private struct HourlyComparisonChart: View {
     let today: [HourPoint]
     let yesterday: [HourPoint]
 
     var body: some View {
         Chart {
-            ForEach(Self.cumulative(yesterday), id: \.hour) { p in
-                LineMark(x: .value("Hour", p.hour), y: .value("Revenue", p.total),
+            ForEach(Self.points(yesterday), id: \.x) { p in
+                LineMark(x: .value("Hour", p.x), y: .value("Sales", p.v),
                          series: .value("Day", "Yesterday"))
                     .foregroundStyle(.gray)
                     .lineStyle(StrokeStyle(lineWidth: 2, dash: [4, 3]))
-                    .interpolationMethod(.catmullRom)
             }
-            ForEach(Self.cumulative(today), id: \.hour) { p in
-                AreaMark(x: .value("Hour", p.hour), y: .value("Revenue", p.total))
-                    .foregroundStyle(.linearGradient(colors: [Color.accentColor.opacity(0.3), Color.accentColor.opacity(0.02)],
-                                                     startPoint: .top, endPoint: .bottom))
-                LineMark(x: .value("Hour", p.hour), y: .value("Revenue", p.total),
+            ForEach(Self.points(today), id: \.x) { p in
+                LineMark(x: .value("Hour", p.x), y: .value("Sales", p.v),
                          series: .value("Day", "Today"))
                     .foregroundStyle(Color.accentColor)
-                    .lineStyle(StrokeStyle(lineWidth: 2)).interpolationMethod(.catmullRom)
-            }
-            // Dot + label on today's latest point so the current value reads
-            // clearly even when it's low against yesterday's full-day scale.
-            if let last = Self.cumulative(today).last {
-                PointMark(x: .value("Hour", last.hour), y: .value("Revenue", last.total))
-                    .foregroundStyle(Color.accentColor).symbolSize(30)
-                    .annotation(position: .topTrailing, spacing: 2) {
-                        Text(Fmt.money(Decimal(last.total)))
-                            .font(.caption2.weight(.semibold).monospacedDigit())
-                            .foregroundStyle(Color.accentColor)
-                    }
+                    .lineStyle(StrokeStyle(lineWidth: 2))
+                    .symbol(Circle())
             }
         }
         .chartForegroundStyleScale(["Today": Color.accentColor, "Yesterday": Color.gray])
-        .chartXScale(domain: 0...23) // always the full UTC day
-        .chartXAxis { AxisMarks(values: [0, 8, 16, 23]) { v in
+        .chartXScale(domain: 0...24)
+        .chartXAxis { AxisMarks(values: [0, 6, 12, 18, 24]) { v in
             AxisGridLine()
             AxisValueLabel { if let h = v.as(Int.self) { Text(String(format: "%02d:00", h)) } }
         } }
         .chartLegend(position: .top, alignment: .leading, spacing: 8)
     }
 
-    static func cumulative(_ points: [HourPoint]) -> [(hour: Int, total: Double)] {
-        var running = 0.0
-        return points.sorted { $0.hour < $1.hour }.map { p in
-            running += dbl(p.revenue)
-            return (p.hour, running)
+    /// Backend values plotted at the end of each hour, prefixed with a 0 origin.
+    static func points(_ src: [HourPoint]) -> [(x: Int, v: Double)] {
+        var out: [(x: Int, v: Double)] = [(0, 0)]
+        for p in src.sorted(by: { $0.hour < $1.hour }) {
+            out.append((p.hour + 1, dbl(p.revenue)))
         }
+        return out
     }
 }
 

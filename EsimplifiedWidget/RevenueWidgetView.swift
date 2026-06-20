@@ -83,44 +83,39 @@ private struct DeltaLabel: View {
     }
 }
 
-/// Cumulative today-vs-yesterday curve (same as the app's hero): yesterday
-/// dashed over the full day, today solid with a dot on the latest point so a
-/// single early-day value is still visible.
+/// Sales per hour as the backend sends them (same as the app's hero): yesterday
+/// dashed, today solid with a dot so a single early-day value still shows. Each
+/// hour is plotted at its end (hour 0 → the `1` mark), with a 0 start.
 private struct HourlyChart: View {
     let today: [HourPoint]
     let yesterday: [HourPoint]
 
     var body: some View {
-        let t = cumulative(today)
-        let y = cumulative(yesterday)
+        let t = points(today)
+        let y = points(yesterday)
         Chart {
-            ForEach(y, id: \.hour) { p in
-                LineMark(x: .value("Hour", p.hour), y: .value("Revenue", p.total),
+            ForEach(y, id: \.x) { p in
+                LineMark(x: .value("Hour", p.x), y: .value("Sales", p.v),
                          series: .value("Day", "Yesterday"))
                     .foregroundStyle(.gray).lineStyle(StrokeStyle(lineWidth: 1.5, dash: [3, 2]))
-                    .interpolationMethod(.catmullRom)
             }
-            ForEach(t, id: \.hour) { p in
-                LineMark(x: .value("Hour", p.hour), y: .value("Revenue", p.total),
+            ForEach(t, id: \.x) { p in
+                LineMark(x: .value("Hour", p.x), y: .value("Sales", p.v),
                          series: .value("Day", "Today"))
                     .foregroundStyle(.tint).lineStyle(StrokeStyle(lineWidth: 2))
-                    .interpolationMethod(.catmullRom)
-            }
-            if let last = t.last {
-                PointMark(x: .value("Hour", last.hour), y: .value("Revenue", last.total))
-                    .foregroundStyle(.tint).symbolSize(22)
+                    .symbol(Circle())
             }
         }
-        .chartXScale(domain: 0...23)
+        .chartXScale(domain: 0...24)
         .chartXAxis(.hidden).chartYAxis(.hidden)
     }
 
-    private func cumulative(_ points: [HourPoint]) -> [(hour: Int, total: Double)] {
-        var running = 0.0
-        return points.sorted { $0.hour < $1.hour }.map { p in
-            running += (p.revenue as NSDecimalNumber).doubleValue
-            return (p.hour, running)
+    private func points(_ src: [HourPoint]) -> [(x: Int, v: Double)] {
+        var out: [(x: Int, v: Double)] = [(0, 0)]
+        for p in src.sorted(by: { $0.hour < $1.hour }) {
+            out.append((p.hour + 1, (p.revenue as NSDecimalNumber).doubleValue))
         }
+        return out
     }
 }
 
