@@ -114,7 +114,7 @@ space — never trim it.
 ## Commands
 
 ```bash
-cd EsimplifiedKit && swift test          # core unit tests (47)
+cd EsimplifiedKit && swift test          # core unit tests (63)
 cd EsimplifiedKit && swift build         # compile the engine
 # Build the app (embeds the widget). CODE_SIGNING_ALLOWED=NO for CI/sim checks.
 xcodebuild -project Esimplified.xcodeproj -scheme EsimplifiedAdmin \

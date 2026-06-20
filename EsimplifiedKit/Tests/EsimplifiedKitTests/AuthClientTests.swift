@@ -128,6 +128,25 @@ final class AuthClientTests: XCTestCase {
         XCTAssertEqual(LiveAuthClient.formEncode(["grant_type": "password"]), "grant_type=password")
     }
 
+    func test_password_leading_space_is_preserved_not_trimmed() async throws {
+        // Hard rule: a user's password may begin with a space and must never be
+        // trimmed. Guard both layers — the encoder, and the login call site (a
+        // `.trimmingCharacters` added before formEncode would slip past unit tests
+        // that only use trivial passwords).
+        XCTAssertEqual(LiveAuthClient.formEncode(["password": " p"]), "password=%20p")
+
+        var captured: URLRequest?
+        MockURLProtocol.handler = { req in
+            captured = req
+            let json = #"{"access_token":"a","refresh_token":"r","expires_in":60,"scope":"order:read","account_type":"human"}"#
+            return (HTTPURLResponse(url: req.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, Data(json.utf8))
+        }
+        _ = try await makeClient().login(username: "u", password: " spacey",
+                                         host: "https://h.io", trustedDeviceToken: nil)
+        let body = try XCTUnwrap(String(data: XCTUnwrap(Self.bodyData(captured)), encoding: .utf8))
+        XCTAssertTrue(body.contains("password=%20spacey"), body)
+    }
+
     func test_login_failure_surfaces_server_status_and_message() async {
         MockURLProtocol.handler = respond(#"{"error":"invalid_grant","error_description":"Invalid credentials given."}"#, 400)
         do {
