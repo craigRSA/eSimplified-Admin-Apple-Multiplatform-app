@@ -48,6 +48,20 @@ final class AuthClientTests: XCTestCase {
         XCTAssertEqual(captured?.value(forHTTPHeaderField: "X-Trusted-Device"), "td-7")
     }
 
+    func test_login_tolerates_string_expires_in_and_array_scope() async throws {
+        // makeSession accepts expires_in as a JSON string OR number, and scope as a
+        // string OR array. Every other fixture uses the numeric/string forms; this
+        // pins the alternate branches so a refactor can't silently break them
+        // (a broken string-expiry would yield a 0s expiry → immediate refresh loop).
+        MockURLProtocol.handler = respond(#"{"access_token":"acc","refresh_token":"ref","expires_in":"3600","scope":["statistics:read","order:read"],"account_type":"human"}"#)
+        let result = try await makeClient().login(username: "u", password: "p",
+                                                  host: "https://h.io", trustedDeviceToken: nil)
+        guard case let .session(s) = result else { return XCTFail("expected session") }
+        XCTAssertEqual(s.scopes, ["statistics:read", "order:read"], "scope as a JSON array must parse")
+        XCTAssertGreaterThan(s.expiresAt.timeIntervalSinceNow, 3000,
+                             "expires_in as a JSON string must parse, not default to 0")
+    }
+
     func test_verify2FA_sends_json_with_correct_fields_and_returns_session() async throws {
         var captured: URLRequest?
         MockURLProtocol.handler = { req in

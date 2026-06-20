@@ -89,6 +89,29 @@ final class SessionManagerTests: XCTestCase {
         XCTAssertEqual(Set(results), ["acc-1"])
     }
 
+    func test_refreshedAccessToken_returnsCurrent_withoutRefresh_whenAlreadyRotated() async throws {
+        // A request 401'd on a token another caller has already rotated past — the
+        // short-circuit that stops N stale 401s from each firing a refresh.
+        let auth = FakeAuthClient()
+        let mgr = SessionManager(session: session(access: "acc-current", refresh: "ref-0", expiresIn: 1000),
+                                 store: InMemorySessionStore(), authClient: auth)
+        let token = try await mgr.refreshedAccessToken(after: "acc-stale")
+        XCTAssertEqual(token, "acc-current", "hand back the already-rotated token")
+        let calls = await auth.counter.count
+        XCTAssertEqual(calls, 0, "must not refresh again when the token already moved on")
+    }
+
+    func test_refreshedAccessToken_refreshes_whenStaleTokenIsStillCurrent() async throws {
+        // The token that 401'd is still current → one real refresh happens.
+        let auth = FakeAuthClient()
+        let mgr = SessionManager(session: session(access: "acc-0", refresh: "ref-0", expiresIn: 1000),
+                                 store: InMemorySessionStore(), authClient: auth)
+        let token = try await mgr.refreshedAccessToken(after: "acc-0")
+        XCTAssertEqual(token, "acc-1")
+        let calls = await auth.counter.count
+        XCTAssertEqual(calls, 1)
+    }
+
     func test_transientError_doesNotClearSession() async {
         let auth = FakeAuthClient()
         auth.refreshError = APIError.unreachable
