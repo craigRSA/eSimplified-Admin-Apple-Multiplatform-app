@@ -66,6 +66,26 @@ struct SectionHeader: View {
     }
 }
 
+// MARK: - UTC clock
+
+/// Live UTC clock for the toolbar — the dashboard's hourly series is in UTC,
+/// so this anchors it no matter where you are.
+struct UTCClock: View {
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { ctx in
+            Label(Self.formatter.string(from: ctx.date), systemImage: "clock")
+                .font(.callout.monospacedDigit()).foregroundStyle(.secondary)
+                .labelStyle(.titleAndIcon)
+        }
+    }
+    private static let formatter: DateFormatter = {
+        let f = DateFormatter()
+        f.timeZone = TimeZone(identifier: "UTC")
+        f.dateFormat = "HH:mm 'UTC'"
+        return f
+    }()
+}
+
 // MARK: - Auto-refresh
 
 /// App-wide auto-refresh interval (seconds; 0 = off), persisted across launches.

@@ -25,20 +25,24 @@ struct DashboardScreen: View {
         }
         .background(AppBackground())
         .navigationTitle("Overview")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Menu {
-                    Picker("Date range", selection: $range) {
-                        ForEach(DashRange.allCases) { Text($0.label).tag($0) }
-                    }
-                } label: {
-                    Label(range.label, systemImage: "calendar")
-                }
-            }
-        }
         .task(id: "\(tenant ?? "all")|\(range.rawValue)") { await load() }
         .refreshable { await load() }
         .autoRefresh { await load() }
+    }
+
+    /// Compact date-range picker that lives on the comparison chart it controls.
+    private var rangeMenu: some View {
+        Menu {
+            Picker("Date range", selection: $range) {
+                ForEach(DashRange.allCases) { Text($0.label).tag($0) }
+            }
+        } label: {
+            Label(range.label, systemImage: "calendar")
+                .font(.subheadline).labelStyle(.titleAndIcon)
+                .padding(.horizontal, 10).padding(.vertical, 5)
+                .glassEffect(.regular.interactive(), in: .capsule)
+        }
+        .menuStyle(.borderlessButton).fixedSize()
     }
 
     @ViewBuilder private func content(_ s: AdminDashboardStats) -> some View {
@@ -65,8 +69,14 @@ struct DashboardScreen: View {
                             "vs last yr: \(Fmt.money(s.revenueLastYear))"),
             ])
 
-            // Selected range vs previous comparable period
-            Card(title: "\(range.label) vs previous") {
+            // Selected range vs previous comparable period — the date picker
+            // lives on this card because it's what the range controls.
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("\(range.label) vs previous").font(.headline)
+                    Spacer()
+                    rangeMenu
+                }
                 let cur = s.current, prev = s.comparison
                 MetricGrid(items: [
                     .comparison("Revenue", Fmt.money(cur.revenue), AdminDashboardStats.change(cur.revenue, vs: prev.revenue), "Prev: \(Fmt.money(prev.revenue))"),
@@ -75,10 +85,12 @@ struct DashboardScreen: View {
                     .comparison("Orders", Fmt.countCompact(cur.orders), AdminDashboardStats.change(Decimal(cur.orders), vs: Decimal(prev.orders)), "Prev: \(Fmt.countCompact(prev.orders))"),
                 ])
                 if !s.current.revenuePerDate.isEmpty {
-                    ComparisonAreaChart(current: s.current.revenuePerDate, previous: s.comparison.revenuePerDate)
+                    ComparisonAreaChart(current: s.current.revenuePerDate, previous: s.comparison.revenuePerDate,
+                                        monthly: range == .yearToDate)
                         .frame(height: 220)
                 }
             }
+            .glassCard()
 
             if !s.revenuePerTenant.isEmpty {
                 Card(title: "Revenue per tenant") {
@@ -89,7 +101,8 @@ struct DashboardScreen: View {
 
             if !s.revenuePerMonth.isEmpty {
                 Card(title: "Revenue per month") {
-                    RevenueBarChart(items: s.revenuePerMonth.map { ($0.month, $0.amount) })
+                    RevenueBarChart(items: s.revenuePerMonth.map { (shortMonth($0.month), $0.amount) },
+                                    desiredLabels: 6)
                         .frame(height: 220)
                 }
             }
@@ -136,12 +149,8 @@ private struct HeroCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top) {
-                Text("TODAY'S GROSS VOLUME")
-                    .font(.caption.weight(.semibold)).tracking(1.0).foregroundStyle(.secondary)
-                Spacer()
-                UTCClock()
-            }
+            Text("TODAY'S GROSS VOLUME")
+                .font(.caption.weight(.semibold)).tracking(1.0).foregroundStyle(.secondary)
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 Text(Fmt.money(today))
                     .font(.system(size: 44, weight: .bold, design: .rounded)).monospacedDigit()
@@ -211,22 +220,6 @@ private struct HourlyComparisonChart: View {
     }
 }
 
-/// Live UTC clock — the hourly chart's x-axis is in UTC, so this anchors it.
-private struct UTCClock: View {
-    var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { ctx in
-            Label(Self.formatter.string(from: ctx.date), systemImage: "clock")
-                .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-                .labelStyle(.titleAndIcon)
-        }
-    }
-    private static let formatter: DateFormatter = {
-        let f = DateFormatter()
-        f.timeZone = TimeZone(identifier: "UTC")
-        f.dateFormat = "HH:mm 'UTC'"
-        return f
-    }()
-}
 
 private struct DeltaPill: View {
     let delta: Decimal?
@@ -321,37 +314,74 @@ private struct MetricGrid: View {
 private struct ComparisonAreaChart: View {
     let current: [DayRevenue]
     let previous: [DayRevenue]
+    /// Year-to-date data is monthly — label the x-axis by month instead of by
+    /// day index.
+    var monthly: Bool = false
 
     var body: some View {
         Chart {
             ForEach(Array(current.enumerated()), id: \.offset) { i, day in
-                AreaMark(x: .value("Day", i + 1), y: .value("Revenue", dbl(day.revenue)),
+                AreaMark(x: .value("Point", i), y: .value("Revenue", dbl(day.revenue)),
                          series: .value("Period", "This period"))
                     .foregroundStyle(.linearGradient(colors: [Color.accentColor.opacity(0.3), Color.accentColor.opacity(0.02)],
                                                      startPoint: .top, endPoint: .bottom))
-                LineMark(x: .value("Day", i + 1), y: .value("Revenue", dbl(day.revenue)),
+                LineMark(x: .value("Point", i), y: .value("Revenue", dbl(day.revenue)),
                          series: .value("Period", "This period"))
                     .foregroundStyle(Color.accentColor).interpolationMethod(.catmullRom)
             }
             ForEach(Array(previous.enumerated()), id: \.offset) { i, day in
-                LineMark(x: .value("Day", i + 1), y: .value("Revenue", dbl(day.revenue)),
+                LineMark(x: .value("Point", i), y: .value("Revenue", dbl(day.revenue)),
                          series: .value("Period", "Previous"))
                     .foregroundStyle(.gray).interpolationMethod(.catmullRom)
             }
         }
         .chartForegroundStyleScale(["This period": Color.accentColor, "Previous": Color.gray])
+        .chartXAxis {
+            if monthly {
+                AxisMarks(values: tickIndices(count: current.count, desired: 6)) { value in
+                    if let i = value.as(Int.self), current.indices.contains(i) {
+                        AxisValueLabel { Text(shortMonth(current[i].date)) }
+                    }
+                }
+            } else {
+                AxisMarks(values: .automatic(desiredCount: 5))
+            }
+        }
     }
 }
 
 private struct RevenueBarChart: View {
     let items: [(String, Decimal)]
+    /// Cap on x-axis labels — keeps month names from colliding on a phone.
+    var desiredLabels = 8
     var body: some View {
-        Chart(Array(items.enumerated()), id: \.offset) { _, item in
-            BarMark(x: .value("Label", item.0), y: .value("Revenue", dbl(item.1)))
+        Chart(Array(items.enumerated()), id: \.offset) { i, item in
+            BarMark(x: .value("Index", i), y: .value("Revenue", dbl(item.1)))
                 .foregroundStyle(Color.accentColor)
         }
-        .chartXAxis { AxisMarks { AxisValueLabel(orientation: .verticalReversed) } }
+        .chartXAxis {
+            AxisMarks(values: tickIndices(count: items.count, desired: desiredLabels)) { value in
+                if let i = value.as(Int.self), items.indices.contains(i) {
+                    AxisValueLabel(orientation: .verticalReversed) { Text(items[i].0) }
+                }
+            }
+        }
     }
+}
+
+/// Evenly-spaced 0-based indices for axis ticks, so charts don't crowd labels.
+private func tickIndices(count: Int, desired: Int) -> [Int] {
+    guard count > desired, desired > 0 else { return Array(0..<max(count, 0)) }
+    let step = max(1, Int((Double(count) / Double(desired)).rounded(.up)))
+    return Array(stride(from: 0, to: count, by: step))
+}
+
+/// "2026-03-01" / "2026-03" → "Mar".
+private func shortMonth(_ date: String) -> String {
+    let parts = date.split(separator: "-")
+    guard parts.count >= 2, let m = Int(parts[1]), (1...12).contains(m) else { return "" }
+    return ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][m - 1]
 }
 
 private struct TopList: View {

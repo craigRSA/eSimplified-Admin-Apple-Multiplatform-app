@@ -60,6 +60,7 @@ struct AdminShell: View {
         } detail: {
             detail
                 .toolbar {
+                    ToolbarItem(placement: .principal) { UTCClock() }
                     ToolbarItemGroup(placement: .primaryAction) {
                         if !model.tenants.isEmpty { TenantMenu(model: model) }
                         RefreshIntervalMenu(seconds: $autoRefreshSeconds)
