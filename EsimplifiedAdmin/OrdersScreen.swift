@@ -10,6 +10,7 @@ struct OrdersScreen: View {
     @State private var orders: [Order] = []
     @State private var total = 0
     @State private var search = ""
+    @State private var path = NavigationPath()
 
     enum Phase { case loading, loaded, failed(String) }
 
@@ -17,7 +18,7 @@ struct OrdersScreen: View {
     private var useTable: Bool { hSize != .compact }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             Group {
                 switch phase {
                 case .loading where orders.isEmpty:
@@ -36,7 +37,7 @@ struct OrdersScreen: View {
                             ContentUnavailableView("No matching orders", systemImage: "tray")
                                 .frame(maxHeight: .infinity)
                         } else if useTable {
-                            OrdersTable(orders: shown)
+                            OrdersTable(orders: shown) { path.append($0) }
                         } else {
                             List(shown) { order in
                                 if let ref = order.customerRef {
@@ -123,24 +124,21 @@ func orderAccent(_ order: Order) -> Color? {
 }
 
 /// Columnar table for Mac/iPad — mirrors the web's Order History columns.
+/// The whole row is clickable (selection → `onOpen`), like a native table.
 private struct OrdersTable: View {
     let orders: [Order]
+    var onOpen: (CustomerRef) -> Void
+    @State private var selectedID: Order.ID?
 
     var body: some View {
-        Table(orders) {
+        Table(orders, selection: $selectedID) {
             TableColumn("Tenant") { o in
                 Text(o.tenant).foregroundStyle(orderAccent(o) ?? .primary)
             }
             TableColumn("Package") { o in
                 Text(o.packageName).foregroundStyle(orderAccent(o) ?? .primary).lineLimit(1)
             }
-            TableColumn("Customer") { o in
-                if let ref = o.customerRef {
-                    NavigationLink(value: ref) { customerCell(o) }
-                } else {
-                    customerCell(o)
-                }
-            }
+            TableColumn("Customer") { o in customerCell(o) }
             TableColumn("Purchased In") { o in
                 Text(o.purchaseCountry ?? "—").foregroundStyle(.secondary)
             }
@@ -156,6 +154,11 @@ private struct OrdersTable: View {
             TableColumn("Date") { o in
                 Text(shortDate(o.purchaseDate)).font(.callout).foregroundStyle(.secondary).lineLimit(1)
             }
+        }
+        .onChange(of: selectedID) { _, id in
+            guard let id, let o = orders.first(where: { $0.id == id }), let ref = o.customerRef else { return }
+            onOpen(ref)
+            selectedID = nil
         }
     }
 

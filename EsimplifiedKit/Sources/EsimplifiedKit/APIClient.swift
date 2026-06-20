@@ -49,16 +49,14 @@ public final class LiveAPIClient: APIClient {
         case 200...299:
             do { return try JSONDecoder().decode(T.self, from: data) }
             catch { throw APIError.decoding }
-        case 401:
-            throw APIError.authExpired
         case 404:
             throw APIError.notFound
         default:
-            // Surface the real status + server reason (403 Forbidden, etc.) rather
-            // than masking everything as "session expired".
+            // Surface the real status + server reason (401/403 with the actual
+            // body) rather than masking everything as "session expired".
             let body = String(data: data, encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
-            let message = (body?.isEmpty == false) ? String(body!.prefix(200)) : nil
+            let message = (body?.isEmpty == false) ? String(body!.prefix(300)) : nil
             throw APIError.requestFailed(status: http.statusCode, serverMessage: message)
         }
     }
