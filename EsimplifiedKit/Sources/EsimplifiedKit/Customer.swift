@@ -3,10 +3,12 @@ import Foundation
 /// A customer from `/api/customers/` (subset of the backend `Customer` shape).
 public struct Customer: Decodable, Identifiable, Sendable {
     public let id: String
+    public let customerId: String?
     public let email: String?
     public let fullName: String?
     public let phoneNumber: String?
     public let isActive: Bool
+    public let emailVerified: Bool
     public let created: String?
 
     private enum K: String, CodingKey {
@@ -14,6 +16,7 @@ public struct Customer: Decodable, Identifiable, Sendable {
         case fullName = "full_name"
         case phoneNumber = "phone_number"
         case isActive = "is_active"
+        case emailVerified = "email_verified"
         case customerId = "customer_id"
     }
 
@@ -23,8 +26,9 @@ public struct Customer: Decodable, Identifiable, Sendable {
         fullName = try c.decodeIfPresent(String.self, forKey: .fullName)
         phoneNumber = try c.decodeIfPresent(String.self, forKey: .phoneNumber)
         isActive = try c.decodeIfPresent(Bool.self, forKey: .isActive) ?? true
+        emailVerified = try c.decodeIfPresent(Bool.self, forKey: .emailVerified) ?? false
         created = try c.decodeIfPresent(String.self, forKey: .created)
-        let customerId = try c.decodeIfPresent(String.self, forKey: .customerId)
+        customerId = try c.decodeIfPresent(String.self, forKey: .customerId)
         id = customerId ?? email ?? UUID().uuidString
     }
 

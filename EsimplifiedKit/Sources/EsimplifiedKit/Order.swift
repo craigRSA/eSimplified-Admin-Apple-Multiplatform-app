@@ -18,11 +18,13 @@ public struct Order: Decodable, Identifiable, Equatable, Sendable {
     public let paymentStatus: String
     public let paymentMethod: String
     public let tenant: String
+    public let iccid: String?
+    public let customerId: String?
     public let customerEmail: String?
     public let customerName: String?
 
     private enum K: String, CodingKey {
-        case tenant, customer
+        case tenant, customer, iccid
         case orderUUID = "order_uuid"
         case orderNumber = "order_number"
         case orderType = "order_type"
@@ -39,7 +41,7 @@ public struct Order: Decodable, Identifiable, Equatable, Sendable {
     }
     private enum CurrencyKeys: String, CodingKey { case symbol }
     private enum CountryKeys: String, CodingKey { case name }
-    private struct Cust: Decodable { let email: String?; let full_name: String? }
+    private struct Cust: Decodable { let email: String?; let full_name: String?; let customer_id: String? }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: K.self)
@@ -58,9 +60,11 @@ public struct Order: Decodable, Identifiable, Equatable, Sendable {
         paymentStatus = try str(.paymentStatus)
         paymentMethod = try str(.paymentMethod)
         tenant = try str(.tenant)
+        iccid = try c.decodeIfPresent(String.self, forKey: .iccid)
         let cust = try c.decodeIfPresent(Cust.self, forKey: .customer)
         customerEmail = cust?.email
         customerName = cust?.full_name
+        customerId = cust?.customer_id
         if let cur = try? c.nestedContainer(keyedBy: CurrencyKeys.self, forKey: .purchaseCurrencyObj) {
             currencySymbol = try cur.decodeIfPresent(String.self, forKey: .symbol)
         } else {

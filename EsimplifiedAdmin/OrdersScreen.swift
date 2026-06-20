@@ -17,32 +17,42 @@ struct OrdersScreen: View {
     private var useTable: Bool { hSize != .compact }
 
     var body: some View {
-        Group {
-            switch phase {
-            case .loading where orders.isEmpty:
-                ProgressView().controlSize(.large).frame(maxWidth: .infinity, maxHeight: .infinity)
-            case let .failed(message) where orders.isEmpty:
-                ContentUnavailableView("Couldn't load orders", systemImage: "exclamationmark.triangle",
-                                       description: Text(message))
-            default:
-                let shown = filtered(orders)
-                VStack(spacing: 0) {
-                    OrdersCountHeader(showing: shown.count, total: total, filtering: !search.isEmpty)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 16).padding(.vertical, 8)
-                    Divider()
-                    if shown.isEmpty {
-                        ContentUnavailableView("No matching orders", systemImage: "tray")
-                            .frame(maxHeight: .infinity)
-                    } else if useTable {
-                        OrdersTable(orders: shown)
-                    } else {
-                        List(shown) { OrderRow(order: $0) }.listStyle(.plain)
+        NavigationStack {
+            Group {
+                switch phase {
+                case .loading where orders.isEmpty:
+                    ProgressView().controlSize(.large).frame(maxWidth: .infinity, maxHeight: .infinity)
+                case let .failed(message) where orders.isEmpty:
+                    ContentUnavailableView("Couldn't load orders", systemImage: "exclamationmark.triangle",
+                                           description: Text(message))
+                default:
+                    let shown = filtered(orders)
+                    VStack(spacing: 0) {
+                        OrdersCountHeader(showing: shown.count, total: total, filtering: !search.isEmpty)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 16).padding(.vertical, 8)
+                        Divider()
+                        if shown.isEmpty {
+                            ContentUnavailableView("No matching orders", systemImage: "tray")
+                                .frame(maxHeight: .infinity)
+                        } else if useTable {
+                            OrdersTable(orders: shown)
+                        } else {
+                            List(shown) { order in
+                                if let ref = order.customerRef {
+                                    NavigationLink(value: ref) { OrderRow(order: order) }
+                                } else {
+                                    OrderRow(order: order)
+                                }
+                            }
+                            .listStyle(.plain)
+                        }
                     }
                 }
             }
+            .navigationTitle("Order History")
+            .navigationDestination(for: CustomerRef.self) { CustomerDetailScreen(session: session, ref: $0) }
         }
-        .navigationTitle("Order History")
         .searchable(text: $search, prompt: "Package, customer, email, order #")
         .reload(on: tenant) { await load() }
         .refreshable { await load() }
@@ -125,11 +135,10 @@ private struct OrdersTable: View {
                 Text(o.packageName).foregroundStyle(orderAccent(o) ?? .primary).lineLimit(1)
             }
             TableColumn("Customer") { o in
-                VStack(alignment: .leading, spacing: 1) {
-                    if let n = o.customerName, !n.isEmpty { Text(n).lineLimit(1) }
-                    if let e = o.customerEmail, !e.isEmpty {
-                        Text(e).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                    }
+                if let ref = o.customerRef {
+                    NavigationLink(value: ref) { customerCell(o) }
+                } else {
+                    customerCell(o)
                 }
             }
             TableColumn("Purchased In") { o in
@@ -146,6 +155,15 @@ private struct OrdersTable: View {
             TableColumn("Status") { o in StatusBadge(status: o.paymentStatus) }
             TableColumn("Date") { o in
                 Text(shortDate(o.purchaseDate)).font(.callout).foregroundStyle(.secondary).lineLimit(1)
+            }
+        }
+    }
+
+    @ViewBuilder private func customerCell(_ o: Order) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            if let n = o.customerName, !n.isEmpty { Text(n).lineLimit(1) }
+            if let e = o.customerEmail, !e.isEmpty {
+                Text(e).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
         }
     }
