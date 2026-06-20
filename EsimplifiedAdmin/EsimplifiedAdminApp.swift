@@ -4,6 +4,9 @@ import EsimplifiedKit
 @main
 struct EsimplifiedAdminApp: App {
     @State private var model = AdminAppModel()
+    #if os(macOS)
+    @State private var menu = MenuBarRevenue()
+    #endif
 
     var body: some Scene {
         WindowGroup {
@@ -11,6 +14,23 @@ struct EsimplifiedAdminApp: App {
         }
         #if os(macOS)
         .defaultSize(width: 1000, height: 700)
+        #endif
+
+        #if os(macOS)
+        MenuBarExtra {
+            MenuBarPanel(model: model, revenue: menu)
+        } label: {
+            MenuBarLabel(revenue: menu)
+                .task(id: model.session?.accessToken) {
+                    await menu.load(session: model.session)
+                    while !Task.isCancelled {
+                        try? await Task.sleep(for: .seconds(300))
+                        if Task.isCancelled { break }
+                        await menu.load(session: model.session)
+                    }
+                }
+        }
+        .menuBarExtraStyle(.window)
         #endif
     }
 }
