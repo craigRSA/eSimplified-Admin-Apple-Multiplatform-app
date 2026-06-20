@@ -137,6 +137,10 @@ final class AdminAppModel {
     }
 
     func logout() {
+        // Clears the session only. `biometricEnabled` is intentionally preserved
+        // across logout: it's a device-level preference ("require biometric to open
+        // this app"), not session state, so the next sign-in on this device re-arms
+        // the gate automatically — matching how system apps treat such preferences.
         Task { await sessionManager.clear() }            // clears store + fires onChange(nil)
     }
 
