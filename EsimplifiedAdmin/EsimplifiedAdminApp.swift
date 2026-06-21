@@ -266,9 +266,13 @@ private struct SplashView: View {
     var body: some View {
         ZStack {
             Color("LaunchBackground").ignoresSafeArea()
-            Image("LogoWordmark").resizable().scaledToFit()
-                .frame(width: 150)
-                .accessibilityLabel("eSimplified")
+            VStack(spacing: Spacing.lg) {
+                Image("LogoWordmark").resizable().scaledToFit()
+                    .frame(maxWidth: 190, maxHeight: 50)
+                    .accessibilityLabel("eSimplified")
+                ProgressView().tint(.secondary)
+            }
+            .padding(Spacing.xl)
         }
     }
 }

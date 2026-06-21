@@ -130,7 +130,7 @@ struct LockScreen: View {
 /// figures don't appear in the iOS app-switcher snapshot.
 private struct PrivacyCover: View {
     var body: some View {
-        ZStack { AppBackground(); Image("BrandMark").resizable().scaledToFit().frame(height: 64) }
+        ZStack { AppBackground(); Image("LogoWordmark").resizable().scaledToFit().frame(maxWidth: 180, maxHeight: 48) }
     }
 }
 
