@@ -126,7 +126,7 @@ final class AdminAppModel {
         // The manager is the single writer of `session`; mirror its changes to the
         // observable on the main actor (also clears tenants on sign-out).
         let mgr = sessionManager
-        Task { await mgr.setOnChange { [weak self] newSession in
+        Task { [weak self] in await mgr.setOnChange { [weak self] newSession in
             Task { @MainActor in
                 self?.session = newSession
                 if newSession == nil { self?.tenants = []; self?.tenantLogos = [:]; self?.selectedTenant = nil }
