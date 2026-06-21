@@ -1010,13 +1010,20 @@ private struct NotificationPrefsView: View {
 private struct Field: View {
     let label: String
     let value: String
+    @Environment(\.horizontalSizeClass) private var hSize
     init(_ label: String, _ value: String) { self.label = label; self.value = value }
     var body: some View {
-        HStack(alignment: .top) {
+        // On a phone, stack the value under the label at full width so long IDs and
+        // emails wrap cleanly instead of mid-word hyphenating in a cramped right
+        // column; Mac/iPad keep the label-left / value-right row.
+        let compact = hSize == .compact
+        let layout = compact ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
+                             : AnyLayout(HStackLayout(alignment: .top, spacing: Spacing.md))
+        layout {
             Text(label).font(.caption).foregroundStyle(.secondary)
-            Spacer(minLength: Spacing.md)
-            Text(value).font(.callout.monospaced()).multilineTextAlignment(.trailing)
-                .textSelection(.enabled).lineLimit(2).minimumScaleFactor(0.7)
+            Text(value).font(.callout.monospaced()).textSelection(.enabled)
+                .multilineTextAlignment(compact ? .leading : .trailing)
+                .frame(maxWidth: .infinity, alignment: compact ? .leading : .trailing)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(label): \(value)")
