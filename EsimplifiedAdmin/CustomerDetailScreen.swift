@@ -32,7 +32,6 @@ struct CustomerDetailScreen: View {
     @State private var detailPhase: DetailPhase = .idle
     @State private var selectedIccid: String?
     @State private var customer: Customer?
-    @State private var ordersError: String?
 
     enum Phase { case loading, loaded, failed(String) }
     enum DetailPhase { case idle, loading, loaded(EsimDetail), failed(String) }
@@ -180,10 +179,7 @@ struct CustomerDetailScreen: View {
 
     private var ordersCard: some View {
         SectionCard(title: "Recent orders (\(orders.count))") {
-            if let ordersError {
-                Label(ordersError, systemImage: "exclamationmark.triangle")
-                    .font(.callout).foregroundStyle(.warning)
-            } else if orders.isEmpty {
+            if orders.isEmpty {
                 Text("No orders.").font(.callout).foregroundStyle(.secondary)
             } else {
                 ForEach(orders) { o in
@@ -253,16 +249,7 @@ struct CustomerDetailScreen: View {
                                             as: SingleCustomerResponse.self)
             customer = cust.customer
             esims = (try? await client.get("/api/esims/\(ref.tenant)/", query: q, as: AssignedEsimsPage.self))?.esims ?? []
-            do {
-                orders = try await client.get("/api/orders/\(ref.tenant)/", query: q, as: OrdersPage.self).orders
-                ordersError = nil
-            } catch is CancellationError {
-                // View navigated away mid-load — not a real error.
-            } catch let e as APIError {
-                orders = []; ordersError = adminErrorMessage(e)
-            } catch {
-                orders = []; ordersError = "Couldn't load orders."
-            }
+            orders = (try? await client.get("/api/orders/\(ref.tenant)/", query: q, as: OrdersPage.self))?.orders ?? []
             phase = .loaded
             let iccid = selectedIccid ?? ref.iccid ?? esims.first?.iccid
             if let iccid { await loadDetail(iccid) }
