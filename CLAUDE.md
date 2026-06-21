@@ -114,7 +114,7 @@ space — never trim it.
 ## Commands
 
 ```bash
-cd EsimplifiedKit && swift test          # core unit tests (69)
+cd EsimplifiedKit && swift test          # core unit tests (78)
 cd EsimplifiedKit && swift build         # compile the engine
 # Build the app (embeds the widget). CODE_SIGNING_ALLOWED=NO for CI/sim checks.
 xcodebuild -project Esimplified.xcodeproj -scheme EsimplifiedAdmin \
@@ -130,8 +130,10 @@ xcodebuild -project Esimplified.xcodeproj -scheme EsimplifiedAdmin \
 ## Status
 
 Built & green (Mac + iOS): auth + 2FA, Dashboard (hero/hourly/date-range/charts),
-Order History, Customers, Search, **full Customer Details** (eSIM panel + View
-Locations/Packages/Sessions/Whitelist), Inventory, Agent Approvals, Profile,
+Order History, Customers, Search, **full Customer Details** (profile + account
+fields + notification prefs, eSIM panel with archived badge, View Locations/
+Packages/Sessions/Whitelist/Supported-countries, per-eSIM orders + all-orders
+sheet — read-only parity with the web page), Inventory, Agent Approvals, Profile,
 embedded self-refreshing widget (hourly chart), macOS menu-bar item, and Siri
 voice intents.
 
@@ -140,5 +142,7 @@ voice intents.
 `docs/backend/2026-06-19-statistics-hourly-and-ytd.md`. The client already decodes
 them and lights up when they ship.
 
-**Deliberately not built:** write actions from the web customer_details page
-(refund request, resend confirmation email) — the app is read-mostly.
+**Deliberately not built:** all customer_details write actions — refund request,
+resend confirmation email, edit customer, activate/terminate package — the app is
+read-mostly. The static install/activation instructions aren't ported yet;
+everything else on that page is matched read-only.
