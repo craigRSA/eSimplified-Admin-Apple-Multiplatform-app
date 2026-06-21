@@ -32,6 +32,7 @@ struct CustomerDetailScreen: View {
     @State private var detailPhase: DetailPhase = .idle
     @State private var selectedIccid: String?
     @State private var customer: Customer?
+    @State private var showAllOrders = false
 
     enum Phase { case loading, loaded, failed(String) }
     enum DetailPhase { case idle, loading, loaded(EsimDetail), failed(String) }
@@ -66,6 +67,9 @@ struct CustomerDetailScreen: View {
         .refreshable { await load() }
         .refreshCommand { Task { await load() } }
         .sheet(item: $sheet) { sheetContent($0) }
+        .sheet(isPresented: $showAllOrders) {
+            AllOrdersSheet(client: client, tenant: ref.tenant, customerId: ref.customerId)
+        }
     }
 
     @ViewBuilder private func sheetContent(_ s: EsimDetailSheet) -> some View {
@@ -150,8 +154,7 @@ struct CustomerDetailScreen: View {
                 ForEach(esims) { e in
                     let isSelected = e.iccid == (selectedIccid ?? ref.iccid)
                     Button {
-                        selectedIccid = e.iccid
-                        Task { await loadDetail(e.iccid) }
+                        Task { await select(e.iccid) }
                     } label: {
                         HStack {
                             Image(systemName: "simcard").foregroundStyle(.secondary)
@@ -183,47 +186,17 @@ struct CustomerDetailScreen: View {
                 Text("No orders.").font(.callout).foregroundStyle(.secondary)
             } else {
                 ForEach(orders) { o in
-                    VStack(alignment: .leading, spacing: Spacing.xs) {
-                        HStack(alignment: .firstTextBaseline) {
-                            Text(o.packageName.isEmpty ? o.orderNumber : o.packageName)
-                                .font(.subheadline.weight(.medium)).lineLimit(1)
-                            Spacer(minLength: Spacing.sm)
-                            VStack(alignment: .trailing, spacing: 0) {
-                                Text(o.usdPriceDisplay).font(.subheadline.monospacedDigit())
-                                if let local = o.localPriceDisplay {
-                                    Text(local).font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                        HStack(spacing: Spacing.xs + 2) {
-                            StatusBadge(status: o.paymentStatus)
-                            if !o.orderType.isEmpty { Text(o.orderType).font(.caption2).foregroundStyle(.secondary) }
-                            if let code = o.discountCode {
-                                Label(code, systemImage: "tag.fill").font(.caption2).foregroundStyle(.warning)
-                            }
-                            Spacer()
-                            Text(shortDate(o.purchaseDate)).font(.caption2).foregroundStyle(.secondary)
-                        }
-                    }
-                    .padding(.vertical, Spacing.xs)
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel(orderA11yLabel(o))
+                    OrderRow(order: o)
                     if o.id != orders.last?.id { Divider() }
                 }
             }
+            if !ref.customerId.isEmpty {
+                Button { showAllOrders = true } label: {
+                    Label("View all orders", systemImage: "list.bullet.rectangle").font(.callout)
+                }
+                .padding(.top, orders.isEmpty ? 0 : Spacing.sm)
+            }
         }
-    }
-
-    /// One spoken sentence for an order row, so VoiceOver reads it as a unit
-    /// rather than five disjoint fragments.
-    private func orderA11yLabel(_ o: Order) -> String {
-        var parts = [o.packageName.isEmpty ? o.orderNumber : o.packageName,
-                     o.usdPriceDisplay,
-                     "Status: \(o.paymentStatus.capitalized)"]
-        if !o.orderType.isEmpty { parts.append(o.orderType) }
-        if let code = o.discountCode { parts.append("Discount \(code)") }
-        parts.append(shortDate(o.purchaseDate))
-        return parts.joined(separator: ", ")
     }
 
     private func load() async {
@@ -239,8 +212,9 @@ struct CustomerDetailScreen: View {
                 }
                 customer = nil
                 esims = []
-                phase = .loaded
                 selectedIccid = iccid
+                await loadOrders(for: iccid)
+                phase = .loaded
                 await loadDetail(iccid)
                 return
             }
@@ -249,9 +223,12 @@ struct CustomerDetailScreen: View {
                                             as: SingleCustomerResponse.self)
             customer = cust.customer
             esims = (try? await client.get("/api/esims/\(ref.tenant)/", query: q, as: AssignedEsimsPage.self))?.esims ?? []
-            orders = (try? await client.get("/api/orders/\(ref.tenant)/", query: q, as: OrdersPage.self))?.orders ?? []
-            phase = .loaded
             let iccid = selectedIccid ?? ref.iccid ?? esims.first?.iccid
+            if let iccid {
+                selectedIccid = iccid
+                await loadOrders(for: iccid)
+            }
+            phase = .loaded
             if let iccid { await loadDetail(iccid) }
         } catch let error as APIError {
             phase = .failed(adminErrorMessage(error))
@@ -260,6 +237,18 @@ struct CustomerDetailScreen: View {
         } catch {
             phase = .failed("Unexpected error.")
         }
+    }
+
+    /// Selecting an eSIM reloads both its detail panel and its orders.
+    private func select(_ iccid: String) async {
+        selectedIccid = iccid
+        await loadOrders(for: iccid)
+        await loadDetail(iccid)
+    }
+
+    private func loadOrders(for iccid: String) async {
+        let q = ["iccid": iccid, "limit": "10"]
+        orders = (try? await client.get("/api/orders/\(ref.tenant)/", query: q, as: OrdersPage.self))?.orders ?? []
     }
 
     private func loadDetail(_ iccid: String) async {
@@ -277,6 +266,123 @@ struct CustomerDetailScreen: View {
             // View navigated away mid-load — not a real error.
         } catch {
             detailPhase = .failed("Unexpected error loading eSIM detail.")
+        }
+    }
+}
+
+// MARK: - Orders
+
+/// One order row, shared by the eSIM-scoped "Recent orders" card and the
+/// "All orders" sheet.
+private struct OrderRow: View {
+    let order: Order
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.xs) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(order.packageName.isEmpty ? order.orderNumber : order.packageName)
+                    .font(.subheadline.weight(.medium)).lineLimit(1)
+                Spacer(minLength: Spacing.sm)
+                VStack(alignment: .trailing, spacing: 0) {
+                    Text(order.usdPriceDisplay).font(.subheadline.monospacedDigit())
+                    if let local = order.localPriceDisplay {
+                        Text(local).font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            HStack(spacing: Spacing.xs + 2) {
+                StatusBadge(status: order.paymentStatus)
+                if !order.orderType.isEmpty { Text(order.orderType).font(.caption2).foregroundStyle(.secondary) }
+                if let code = order.discountCode {
+                    Label(code, systemImage: "tag.fill").font(.caption2).foregroundStyle(.warning)
+                }
+                Spacer()
+                Text(shortDate(order.purchaseDate)).font(.caption2).foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, Spacing.xs)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(Self.a11yLabel(order))
+    }
+
+    /// One spoken sentence so VoiceOver reads the row as a unit.
+    static func a11yLabel(_ o: Order) -> String {
+        var parts = [o.packageName.isEmpty ? o.orderNumber : o.packageName,
+                     o.usdPriceDisplay, "Status: \(o.paymentStatus.capitalized)"]
+        if !o.orderType.isEmpty { parts.append(o.orderType) }
+        if let code = o.discountCode { parts.append("Discount \(code)") }
+        parts.append(shortDate(o.purchaseDate))
+        return parts.joined(separator: ", ")
+    }
+}
+
+/// Every order for the customer (not just the selected eSIM), in a sheet.
+private struct AllOrdersSheet: View {
+    let client: LiveAPIClient
+    let tenant: String
+    let customerId: String
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var phase: Phase = .loading
+    @State private var orders: [Order] = []
+    @State private var total = 0
+    enum Phase { case loading, loaded, failed(String) }
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                switch phase {
+                case .loading:
+                    ProgressView().controlSize(.large).frame(maxWidth: .infinity, maxHeight: .infinity)
+                case let .failed(message):
+                    ContentUnavailableView("Couldn't load orders", systemImage: "exclamationmark.triangle",
+                                           description: Text(message))
+                case .loaded:
+                    if orders.isEmpty {
+                        ContentUnavailableView("No orders", systemImage: "bag")
+                    } else {
+                        ScrollView {
+                            LazyVStack(spacing: 0) {
+                                ForEach(orders) { o in
+                                    OrderRow(order: o).padding(.horizontal)
+                                    if o.id != orders.last?.id { Divider().padding(.horizontal) }
+                                }
+                                if total > orders.count {
+                                    Text("Showing \(orders.count) of \(total)")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                        .frame(maxWidth: .infinity).padding()
+                                }
+                            }
+                            .padding(.vertical, Spacing.sm)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("All orders")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+        }
+        #if os(macOS)
+        .frame(minWidth: 460, minHeight: 480)
+        #endif
+        .reload(on: customerId) { await load() }
+    }
+
+    private func load() async {
+        do {
+            let page = try await client.get("/api/orders/\(tenant)/",
+                                            query: ["customer__customer_id": customerId, "limit": "100"],
+                                            as: OrdersPage.self)
+            orders = page.orders
+            total = page.count
+            phase = .loaded
+        } catch is CancellationError {
+        } catch let e as APIError {
+            phase = .failed(adminErrorMessage(e))
+        } catch {
+            phase = .failed("Couldn't load orders.")
         }
     }
 }
