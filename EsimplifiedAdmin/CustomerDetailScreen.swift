@@ -253,13 +253,9 @@ struct CustomerDetailScreen: View {
                                             as: SingleCustomerResponse.self)
             customer = cust.customer
             esims = (try? await client.get("/api/esims/\(ref.tenant)/", query: q, as: AssignedEsimsPage.self))?.esims ?? []
-            // Don't silently swallow order-load failures — surface the cause.
             do {
-                let page = try await client.get("/api/orders/\(ref.tenant)/", query: q, as: OrdersPage.self)
-                orders = page.orders
-                ordersError = (page.orders.isEmpty && page.count > 0)
-                    ? "Server reports \(page.count) order\(page.count == 1 ? "" : "s") but they couldn't be read (response shape)."
-                    : nil
+                orders = try await client.get("/api/orders/\(ref.tenant)/", query: q, as: OrdersPage.self).orders
+                ordersError = nil
             } catch is CancellationError {
                 // View navigated away mid-load — not a real error.
             } catch let e as APIError {
