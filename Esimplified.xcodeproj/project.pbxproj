@@ -18,10 +18,6 @@
 		A3000000000000000000023 /* TwoFactorSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000013 /* TwoFactorSetupView.swift */; };
 		A3000000000000000000027 /* DashboardScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000017 /* DashboardScreen.swift */; };
 		A3000000000000000000028 /* OrdersScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000018 /* OrdersScreen.swift */; };
-		A3000000000000000000051 /* AdminTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000050 /* AdminTheme.swift */; };
-		A3000000000000000000053 /* MenuBarRevenue.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000052 /* MenuBarRevenue.swift */; };
-		A3000000000000000000055 /* CustomerDetailScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000054 /* CustomerDetailScreen.swift */; };
-		A3000000000000000000057 /* AdminSiri.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000056 /* AdminSiri.swift */; };
 		A3000000000000000000029 /* CustomersScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000019 /* CustomersScreen.swift */; };
 		A300000000000000000002A /* InventoryScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A300000000000000000001A /* InventoryScreen.swift */; };
 		A300000000000000000002B /* ProfileScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A300000000000000000001B /* ProfileScreen.swift */; };
@@ -29,6 +25,10 @@
 		A300000000000000000002D /* AgentApprovalsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A300000000000000000001D /* AgentApprovalsScreen.swift */; };
 		A300000000000000000002E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A300000000000000000001E /* Assets.xcassets */; };
 		A3000000000000000000032 /* EsimplifiedKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3000000000000000000031 /* EsimplifiedKit */; };
+		A3000000000000000000051 /* AdminTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000050 /* AdminTheme.swift */; };
+		A3000000000000000000053 /* MenuBarRevenue.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000052 /* MenuBarRevenue.swift */; };
+		A3000000000000000000055 /* CustomerDetailScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000054 /* CustomerDetailScreen.swift */; };
+		A3000000000000000000057 /* AdminSiri.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000056 /* AdminSiri.swift */; };
 		A3000000000000000000061 /* BiometricLock.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000060 /* BiometricLock.swift */; };
 /* End PBXBuildFile section */
 
@@ -73,16 +73,16 @@
 		A3000000000000000000016 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A3000000000000000000017 /* DashboardScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardScreen.swift; sourceTree = "<group>"; };
 		A3000000000000000000018 /* OrdersScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrdersScreen.swift; sourceTree = "<group>"; };
-		A3000000000000000000050 /* AdminTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminTheme.swift; sourceTree = "<group>"; };
-		A3000000000000000000052 /* MenuBarRevenue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarRevenue.swift; sourceTree = "<group>"; };
-		A3000000000000000000054 /* CustomerDetailScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomerDetailScreen.swift; sourceTree = "<group>"; };
-		A3000000000000000000056 /* AdminSiri.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminSiri.swift; sourceTree = "<group>"; };
 		A3000000000000000000019 /* CustomersScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomersScreen.swift; sourceTree = "<group>"; };
 		A300000000000000000001A /* InventoryScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InventoryScreen.swift; sourceTree = "<group>"; };
 		A300000000000000000001B /* ProfileScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileScreen.swift; sourceTree = "<group>"; };
 		A300000000000000000001C /* SearchScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchScreen.swift; sourceTree = "<group>"; };
 		A300000000000000000001D /* AgentApprovalsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentApprovalsScreen.swift; sourceTree = "<group>"; };
 		A300000000000000000001E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A3000000000000000000050 /* AdminTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminTheme.swift; sourceTree = "<group>"; };
+		A3000000000000000000052 /* MenuBarRevenue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarRevenue.swift; sourceTree = "<group>"; };
+		A3000000000000000000054 /* CustomerDetailScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomerDetailScreen.swift; sourceTree = "<group>"; };
+		A3000000000000000000056 /* AdminSiri.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminSiri.swift; sourceTree = "<group>"; };
 		A3000000000000000000060 /* BiometricLock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiometricLock.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -319,7 +319,9 @@
 					"DEBUG=1",
 					"$(inherited)",
 				);
+				IPHONEOS_DEPLOYMENT_TARGET = 26.6;
 				ONLY_ACTIVE_ARCH = YES;
+				SUPPORTED_PLATFORMS = "iphonesimulator iphoneos";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -336,6 +338,8 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.6;
+				SUPPORTED_PLATFORMS = "iphonesimulator iphoneos";
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 			};
@@ -411,8 +415,8 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = A3000000000000000000015 /* Secrets.xcconfig */;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS = NO;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS = NO;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = EsimplifiedAdmin/EsimplifiedAdmin.entitlements;
 				CODE_SIGN_STYLE = Automatic;
@@ -421,12 +425,12 @@
 				DEVELOPMENT_TEAM = 8GVFL9KS7M;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "eSimplified Admin";
 				INFOPLIST_FILE = EsimplifiedAdmin/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "eSimplified Admin";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
 				"INFOPLIST_KEY_NSPrincipalClass[sdk=macosx*]" = NSApplication;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = NO;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -450,8 +454,8 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = A3000000000000000000015 /* Secrets.xcconfig */;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS = NO;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS = NO;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = EsimplifiedAdmin/EsimplifiedAdmin.entitlements;
 				CODE_SIGN_STYLE = Automatic;
@@ -460,12 +464,12 @@
 				DEVELOPMENT_TEAM = 8GVFL9KS7M;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "eSimplified Admin";
 				INFOPLIST_FILE = EsimplifiedAdmin/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "eSimplified Admin";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
 				"INFOPLIST_KEY_NSPrincipalClass[sdk=macosx*]" = NSApplication;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = NO;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
