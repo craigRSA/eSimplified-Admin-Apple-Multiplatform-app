@@ -12,8 +12,14 @@ struct OrdersScreen: View {
     @State private var total = 0
     @State private var search = ""
     @State private var path = NavigationPath()
+    @State private var offset = 0
+    /// Persisted across launches — change it once and it sticks.
+    @AppStorage("ordersPageSize") private var pageSize = 25
 
     enum Phase { case loading, loaded, failed(String) }
+
+    private static let pageSizes = [25, 50, 100, 200]
+    private var totalPages: Int { total == 0 ? 1 : (total + pageSize - 1) / pageSize }
 
     /// iPhone (compact) gets rich rows; Mac/iPad (regular) gets a columnar table.
     private var useTable: Bool { hSize != .compact }
@@ -35,7 +41,7 @@ struct OrdersScreen: View {
                     }
                 default:
                     VStack(spacing: 0) {
-                        OrdersCountHeader(showing: orders.count, total: total, filtering: !search.isEmpty)
+                        OrdersCountHeader(total: total, filtering: !search.isEmpty)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, Spacing.lg).padding(.vertical, Spacing.sm)
                         Divider()
@@ -62,6 +68,8 @@ struct OrdersScreen: View {
                             .listStyle(.plain)
                             .scrollContentBackground(.hidden)
                         }
+                        Divider()
+                        paginationBar
                     }
                 }
             }
@@ -73,10 +81,11 @@ struct OrdersScreen: View {
         .searchable(text: $search, prompt: "Package, customer, email, order #")
         // Server-side search (the web searches server-side; a local filter would only
         // see the rows already loaded and silently miss matches beyond the page).
-        .debouncedSearch(of: search) { await load() }
-        .reload(on: tenant) { await load() }
+        .debouncedSearch(of: search) { offset = 0; await load() }
+        .reload(on: tenant) { offset = 0; await load() }
         .refreshable { await load() }
         .autoRefresh { await load() }
+        .onChange(of: pageSize) { offset = 0; Task { await load() } }
     }
 
     private func load() async {
@@ -84,7 +93,7 @@ struct OrdersScreen: View {
         do {
             let client = LiveAPIClient(host: session.host, tokenProvider: tokenProvider)
             let path = tenant.map { "/api/orders/\($0)/" } ?? "/api/orders/"
-            var query = ["limit": "500"]
+            var query = ["limit": "\(pageSize)", "offset": "\(offset)"]
             let term = search.trimmingCharacters(in: .whitespaces)
             if !term.isEmpty { query["search"] = term }
             let page = try await client.get(path, query: query, as: OrdersPage.self)
@@ -99,24 +108,48 @@ struct OrdersScreen: View {
             phase = .failed("Unexpected error.")
         }
     }
+
+    @ViewBuilder private var paginationBar: some View {
+        HStack(spacing: Spacing.md) {
+            Menu {
+                Picker("Page size", selection: $pageSize) {
+                    ForEach(Self.pageSizes, id: \.self) { Text("\($0) per page").tag($0) }
+                }
+            } label: {
+                Label("\(pageSize) / page", systemImage: "list.number").font(.caption)
+            }
+            Spacer()
+            if total > 0 {
+                Text("\(offset + 1)–\(min(offset + orders.count, total)) of \(total.formatted())")
+                    .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+            }
+            if totalPages > 1 {
+                Button { Task { await go(to: offset - pageSize) } } label: { Image(systemName: "chevron.left") }
+                    .disabled(offset == 0)
+                    .accessibilityLabel("Previous page")
+                Button { Task { await go(to: offset + pageSize) } } label: { Image(systemName: "chevron.right") }
+                    .disabled(offset + pageSize >= total)
+                    .accessibilityLabel("Next page")
+            }
+        }
+        .padding(.horizontal, Spacing.lg).padding(.vertical, Spacing.sm)
+    }
+
+    /// Clamp to a valid page start, then reload.
+    private func go(to newOffset: Int) async {
+        offset = max(0, min(newOffset, (totalPages - 1) * pageSize))
+        await load()
+    }
 }
 
 private struct OrdersCountHeader: View {
-    let showing: Int
     let total: Int
     let filtering: Bool
     var body: some View {
         HStack(spacing: 6) {
-            // Show "N of total" while filtering OR whenever the page is capped below
-            // the full count — otherwise an unfiltered tenant with >500 orders would
-            // read "1,200 orders" above a list that only holds the first 500.
-            if filtering || showing < total {
-                Text("\(showing.formatted()) of \(total.formatted())")
-            } else {
-                Text("\(total.formatted())").font(.subheadline.weight(.semibold).monospacedDigit())
-                    .foregroundStyle(.primary)
-                Text(total == 1 ? "order" : "orders")
-            }
+            Text("\(total.formatted())").font(.subheadline.weight(.semibold).monospacedDigit())
+                .foregroundStyle(.primary)
+            Text((filtering ? "matching " : "") + (total == 1 ? "order" : "orders"))
         }
         .font(.subheadline).foregroundStyle(.secondary)
         .textCase(nil).padding(.vertical, 2)
