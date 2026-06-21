@@ -103,6 +103,34 @@ final class OrderTests: XCTestCase {
         XCTAssertEqual(page.orders[1].purchaseCountry, "South Africa")
     }
 
+    func test_decode_purchase_price_and_refund_status() throws {
+        let json = """
+        {
+          "count": 1,
+          "results": [{
+            "orders": [{
+              "order_uuid": "u9", "order_number": 91076, "order_type": "BUY",
+              "package_name": "South Africa 1 GB 7 Days",
+              "final_price": "2.92", "purchase_price": "3.89",
+              "purchase_currency": "US $", "discount_code": "Visa 25% Off Reward",
+              "purchase_country": {"name": "South Africa"},
+              "purchase_date": "2025-11-25T07:45:31Z", "payment_status": "refunded",
+              "payment_method": "agent_payment", "tenant": "knowroaming",
+              "refund_request": {"refund_status": "approved", "refund_amount": "3.89"}
+            }]
+          }]
+        }
+        """
+        let order = try JSONDecoder().decode(OrdersPage.self, from: Data(json.utf8)).orders.first!
+        XCTAssertEqual(order.purchasePrice, "3.89")
+        XCTAssertEqual(order.usdPriceDisplay, "$2.92")
+        XCTAssertEqual(order.struckPriceDisplay, "$3.89")   // discount → original struck
+        XCTAssertEqual(order.refundStatus, "approved")
+        XCTAssertNil(order.refundLabel)                      // approved isn't a list label
+        XCTAssertFalse(order.isComplimentary)
+        XCTAssertEqual(order.purchaseCountry, "South Africa")
+    }
+
     func test_decode_tolerates_empty() throws {
         let page = try JSONDecoder().decode(OrdersPage.self, from: Data("{}".utf8))
         XCTAssertEqual(page.count, 0)

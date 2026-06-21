@@ -278,26 +278,31 @@ private struct OrderRow: View {
     let order: Order
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.xs) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(order.packageName.isEmpty ? order.orderNumber : order.packageName)
-                    .font(.subheadline.weight(.medium)).lineLimit(1)
-                Spacer(minLength: Spacing.sm)
-                VStack(alignment: .trailing, spacing: 0) {
-                    Text(order.usdPriceDisplay).font(.subheadline.monospacedDigit())
-                    if let local = order.localPriceDisplay {
-                        Text(local).font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+        HStack(spacing: Spacing.sm) {
+            // Leading accent encodes the payment category (the web colors the whole row).
+            RoundedRectangle(cornerRadius: 1.5).fill(tint ?? .clear).frame(width: 3)
+            VStack(alignment: .leading, spacing: Spacing.xs) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(order.packageName.isEmpty ? order.orderNumber : order.packageName)
+                        .font(.subheadline.weight(.medium)).lineLimit(1)
+                    Spacer(minLength: Spacing.sm)
+                    priceView
+                }
+                HStack(spacing: Spacing.xs + 2) {
+                    StatusBadge(status: order.paymentStatus)
+                    if !order.orderType.isEmpty { Text(order.orderType).font(.caption2).foregroundStyle(.secondary) }
+                    if let code = order.discountCode {
+                        Label(code, systemImage: "tag.fill").font(.caption2).foregroundStyle(.warning)
                     }
+                    if let refund = order.refundLabel {
+                        Text(refund).font(.caption2).foregroundStyle(.warning)
+                    }
+                    Spacer()
+                    Text(shortDate(order.purchaseDate)).font(.caption2).foregroundStyle(.secondary)
                 }
-            }
-            HStack(spacing: Spacing.xs + 2) {
-                StatusBadge(status: order.paymentStatus)
-                if !order.orderType.isEmpty { Text(order.orderType).font(.caption2).foregroundStyle(.secondary) }
-                if let code = order.discountCode {
-                    Label(code, systemImage: "tag.fill").font(.caption2).foregroundStyle(.warning)
+                if let country = order.purchaseCountry, !country.isEmpty {
+                    Text("Purchased in \(country)").font(.caption2).foregroundStyle(.tertiary)
                 }
-                Spacer()
-                Text(shortDate(order.purchaseDate)).font(.caption2).foregroundStyle(.secondary)
             }
         }
         .padding(.vertical, Spacing.xs)
@@ -305,12 +310,40 @@ private struct OrderRow: View {
         .accessibilityLabel(Self.a11yLabel(order))
     }
 
+    @ViewBuilder private var priceView: some View {
+        if order.isComplimentary {
+            Text("Complimentary").font(.subheadline.weight(.medium)).foregroundStyle(.positive)
+        } else {
+            VStack(alignment: .trailing, spacing: 0) {
+                if let struck = order.struckPriceDisplay {
+                    Text(struck).font(.caption2.monospacedDigit()).foregroundStyle(.tertiary).strikethrough()
+                }
+                Text(order.usdPriceDisplay).font(.subheadline.monospacedDigit())
+                if let local = order.localPriceDisplay {
+                    Text(local).font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    /// Mirrors the web's per-row color by payment state/type.
+    private var tint: Color? {
+        if order.paymentStatus == "refunded" { return .negative }
+        if order.isComplimentary { return .positive }
+        if order.paymentMethod == "agent_payment" { return .purple }
+        if order.paymentMethod == "voucher" { return .teal }
+        if order.discountCode != nil && order.paymentStatus == "success" { return .orange }
+        return nil
+    }
+
     /// One spoken sentence so VoiceOver reads the row as a unit.
     static func a11yLabel(_ o: Order) -> String {
         var parts = [o.packageName.isEmpty ? o.orderNumber : o.packageName,
-                     o.usdPriceDisplay, "Status: \(o.paymentStatus.capitalized)"]
+                     o.isComplimentary ? "Complimentary" : o.usdPriceDisplay,
+                     "Status: \(o.paymentStatus.capitalized)"]
         if !o.orderType.isEmpty { parts.append(o.orderType) }
         if let code = o.discountCode { parts.append("Discount \(code)") }
+        if let refund = o.refundLabel { parts.append(refund) }
         parts.append(shortDate(o.purchaseDate))
         return parts.joined(separator: ", ")
     }

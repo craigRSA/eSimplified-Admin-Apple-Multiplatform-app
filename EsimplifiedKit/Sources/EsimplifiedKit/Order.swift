@@ -22,6 +22,8 @@ public struct Order: Decodable, Identifiable, Equatable, Sendable {
     public let customerId: String?
     public let customerEmail: String?
     public let customerName: String?
+    public let purchasePrice: String
+    public let refundStatus: String?
 
     private enum K: String, CodingKey {
         case tenant, customer, iccid
@@ -38,7 +40,10 @@ public struct Order: Decodable, Identifiable, Equatable, Sendable {
         case purchaseDate = "purchase_date"
         case paymentStatus = "payment_status"
         case paymentMethod = "payment_method"
+        case purchasePrice = "purchase_price"
+        case refundRequest = "refund_request"
     }
+    private enum RefundK: String, CodingKey { case refundStatus = "refund_status" }
     private enum CurrencyKeys: String, CodingKey { case symbol }
     private enum CountryKeys: String, CodingKey { case name }
     private struct Cust: Decodable { let email: String?; let full_name: String?; let customer_id: String? }
@@ -66,6 +71,20 @@ public struct Order: Decodable, Identifiable, Equatable, Sendable {
         purchaseDate = try str(.purchaseDate)
         paymentStatus = try str(.paymentStatus)
         paymentMethod = try str(.paymentMethod)
+        // purchase_price (pre-discount) is money — usually a string, occasionally a number.
+        if let s = try? c.decode(String.self, forKey: .purchasePrice) {
+            purchasePrice = s
+        } else if let d = try? c.decode(FlexibleDecimal.self, forKey: .purchasePrice) {
+            purchasePrice = NSDecimalNumber(decimal: d.value).stringValue
+        } else {
+            purchasePrice = ""
+        }
+        // refund_request is an object or null.
+        if let r = try? c.nestedContainer(keyedBy: RefundK.self, forKey: .refundRequest) {
+            refundStatus = try? r.decodeIfPresent(String.self, forKey: .refundStatus)
+        } else {
+            refundStatus = nil
+        }
         tenant = try str(.tenant)
         iccid = try c.decodeIfPresent(String.self, forKey: .iccid)
         let cust = try c.decodeIfPresent(Cust.self, forKey: .customer)
@@ -99,6 +118,24 @@ public struct Order: Decodable, Identifiable, Equatable, Sendable {
     public var localPriceDisplay: String? {
         guard purchaseCurrency != "US $", !purchaseCurrency.isEmpty, !finalPriceLocal.isEmpty else { return nil }
         return "\(purchaseCurrency) \(finalPriceLocal)"
+    }
+
+    /// Given free — web shows "Complimentary" instead of a price.
+    public var isComplimentary: Bool { paymentMethod == "complimentary" }
+
+    /// Pre-discount USD price, shown struck-through when a discount applied and it differs.
+    public var struckPriceDisplay: String? {
+        guard discountCode != nil, !purchasePrice.isEmpty, purchasePrice != finalPrice else { return nil }
+        return "$\(purchasePrice)"
+    }
+
+    /// Short refund-status label matching the web's order list, or nil.
+    public var refundLabel: String? {
+        switch refundStatus {
+        case "requested", "awaiting_s2s": return "Refund Requested"
+        case "cancelled": return "Refund Cancelled"
+        default: return nil
+        }
     }
 }
 
