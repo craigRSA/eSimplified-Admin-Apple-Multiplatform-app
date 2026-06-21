@@ -462,18 +462,21 @@ private struct EsimDetailCard: View {
     @ViewBuilder private var buttonRow: some View {
         let showDetails = hSize == .compact && !euiccItems.isEmpty
         if showDetails || !allSupportedCountries.isEmpty || !detail.whitelist.isEmpty {
-            HStack(spacing: Spacing.md) {
-                Spacer()
-                if showDetails { viewButton("Details", .euiccDetails(euiccItems)) }
+            FlowLayout(spacing: Spacing.sm) {
+                if showDetails { chipButton("Details", .euiccDetails(euiccItems)) }
                 if !allSupportedCountries.isEmpty {
-                    viewButton("Supported countries (\(allSupportedCountries.count))",
+                    chipButton("Supported countries (\(allSupportedCountries.count))",
                                .supportedCountries(allSupportedCountries))
                 }
                 if !detail.whitelist.isEmpty {
-                    viewButton("Whitelist (\(detail.whitelist.count))", .whitelist(detail.whitelist))
+                    chipButton("Whitelist (\(detail.whitelist.count))", .whitelist(detail.whitelist))
                 }
             }
         }
+    }
+
+    private func chipButton(_ title: String, _ sheet: EsimDetailSheet) -> some View {
+        Button(title) { onView(sheet) }.font(.caption).buttonStyle(.bordered).controlSize(.small)
     }
 
     /// Unique sorted union of every package's supported countries (web aggregates these).
@@ -501,6 +504,10 @@ private struct EsimDetailCard: View {
                 if let name = detail.esimName, !name.isEmpty {
                     Text(name).font(.caption).foregroundStyle(.secondary)
                 }
+                if let msg = detail.euicc?.stateMessage ?? detail.euicc?.state {
+                    Label(msg, systemImage: "simcard").font(.caption).foregroundStyle(.secondary)
+                        .accessibilityLabel("State: \(msg)")
+                }
             }
             Spacer()
             VStack(alignment: .trailing, spacing: Spacing.xs) {
@@ -518,7 +525,7 @@ private struct EsimDetailCard: View {
     private var euiccItems: [(String, String)] {
         var items: [(String, String)] = []
         let e = detail.euicc
-        if let s = e?.stateMessage ?? e?.state { items.append(("State", s)) }
+        // State is always shown in the header now, so it's omitted here.
         if let d = epochDate(e?.lastOperationDate) { items.append(("Last operation", d)) }
         if let n = e?.reuseRemainingCount { items.append(("Remaining reuse", e?.maxReuseCount.map { "\(n) / \($0)" } ?? "\(n)")) }
         if let imsi = detail.imsi, !imsi.isEmpty { items.append(("IMSI", imsi)) }
@@ -854,6 +861,35 @@ private struct SupportedCountriesSheet: View {
     }
 }
 
+/// A minimal wrapping row: lays children left-to-right, wrapping to a new line
+/// when the next one would overflow. Used for the eSIM "view" chips.
+private struct FlowLayout: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let maxWidth = proposal.width ?? .infinity
+        var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0, widest: CGFloat = 0
+        for sv in subviews {
+            let s = sv.sizeThatFits(.unspecified)
+            if x > 0, x + s.width > maxWidth { widest = max(widest, x - spacing); x = 0; y += rowHeight + spacing; rowHeight = 0 }
+            x += s.width + spacing
+            rowHeight = max(rowHeight, s.height)
+        }
+        return CGSize(width: min(max(widest, x - spacing), maxWidth), height: y + rowHeight)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x = bounds.minX, y = bounds.minY, rowHeight: CGFloat = 0
+        for sv in subviews {
+            let s = sv.sizeThatFits(.unspecified)
+            if x > bounds.minX, x + s.width > bounds.maxX { x = bounds.minX; y += rowHeight + spacing; rowHeight = 0 }
+            sv.place(at: CGPoint(x: x, y: y), anchor: .topLeading, proposal: ProposedViewSize(s))
+            x += s.width + spacing
+            rowHeight = max(rowHeight, s.height)
+        }
+    }
+}
+
 @ViewBuilder
 private func listOrEmpty<Content: View>(loading: Bool, count: Int, empty: String,
                                         error: String? = nil, retry: (() -> Void)? = nil,
@@ -923,10 +959,6 @@ private func fmtBytes(_ bytes: Double?) -> String {
     return String(format: "%.2f %@", v, units[i])
 }
 
-/// Colour an eUICC state badge by meaning — the web shows no colour, but a flat
-/// green badge wrongly implies "all good" for ERROR/DISABLED states. Anchored to
-/// the design system's `StatusStyle` for the states it knows, with eUICC-specific
-/// nuance on top (DISABLED/DELETED read as a warning, UNKNOWN as a problem).
 /// Shows a roaming operator and whether data is allowed on it. Meaning rides on
 /// a glyph + spoken label (allowed/blocked), with colour as reinforcement only —
 /// never the sole signal. Reused by the location, locations-history, and
@@ -951,9 +983,20 @@ private struct OperatorAllowance: View {
 
 private struct ProfileCard: View {
     let customer: Customer
+    @State private var showDetails = false
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.md) {
-            Text(customer.displayName).font(.title2.weight(.semibold))
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(customer.displayName).font(.title2.weight(.semibold))
+                    if let created = customer.created {
+                        Text("Created \(shortDate(created))").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+                Button { showDetails = true } label: { Label("View", systemImage: "eye") }
+                    .font(.callout).buttonStyle(.bordered).controlSize(.small)
+            }
             HStack(spacing: Spacing.sm) {
                 Badge(text: customer.isActive ? "Active" : "Disabled",
                       color: customer.isActive ? .positive : .negative,
@@ -966,18 +1009,43 @@ private struct ProfileCard: View {
             }
             if let email = customer.email { Field("Email", email) }
             if let phone = customer.phoneNumber, !phone.isEmpty { Field("Phone", phone) }
-            if let cid = customer.customerId { Field("Customer ID", cid) }
-            if let created = customer.created { Field("Created", shortDate(created)) }
-            if let ref = customer.externalReference, !ref.isEmpty { Field("External ref", ref) }
-            if let pay = customer.paymentReference, !pay.isEmpty { Field("Payment ref", pay) }
-            if let prov = customer.signInProvider, !prov.isEmpty { Field("Sign-in", prov) }
-            if let code = customer.uniqueReferralCode, !code.isEmpty { Field("Referral code", code) }
-            if !customer.notificationGroups.isEmpty {
-                Divider().padding(.vertical, 1)
-                NotificationPrefsView(groups: customer.notificationGroups)
-            }
         }
         .glassCard()
+        .sheet(isPresented: $showDetails) { CustomerDetailsSheet(customer: customer) }
+    }
+}
+
+/// The full customer record behind the card's "View" button — the fields not
+/// shown inline (ids, refs, sign-in provider, notification preferences).
+private struct CustomerDetailsSheet: View {
+    let customer: Customer
+    @Environment(\.dismiss) private var dismiss
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Spacing.md) {
+                    if let cid = customer.customerId { Field("Customer ID", cid) }
+                    if let code = customer.uniqueReferralCode, !code.isEmpty { Field("Referral code", code) }
+                    if let ref = customer.externalReference, !ref.isEmpty { Field("External ref", ref) }
+                    if let pay = customer.paymentReference, !pay.isEmpty { Field("Payment ref", pay) }
+                    if let prov = customer.signInProvider, !prov.isEmpty { Field("Sign-in", prov) }
+                    if !customer.notificationGroups.isEmpty {
+                        Divider().padding(.vertical, 1)
+                        NotificationPrefsView(groups: customer.notificationGroups)
+                    }
+                }
+                .padding(Spacing.lg)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .navigationTitle(customer.displayName)
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+        }
+        #if os(macOS)
+        .frame(minWidth: 420, minHeight: 360)
+        #endif
     }
 }
 
