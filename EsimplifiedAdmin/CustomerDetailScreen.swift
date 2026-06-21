@@ -81,6 +81,7 @@ struct CustomerDetailScreen: View {
                 case let .packages(pkgs): PackagesSheet(packages: pkgs)
                 case let .whitelist(items): WhitelistSheet(items: items)
                 case let .supportedCountries(list): SupportedCountriesSheet(countries: list)
+                case let .euiccDetails(items): EuiccDetailsSheet(items: items)
                 }
             }
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { sheet = nil } } }
@@ -426,29 +427,21 @@ private struct AllOrdersSheet: View {
 private struct EsimDetailCard: View {
     let detail: EsimDetail
     var onView: (EsimDetailSheet) -> Void
+    @Environment(\.horizontalSizeClass) private var hSize
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.lg) {
             header
-            if !euiccItems.isEmpty {
+            // The eUICC technical grid is fine on Mac/iPad but overwhelming on a
+            // phone — there it collapses behind the "Details" button (buttonRow).
+            if !euiccItems.isEmpty, hSize != .compact {
                 LazyVGrid(columns: [GridItem(.flexible(), alignment: .topLeading),
                                     GridItem(.flexible(), alignment: .topLeading)],
                           alignment: .leading, spacing: Spacing.md) {
                     ForEach(euiccItems, id: \.0) { LabeledValue(label: $0.0, value: $0.1) }
                 }
             }
-            if !allSupportedCountries.isEmpty || !detail.whitelist.isEmpty {
-                HStack(spacing: Spacing.md) {
-                    Spacer()
-                    if !allSupportedCountries.isEmpty {
-                        viewButton("Supported countries (\(allSupportedCountries.count))",
-                                   .supportedCountries(allSupportedCountries))
-                    }
-                    if !detail.whitelist.isEmpty {
-                        viewButton("Whitelist (\(detail.whitelist.count))", .whitelist(detail.whitelist))
-                    }
-                }
-            }
+            buttonRow
             divider
             dataUsageBlock
             divider; locationBlock(detail.latestLocation)
@@ -462,6 +455,25 @@ private struct EsimDetailCard: View {
 
     private func viewButton(_ title: String, _ sheet: EsimDetailSheet) -> some View {
         Button(title) { onView(sheet) }.font(.caption).buttonStyle(.borderless)
+    }
+
+    /// "View" affordances under the header: eUICC details (phone only — see body),
+    /// supported countries, and whitelist, each opening a sheet.
+    @ViewBuilder private var buttonRow: some View {
+        let showDetails = hSize == .compact && !euiccItems.isEmpty
+        if showDetails || !allSupportedCountries.isEmpty || !detail.whitelist.isEmpty {
+            HStack(spacing: Spacing.md) {
+                Spacer()
+                if showDetails { viewButton("Details", .euiccDetails(euiccItems)) }
+                if !allSupportedCountries.isEmpty {
+                    viewButton("Supported countries (\(allSupportedCountries.count))",
+                               .supportedCountries(allSupportedCountries))
+                }
+                if !detail.whitelist.isEmpty {
+                    viewButton("Whitelist (\(detail.whitelist.count))", .whitelist(detail.whitelist))
+                }
+            }
+        }
     }
 
     /// Unique sorted union of every package's supported countries (web aggregates these).
@@ -492,10 +504,6 @@ private struct EsimDetailCard: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: Spacing.xs) {
-                if let st = detail.euicc?.state {
-                    Badge(text: st.capitalized, color: stateColor(st), systemImage: stateGlyph(st))
-                        .accessibilityLabel("eUICC state: \(st.capitalized)")
-                }
                 Badge(text: detail.autoTopUp ? "Auto Top-Up On" : "Auto Top-Up Off",
                       color: detail.autoTopUp ? .blue : .secondary,
                       systemImage: detail.autoTopUp ? "arrow.triangle.2.circlepath" : "pause.circle")
@@ -618,6 +626,7 @@ enum EsimDetailSheet: Identifiable {
     case packages([EsimPackage])
     case whitelist([Whitelist])
     case supportedCountries([String])
+    case euiccDetails([EuiccItem])
     var id: String {
         switch self {
         case .locations: "locations"
@@ -625,9 +634,14 @@ enum EsimDetailSheet: Identifiable {
         case .packages: "packages"
         case .whitelist: "whitelist"
         case .supportedCountries: "supportedCountries"
+        case .euiccDetails: "euiccDetails"
         }
     }
 }
+
+/// A (label, value) pair from the eUICC profile grid (shared by the inline grid
+/// and the phone "Details" sheet).
+typealias EuiccItem = (String, String)
 
 private struct LocationsSheet: View {
     let session: Session
@@ -777,7 +791,6 @@ private struct WhitelistSheet: View {
                         }
                     }
                     HStack(spacing: Spacing.sm) {
-                        if let n = w.whitelistName { Text(n).font(.caption2).foregroundStyle(.secondary) }
                         if let bc = w.bestConnectivity { Text(bc).font(.caption2).foregroundStyle(.tertiary) }
                         if let lte = w.lteSupport, !lte.isEmpty {
                             Text("LTE \(lte)").font(.caption2).foregroundStyle(.tertiary)
@@ -802,6 +815,26 @@ private struct WhitelistSheet: View {
                 .font(.caption2).foregroundStyle(on ? .positive : .secondary)
             Text(label).font(.caption2).foregroundStyle(.tertiary)
         }
+    }
+}
+
+/// The full eUICC technical grid — shown inline on Mac/iPad, behind a "Details"
+/// button on phones where it would otherwise dominate the card.
+private struct EuiccDetailsSheet: View {
+    let items: [EuiccItem]
+    var body: some View {
+        List {
+            ForEach(items, id: \.0) { item in
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.0).font(.caption).foregroundStyle(.secondary)
+                    Text(item.1).font(.callout.monospaced()).textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("\(item.0): \(item.1)")
+            }
+        }
+        .navigationTitle("eSIM details")
     }
 }
 
@@ -894,27 +927,6 @@ private func fmtBytes(_ bytes: Double?) -> String {
 /// green badge wrongly implies "all good" for ERROR/DISABLED states. Anchored to
 /// the design system's `StatusStyle` for the states it knows, with eUICC-specific
 /// nuance on top (DISABLED/DELETED read as a warning, UNKNOWN as a problem).
-private func stateColor(_ state: String) -> Color {
-    switch state.uppercased() {
-    case "DISABLED", "DELETED": return .warning
-    case "UNKNOWN": return .negative
-    default:
-        let c = StatusStyle.color(state)
-        return c == .secondary ? .secondary : c
-    }
-}
-
-/// A glyph that carries the eUICC state's meaning without relying on colour, so
-/// the badge is legible to colour-blind users and VoiceOver alike.
-private func stateGlyph(_ state: String) -> String {
-    switch state.uppercased() {
-    case "RELEASED", "ENABLED", "INSTALLED": return "checkmark.circle"
-    case "DISABLED", "DELETED": return "pause.circle"
-    case "ERROR", "UNKNOWN": return "exclamationmark.triangle"
-    default: return "questionmark.circle"
-    }
-}
-
 /// Shows a roaming operator and whether data is allowed on it. Meaning rides on
 /// a glyph + spoken label (allowed/blocked), with colour as reinforcement only —
 /// never the sole signal. Reused by the location, locations-history, and
@@ -1004,7 +1016,7 @@ private struct Field: View {
             Text(label).font(.caption).foregroundStyle(.secondary)
             Spacer(minLength: Spacing.md)
             Text(value).font(.callout.monospaced()).multilineTextAlignment(.trailing)
-                .textSelection(.enabled).lineLimit(2)
+                .textSelection(.enabled).lineLimit(2).minimumScaleFactor(0.7)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(label): \(value)")
