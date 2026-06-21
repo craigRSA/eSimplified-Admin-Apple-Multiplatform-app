@@ -211,8 +211,29 @@ extension EnvironmentValues {
 
 struct AdminRootView: View {
     @Bindable var model: AdminAppModel
+    #if os(iOS)
+    @State private var showSplash = true
+    #endif
 
     var body: some View {
+        ZStack {
+            content
+            #if os(iOS)
+            if showSplash {
+                SplashView()
+                    .transition(.opacity)
+                    .task {
+                        // Hold the brand for a beat after the system launch screen,
+                        // then fade into the app.
+                        try? await Task.sleep(for: .seconds(0.9))
+                        withAnimation(.easeOut(duration: 0.4)) { showSplash = false }
+                    }
+            }
+            #endif
+        }
+    }
+
+    @ViewBuilder private var content: some View {
         if model.session == nil {
             LoginView(model: model)
         } else {
@@ -236,6 +257,22 @@ struct AdminRootView: View {
         }
     }
 }
+
+#if os(iOS)
+/// A brief branded splash shown over the app at launch, fading into the UI. It
+/// mirrors the static launch screen (logo on the dark launch background) so the
+/// hand-off from the system launch screen is seamless.
+private struct SplashView: View {
+    var body: some View {
+        ZStack {
+            Color("LaunchBackground").ignoresSafeArea()
+            Image("LogoWordmark").resizable().scaledToFit()
+                .frame(width: 150)
+                .accessibilityLabel("eSimplified")
+        }
+    }
+}
+#endif
 
 #if os(macOS)
 /// Menu-bar commands: ⌘R refresh (routed to the focused screen) and ⌘1…⌘9 to
