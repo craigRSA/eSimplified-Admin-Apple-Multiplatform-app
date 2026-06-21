@@ -41,9 +41,18 @@ struct OrdersScreen: View {
                     }
                 default:
                     VStack(spacing: 0) {
-                        OrdersCountHeader(total: total, filtering: !search.isEmpty)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, Spacing.lg).padding(.vertical, Spacing.sm)
+                        HStack(spacing: Spacing.md) {
+                            OrdersCountHeader(total: total, filtering: !search.isEmpty)
+                            #if os(macOS)
+                            Spacer()
+                            pageSizeMenu
+                            rangeText
+                            pageButtons
+                            #endif
+                        }
+                        .font(.callout)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, Spacing.lg).padding(.vertical, Spacing.sm)
                         Divider()
                         if orders.isEmpty {
                             ContentUnavailableView("No matching orders", systemImage: "tray")
@@ -68,8 +77,10 @@ struct OrdersScreen: View {
                             .listStyle(.plain)
                             .scrollContentBackground(.hidden)
                         }
+                        #if !os(macOS)
                         Divider()
                         paginationBar
+                        #endif
                     }
                 }
             }
@@ -109,31 +120,44 @@ struct OrdersScreen: View {
         }
     }
 
-    @ViewBuilder private var paginationBar: some View {
-        HStack(spacing: Spacing.md) {
-            Menu {
-                Picker("Page size", selection: $pageSize) {
-                    ForEach(Self.pageSizes, id: \.self) { Text("\($0) per page").tag($0) }
-                }
-            } label: {
-                Label("\(pageSize) / page", systemImage: "list.number").font(.caption)
+    private var pageSizeMenu: some View {
+        Menu {
+            Picker("Page size", selection: $pageSize) {
+                ForEach(Self.pageSizes, id: \.self) { Text("\($0) per page").tag($0) }
             }
-            Spacer()
-            if total > 0 {
-                Text("\(offset + 1)–\(min(offset + orders.count, total)) of \(total.formatted())")
-                    .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-            }
-            if totalPages > 1 {
-                Button { Task { await go(to: offset - pageSize) } } label: { Image(systemName: "chevron.left") }
-                    .disabled(offset == 0)
-                    .accessibilityLabel("Previous page")
-                Button { Task { await go(to: offset + pageSize) } } label: { Image(systemName: "chevron.right") }
-                    .disabled(offset + pageSize >= total)
-                    .accessibilityLabel("Next page")
-            }
+        } label: { Label("\(pageSize) / page", systemImage: "list.number") }
+    }
+
+    @ViewBuilder private var rangeText: some View {
+        if total > 0 {
+            Text("\(offset + 1)–\(min(offset + orders.count, total)) of \(total.formatted())")
+                .foregroundStyle(.secondary).monospacedDigit()
         }
+    }
+
+    @ViewBuilder private var pageButtons: some View {
+        if totalPages > 1 {
+            Button { Task { await go(to: offset - pageSize) } } label: { Image(systemName: "chevron.left") }
+                .disabled(offset == 0).accessibilityLabel("Previous page")
+            Button { Task { await go(to: offset + pageSize) } } label: { Image(systemName: "chevron.right") }
+                .disabled(offset + pageSize >= total).accessibilityLabel("Next page")
+        }
+    }
+
+    #if !os(macOS)
+    /// iPhone/iPad bottom pagination bar. macOS shows the same controls in the
+    /// header row instead, so they clear the global bottom status bar.
+    private var paginationBar: some View {
+        HStack(spacing: Spacing.md) {
+            pageSizeMenu
+            Spacer()
+            rangeText
+            pageButtons
+        }
+        .font(.caption)
         .padding(.horizontal, Spacing.lg).padding(.vertical, Spacing.sm)
     }
+    #endif
 
     /// Clamp to a valid page start, then reload.
     private func go(to newOffset: Int) async {
