@@ -13,6 +13,16 @@ public struct Customer: Decodable, Identifiable, Sendable {
     public let isActive: Bool
     public let emailVerified: Bool
     public let created: String?
+    public let paymentReference: String?
+    public let signInProvider: String?
+    public let uniqueReferralCode: String?
+    public let marketingEmail: Bool?
+    public let marketingPush: Bool?
+    public let accountEmail: Bool?
+    public let accountSms: Bool?
+    public let accountPush: Bool?
+    public let purchaseEmail: Bool?
+    public let purchasePush: Bool?
 
     private enum K: String, CodingKey {
         case email, created
@@ -24,6 +34,16 @@ public struct Customer: Decodable, Identifiable, Sendable {
         case isActive = "is_active"
         case emailVerified = "email_verified"
         case customerId = "customer_id"
+        case paymentReference = "payment_reference"
+        case signInProvider = "sign_in_as_provider"
+        case uniqueReferralCode = "unique_referral_code"
+        case marketingEmail = "marketing_email"
+        case marketingPush = "marketing_push"
+        case accountEmail = "account_email"
+        case accountSms = "account_sms"
+        case accountPush = "account_push"
+        case purchaseEmail = "purchase_email"
+        case purchasePush = "purchase_push"
     }
 
     public init(from decoder: Decoder) throws {
@@ -40,6 +60,16 @@ public struct Customer: Decodable, Identifiable, Sendable {
         emailVerified = try c.decodeIfPresent(Bool.self, forKey: .emailVerified) ?? false
         created = try c.decodeIfPresent(String.self, forKey: .created)
         customerId = try c.decodeIfPresent(String.self, forKey: .customerId)
+        paymentReference = try c.decodeIfPresent(String.self, forKey: .paymentReference)
+        signInProvider = try c.decodeIfPresent(String.self, forKey: .signInProvider)
+        uniqueReferralCode = try c.decodeIfPresent(String.self, forKey: .uniqueReferralCode)
+        marketingEmail = try c.decodeIfPresent(Bool.self, forKey: .marketingEmail)
+        marketingPush = try c.decodeIfPresent(Bool.self, forKey: .marketingPush)
+        accountEmail = try c.decodeIfPresent(Bool.self, forKey: .accountEmail)
+        accountSms = try c.decodeIfPresent(Bool.self, forKey: .accountSms)
+        accountPush = try c.decodeIfPresent(Bool.self, forKey: .accountPush)
+        purchaseEmail = try c.decodeIfPresent(Bool.self, forKey: .purchaseEmail)
+        purchasePush = try c.decodeIfPresent(Bool.self, forKey: .purchasePush)
         id = customerId ?? email ?? UUID().uuidString
     }
 
@@ -51,6 +81,20 @@ public struct Customer: Decodable, Identifiable, Sendable {
         if !names.isEmpty { return names.joined(separator: " ") }
         if let externalReference, !externalReference.isEmpty { return externalReference }
         return email ?? "—"
+    }
+
+    /// Notification preferences grouped for read-only display: (group, [(channel, on)]).
+    /// Channels absent from the response are omitted.
+    public var notificationGroups: [(String, [(String, Bool)])] {
+        func group(_ name: String, _ pairs: [(String, Bool?)]) -> (String, [(String, Bool)])? {
+            let present = pairs.compactMap { label, value in value.map { (label, $0) } }
+            return present.isEmpty ? nil : (name, present)
+        }
+        return [
+            group("Marketing", [("Email", marketingEmail), ("Push", marketingPush)]),
+            group("Account", [("Email", accountEmail), ("SMS", accountSms), ("Push", accountPush)]),
+            group("Purchase", [("Email", purchaseEmail), ("Push", purchasePush)]),
+        ].compactMap { $0 }
     }
 }
 

@@ -484,6 +484,10 @@ private struct EsimDetailCard: View {
                 Badge(text: detail.autoTopUp ? "Auto Top-Up On" : "Auto Top-Up Off",
                       color: detail.autoTopUp ? .blue : .secondary,
                       systemImage: detail.autoTopUp ? "arrow.triangle.2.circlepath" : "pause.circle")
+                Badge(text: detail.archived ? "Archived" : "Active",
+                      color: detail.archived ? .secondary : .positive,
+                      systemImage: detail.archived ? "archivebox" : "checkmark.circle")
+                    .accessibilityLabel(detail.archived ? "Archived" : "Active")
             }
         }
     }
@@ -885,8 +889,42 @@ private struct ProfileCard: View {
             if let phone = customer.phoneNumber, !phone.isEmpty { Field("Phone", phone) }
             if let cid = customer.customerId { Field("Customer ID", cid) }
             if let created = customer.created { Field("Created", shortDate(created)) }
+            if let ref = customer.externalReference, !ref.isEmpty { Field("External ref", ref) }
+            if let pay = customer.paymentReference, !pay.isEmpty { Field("Payment ref", pay) }
+            if let prov = customer.signInProvider, !prov.isEmpty { Field("Sign-in", prov) }
+            if let code = customer.uniqueReferralCode, !code.isEmpty { Field("Referral code", code) }
+            if !customer.notificationGroups.isEmpty {
+                Divider().padding(.vertical, 1)
+                NotificationPrefsView(groups: customer.notificationGroups)
+            }
         }
         .glassCard()
+    }
+}
+
+/// Read-only notification opt-ins, mirroring the web's preferences block.
+private struct NotificationPrefsView: View {
+    let groups: [(String, [(String, Bool)])]
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.xs) {
+            Text("NOTIFICATIONS").eyebrow()
+            ForEach(groups, id: \.0) { group in
+                HStack(alignment: .firstTextBaseline, spacing: Spacing.sm) {
+                    Text(group.0).font(.caption).foregroundStyle(.secondary)
+                        .frame(width: 72, alignment: .leading)
+                    ForEach(group.1, id: \.0) { item in
+                        HStack(spacing: 3) {
+                            Image(systemName: item.1 ? "checkmark.circle.fill" : "circle")
+                                .font(.caption2).foregroundStyle(item.1 ? .positive : .tertiary)
+                            Text(item.0).font(.caption2).foregroundStyle(.secondary)
+                        }
+                    }
+                    Spacer()
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("\(group.0): " + group.1.map { "\($0.0) \($0.1 ? "on" : "off")" }.joined(separator: ", "))
+            }
+        }
     }
 }
 

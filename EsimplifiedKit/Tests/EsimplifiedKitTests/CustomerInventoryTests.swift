@@ -21,6 +21,27 @@ final class CustomerInventoryTests: XCTestCase {
         XCTAssertFalse(page.customers[1].isActive)
     }
 
+    func test_customer_decodes_refs_and_notification_prefs() throws {
+        let json = #"""
+        {"customer_id":"c9","email":"x@x.io","full_name":"Xolani",
+         "payment_reference":"pay_123","sign_in_as_provider":"google",
+         "unique_referral_code":"IX5Q80","external_reference":"ext-1",
+         "marketing_email":true,"marketing_push":false,
+         "account_email":true,"account_sms":false,"account_push":true,
+         "purchase_email":true,"purchase_push":true}
+        """#
+        let c = try JSONDecoder().decode(Customer.self, from: Data(json.utf8))
+        XCTAssertEqual(c.paymentReference, "pay_123")
+        XCTAssertEqual(c.signInProvider, "google")
+        XCTAssertEqual(c.uniqueReferralCode, "IX5Q80")
+        let groups = c.notificationGroups
+        XCTAssertEqual(groups.map { $0.0 }, ["Marketing", "Account", "Purchase"])
+        XCTAssertEqual(groups[0].1.map { $0.0 }, ["Email", "Push"])
+        XCTAssertEqual(groups[0].1[0].1, true)   // marketing email on
+        XCTAssertEqual(groups[0].1[1].1, false)  // marketing push off
+        XCTAssertEqual(groups[1].1.count, 3)     // account: email/sms/push
+    }
+
     func test_customer_displayName_falls_back_first_last_then_external_then_email() throws {
         func customer(_ json: String) throws -> Customer {
             try JSONDecoder().decode(Customer.self, from: Data(json.utf8))
