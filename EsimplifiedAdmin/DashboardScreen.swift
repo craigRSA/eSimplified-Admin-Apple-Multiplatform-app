@@ -414,6 +414,7 @@ private struct MetricGrid: View {
     /// Fixed column count for a balanced grid (e.g. 3 → the 9 top stats fill 3×3 with
     /// no orphan); nil keeps the responsive adaptive layout.
     var columns: Int?
+    @Environment(\.horizontalSizeClass) private var hSize
 
     private var gridColumns: [GridItem] {
         if let columns {
@@ -429,11 +430,16 @@ private struct MetricGrid: View {
                 // inline beside it, then the optional context line — no 4-line stack.
                 VStack(alignment: .leading, spacing: Spacing.xs) {
                     Text(item.title.uppercased()).eyebrow()
-                    HStack(alignment: .firstTextBaseline, spacing: Spacing.sm) {
+                    // Inline value + delta on wide cards; stacked on a phone, where a
+                    // 3-wide card can't fit both on one line without truncating.
+                    let valueDelta = hSize == .compact
+                        ? AnyLayout(VStackLayout(alignment: .leading, spacing: Spacing.xs))
+                        : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: Spacing.sm))
+                    valueDelta {
                         Text(item.value).font(.title3.weight(.semibold).monospacedDigit())
                             .lineLimit(1).minimumScaleFactor(0.55)
                         if let delta = item.delta {
-                            TrendDelta(percent: delta, font: .caption.weight(.semibold))
+                            TrendDelta(percent: delta, font: .caption.weight(.semibold)).fixedSize()
                         }
                     }
                     if let sub = item.sub { Text(sub).font(.caption2).foregroundStyle(.secondary) }
