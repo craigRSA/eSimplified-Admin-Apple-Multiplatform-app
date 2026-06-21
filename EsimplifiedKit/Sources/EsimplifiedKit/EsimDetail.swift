@@ -103,6 +103,12 @@ public struct EsimPackage: Decodable, Sendable, Identifiable {
     public let packageCountryName: String?
     public let timeAllowanceDays: Int?
     public let nestedPackageName: String?   // package.name — used for Unlimited detection
+    public let dataAllowanceBytes: Double?
+    public let dataUsageRemainingBytes: Double?
+    public let windowActivationStartEpoch: Double?
+    public let windowActivationEndEpoch: Double?
+    public let dateActivatedEpoch: Double?
+    public let dateTerminatedEpoch: Double?
     public var id: String { "\(name ?? "?")-\(dateCreatedEpoch ?? 0)" }
 
     private enum K: String, CodingKey {
@@ -112,6 +118,12 @@ public struct EsimPackage: Decodable, Sendable, Identifiable {
         case supportedCountries = "supported_countries"
         case packageCountryName = "package_country_name"
         case timeAllowanceDays = "time_allowance_days"
+        case dataAllowanceBytes = "data_allowance_bytes"
+        case dataUsageRemainingBytes = "data_usage_remaining_bytes"
+        case windowActivationStartEpoch = "window_activation_start_epoch"
+        case windowActivationEndEpoch = "window_activation_end_epoch"
+        case dateActivatedEpoch = "date_activated_epoch"
+        case dateTerminatedEpoch = "date_terminated_epoch"
     }
     private struct Named: Decodable { let name: String? }
 
@@ -124,6 +136,12 @@ public struct EsimPackage: Decodable, Sendable, Identifiable {
         packageCountryName = try? c.decodeIfPresent(String.self, forKey: .packageCountryName)
         timeAllowanceDays = try? c.decodeIfPresent(Int.self, forKey: .timeAllowanceDays)
         nestedPackageName = (try? c.decodeIfPresent(Named.self, forKey: .package))??.name
+        dataAllowanceBytes = try? c.decode(Double.self, forKey: .dataAllowanceBytes)
+        dataUsageRemainingBytes = try? c.decode(Double.self, forKey: .dataUsageRemainingBytes)
+        windowActivationStartEpoch = try? c.decode(Double.self, forKey: .windowActivationStartEpoch)
+        windowActivationEndEpoch = try? c.decode(Double.self, forKey: .windowActivationEndEpoch)
+        dateActivatedEpoch = try? c.decode(Double.self, forKey: .dateActivatedEpoch)
+        dateTerminatedEpoch = try? c.decode(Double.self, forKey: .dateTerminatedEpoch)
         // supported_countries may be [String] or [{name}]
         if let names = try? c.decodeIfPresent([String].self, forKey: .supportedCountries) {
             supportedCountries = names
@@ -141,11 +159,21 @@ public struct EsimPackage: Decodable, Sendable, Identifiable {
         let country = packageCountryName ?? ""
         let days = timeAllowanceDays ?? 0
         let dayUnit = days == 1 ? "Day" : "Days"
-        let gb = dataAllowanceGB ?? 0
-        let isUnlimited = (nestedPackageName?.contains("Unlimited") ?? false) || gb < 0
-        let allowance = isUnlimited ? "Unlimited" : Self.formatDataGB(gb)
+        let allowance = isUnlimited ? "Unlimited" : Self.formatDataGB(dataAllowanceGB ?? 0)
         return "\(country) \(allowance) \(days) \(dayUnit)"
             .trimmingCharacters(in: .whitespaces)
+    }
+
+    /// True when the package is unlimited (web: package.name contains "Unlimited"
+    /// or a negative allowance).
+    public var isUnlimited: Bool {
+        (nestedPackageName?.contains("Unlimited") ?? false) || (dataAllowanceGB ?? 0) < 0
+    }
+
+    /// Bytes consumed = allowance − remaining, when both are present.
+    public var dataUsedBytes: Double? {
+        guard let a = dataAllowanceBytes, let r = dataUsageRemainingBytes else { return nil }
+        return max(0, a - r)
     }
 
     /// Port of the web `format_data_gb`: parseInt truncates toward zero, then
@@ -204,6 +232,9 @@ public struct Whitelist: Decodable, Sendable, Identifiable {
     public let whitelistName: String?
     public let dataAllowed: Bool
     public let bestConnectivity: String?
+    public let lteSupport: String?
+    public let androidAutoApn: Bool?
+    public let iosAutoApn: Bool?
     public var id: String { "\(country ?? "")-\(`operator` ?? "")-\(whitelistName ?? "")" }
 
     private enum K: String, CodingKey {
@@ -211,6 +242,9 @@ public struct Whitelist: Decodable, Sendable, Identifiable {
         case whitelistName = "whitelist_name"
         case dataAllowed = "data_allowed"
         case bestConnectivity = "best_connectivity"
+        case lteSupport = "lte_support"
+        case androidAutoApn = "android_auto_apn"
+        case iosAutoApn = "ios_auto_apn"
     }
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: K.self)
@@ -219,6 +253,9 @@ public struct Whitelist: Decodable, Sendable, Identifiable {
         whitelistName = try? c.decode(String.self, forKey: .whitelistName)
         dataAllowed = (try? c.decode(Bool.self, forKey: .dataAllowed)) ?? false
         bestConnectivity = try? c.decode(String.self, forKey: .bestConnectivity)
+        lteSupport = try? c.decode(String.self, forKey: .lteSupport)
+        androidAutoApn = try? c.decode(Bool.self, forKey: .androidAutoApn)
+        iosAutoApn = try? c.decode(Bool.self, forKey: .iosAutoApn)
     }
 }
 

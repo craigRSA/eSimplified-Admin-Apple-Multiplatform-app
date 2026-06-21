@@ -39,6 +39,36 @@ final class EsimDetailTests: XCTestCase {
         XCTAssertEqual(esim.packages.first?.displayName, "USA Unlimited 7 Days")
     }
 
+    func test_package_decodes_bytes_dates_and_used() throws {
+        let esim = try decodeEsim(#"""
+        {"iccid":"1","packages":[
+          {"status":"ACTIVE","package_country_name":"Italy","data_allowance_gigabytes":5,
+           "time_allowance_days":30,"package":{"name":"Italy 5GB"},
+           "data_allowance_bytes":5368709120,"data_usage_remaining_bytes":1073741824,
+           "date_activated_epoch":1700000000,"supported_countries":["Italy","France"]}
+        ]}
+        """#)
+        let pkg = try XCTUnwrap(esim.packages.first)
+        XCTAssertEqual(pkg.dataUsedBytes, 4294967296)   // allowance − remaining
+        XCTAssertEqual(pkg.dateActivatedEpoch, 1700000000)
+        XCTAssertFalse(pkg.isUnlimited)
+        XCTAssertEqual(pkg.supportedCountries, ["Italy", "France"])
+    }
+
+    func test_whitelist_decodes_lte_and_apn_flags() throws {
+        let esim = try decodeEsim(#"""
+        {"iccid":"1","whitelist":[
+          {"country":"France","operator":"Orange","data_allowed":true,
+           "lte_support":"Yes","best_connectivity":"4G",
+           "android_auto_apn":true,"ios_auto_apn":false}
+        ]}
+        """#)
+        let w = try XCTUnwrap(esim.whitelist.first)
+        XCTAssertEqual(w.lteSupport, "Yes")
+        XCTAssertEqual(w.androidAutoApn, true)
+        XCTAssertEqual(w.iosAutoApn, false)
+    }
+
     func test_formatDataGB_thresholds_match_web() {
         XCTAssertEqual(EsimPackage.formatDataGB(-1), "Unlimited")
         XCTAssertEqual(EsimPackage.formatDataGB(0), "0 MB")

@@ -80,6 +80,7 @@ struct CustomerDetailScreen: View {
                 case let .sessions(iccid): SessionsSheet(session: session, iccid: iccid)
                 case let .packages(pkgs): PackagesSheet(packages: pkgs)
                 case let .whitelist(items): WhitelistSheet(items: items)
+                case let .supportedCountries(list): SupportedCountriesSheet(countries: list)
                 }
             }
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { sheet = nil } } }
@@ -436,8 +437,17 @@ private struct EsimDetailCard: View {
                     ForEach(euiccItems, id: \.0) { LabeledValue(label: $0.0, value: $0.1) }
                 }
             }
-            if !detail.whitelist.isEmpty {
-                HStack { Spacer(); viewButton("Whitelist (\(detail.whitelist.count))", .whitelist(detail.whitelist)) }
+            if !allSupportedCountries.isEmpty || !detail.whitelist.isEmpty {
+                HStack(spacing: Spacing.md) {
+                    Spacer()
+                    if !allSupportedCountries.isEmpty {
+                        viewButton("Supported countries (\(allSupportedCountries.count))",
+                                   .supportedCountries(allSupportedCountries))
+                    }
+                    if !detail.whitelist.isEmpty {
+                        viewButton("Whitelist (\(detail.whitelist.count))", .whitelist(detail.whitelist))
+                    }
+                }
             }
             divider
             dataUsageBlock
@@ -452,6 +462,11 @@ private struct EsimDetailCard: View {
 
     private func viewButton(_ title: String, _ sheet: EsimDetailSheet) -> some View {
         Button(title) { onView(sheet) }.font(.caption).buttonStyle(.borderless)
+    }
+
+    /// Unique sorted union of every package's supported countries (web aggregates these).
+    private var allSupportedCountries: [String] {
+        Array(Set(detail.packages.flatMap { $0.supportedCountries })).sorted()
     }
 
     /// A sub-section eyebrow with an optional "View all" affordance. Matches the
@@ -602,12 +617,14 @@ enum EsimDetailSheet: Identifiable {
     case sessions(String)
     case packages([EsimPackage])
     case whitelist([Whitelist])
+    case supportedCountries([String])
     var id: String {
         switch self {
         case .locations: "locations"
         case .sessions: "sessions"
         case .packages: "packages"
         case .whitelist: "whitelist"
+        case .supportedCountries: "supportedCountries"
         }
     }
 }
@@ -710,22 +727,39 @@ private struct PackagesSheet: View {
     var body: some View {
         listOrEmpty(loading: false, count: packages.count, empty: "No packages.") {
             ForEach(packages) { pkg in
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 3) {
                     HStack {
                         Text(pkg.displayName).font(.body)
                         Spacer()
                         if let s = pkg.status { StatusBadge(status: s) }
                     }
-                    HStack(spacing: Spacing.sm) {
-                        // Allowance is already part of displayName; show countries + created date here.
-                        if !pkg.supportedCountries.isEmpty { Text("\(pkg.supportedCountries.count) countries").font(.caption2).foregroundStyle(.secondary) }
-                        if let when = epochDate(pkg.dateCreatedEpoch) { Text(when).font(.caption2).foregroundStyle(.secondary) }
+                    ForEach(detailLines(pkg), id: \.self) { line in
+                        Text(line).font(.caption2).foregroundStyle(.secondary)
                     }
                 }
                 .accessibilityElement(children: .combine)
             }
         }
         .navigationTitle("Packages")
+    }
+
+    /// Status-dependent detail lines, mirroring the web's package modal columns.
+    private func detailLines(_ pkg: EsimPackage) -> [String] {
+        var lines: [String] = []
+        switch (pkg.status ?? "").uppercased() {
+        case "NOT_ACTIVE":
+            let start = epochDate(pkg.windowActivationStartEpoch)
+            let end = epochDate(pkg.windowActivationEndEpoch)
+            if start != nil || end != nil { lines.append("Window \(start ?? "—") – \(end ?? "—")") }
+        case "TERMINATED":
+            if let d = epochDate(pkg.dateTerminatedEpoch) { lines.append("Terminated \(d)") }
+        default:
+            if let d = epochDate(pkg.dateActivatedEpoch) { lines.append("Activated \(d)") }
+            if !pkg.isUnlimited, let r = pkg.dataUsageRemainingBytes { lines.append("\(fmtBytes(r)) left") }
+        }
+        if let used = pkg.dataUsedBytes { lines.append("\(fmtBytes(used)) used") }
+        if !pkg.supportedCountries.isEmpty { lines.append("\(pkg.supportedCountries.count) countries") }
+        return lines
     }
 }
 
@@ -745,12 +779,45 @@ private struct WhitelistSheet: View {
                     HStack(spacing: Spacing.sm) {
                         if let n = w.whitelistName { Text(n).font(.caption2).foregroundStyle(.secondary) }
                         if let bc = w.bestConnectivity { Text(bc).font(.caption2).foregroundStyle(.tertiary) }
+                        if let lte = w.lteSupport, !lte.isEmpty {
+                            Text("LTE \(lte)").font(.caption2).foregroundStyle(.tertiary)
+                        }
+                    }
+                    if w.androidAutoApn != nil || w.iosAutoApn != nil {
+                        HStack(spacing: Spacing.sm) {
+                            if let a = w.androidAutoApn { apnFlag("Android APN", a) }
+                            if let i = w.iosAutoApn { apnFlag("iOS APN", i) }
+                        }
                     }
                 }
                 .accessibilityElement(children: .combine)
             }
         }
         .navigationTitle("Whitelist")
+    }
+
+    private func apnFlag(_ label: String, _ on: Bool) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: on ? "checkmark.circle.fill" : "xmark.circle")
+                .font(.caption2).foregroundStyle(on ? .positive : .tertiary)
+            Text(label).font(.caption2).foregroundStyle(.tertiary)
+        }
+    }
+}
+
+/// Searchable union of countries supported across all of an eSIM's packages.
+private struct SupportedCountriesSheet: View {
+    let countries: [String]
+    @State private var query = ""
+    private var filtered: [String] {
+        query.isEmpty ? countries : countries.filter { $0.localizedCaseInsensitiveContains(query) }
+    }
+    var body: some View {
+        listOrEmpty(loading: false, count: filtered.count, empty: "No countries.") {
+            ForEach(filtered, id: \.self) { Text($0).font(.body) }
+        }
+        .navigationTitle("Supported countries")
+        .searchable(text: $query)
     }
 }
 
