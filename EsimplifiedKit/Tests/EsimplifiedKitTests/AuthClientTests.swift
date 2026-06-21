@@ -104,9 +104,10 @@ final class AuthClientTests: XCTestCase {
         XCTAssertEqual(s.accessToken, "a3")
     }
 
-    func test_refresh_omits_basic_auth_and_sends_client_creds_in_body() async throws {
-        // OAuth2 confidential-client refresh: no Basic header; creds in the form
-        // body (mirrors the web client). Login keeps Basic — verified separately.
+    func test_refresh_uses_basic_auth_with_only_grant_in_body() async throws {
+        // The client authenticates the refresh via HTTP Basic auth (like login, and
+        // the working `curl -u CLIENT:SECRET`); only grant_type + refresh_token go in
+        // the body. Creds in the body with no Basic header get rejected as invalid_grant.
         var captured: URLRequest?
         MockURLProtocol.handler = { req in
             captured = req
@@ -115,12 +116,13 @@ final class AuthClientTests: XCTestCase {
         }
         _ = try await makeClient().refresh(host: "https://h.io", refreshToken: "r2")
         XCTAssertEqual(captured?.url?.absoluteString, "https://h.io/auth/token/")
-        XCTAssertNil(captured?.value(forHTTPHeaderField: "Authorization"))
+        XCTAssertEqual(captured?.value(forHTTPHeaderField: "Authorization"),
+                       "Basic " + Data("cid:csec".utf8).base64EncodedString())
         let body = try XCTUnwrap(String(data: XCTUnwrap(Self.bodyData(captured)), encoding: .utf8))
         XCTAssertTrue(body.contains("grant_type=refresh_token"), body)
         XCTAssertTrue(body.contains("refresh_token=r2"), body)
-        XCTAssertTrue(body.contains("client_id=cid"), body)
-        XCTAssertTrue(body.contains("client_secret=csec"), body)
+        XCTAssertFalse(body.contains("client_id"), "client creds belong in Basic auth, not the body: \(body)")
+        XCTAssertFalse(body.contains("client_secret"), body)
     }
 
     private static func bodyData(_ req: URLRequest?) -> Data? {

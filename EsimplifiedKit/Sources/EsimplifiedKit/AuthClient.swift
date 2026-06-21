@@ -49,13 +49,13 @@ public final class LiveAuthClient: AuthClient {
     }
 
     public func refresh(host: String, refreshToken: String) async throws -> Session {
-        // OAuth2 refresh for a confidential client mirrors the web client: NO
-        // Basic auth header; the client_id/client_secret travel in the form body.
-        // (Login, by contrast, keeps Basic auth and omits body creds.)
+        // The client authenticates via HTTP Basic auth — same as login, and as the
+        // server's documented `curl -u CLIENT_ID:CLIENT_SECRET … -d grant_type=refresh_token`.
+        // Only the grant travels in the body; putting the creds in the body with no
+        // Basic header instead is rejected with `invalid_grant`.
         let json = try await post(host: host, path: "/auth/token/", extraHeaders: [:], form: [
             "grant_type": "refresh_token", "refresh_token": refreshToken,
-            "client_id": clientID, "client_secret": clientSecret,
-        ], useBasicAuth: false)
+        ])
         return try Self.makeSession(from: json, host: host)
     }
 
