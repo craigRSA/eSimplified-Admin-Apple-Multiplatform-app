@@ -799,7 +799,7 @@ private struct WhitelistSheet: View {
     private func apnFlag(_ label: String, _ on: Bool) -> some View {
         HStack(spacing: 3) {
             Image(systemName: on ? "checkmark.circle.fill" : "xmark.circle")
-                .font(.caption2).foregroundStyle(on ? .positive : .tertiary)
+                .font(.caption2).foregroundStyle(on ? .positive : .secondary)
             Text(label).font(.caption2).foregroundStyle(.tertiary)
         }
     }
@@ -982,7 +982,7 @@ private struct NotificationPrefsView: View {
                     ForEach(group.1, id: \.0) { item in
                         HStack(spacing: 3) {
                             Image(systemName: item.1 ? "checkmark.circle.fill" : "circle")
-                                .font(.caption2).foregroundStyle(item.1 ? .positive : .tertiary)
+                                .font(.caption2).foregroundStyle(item.1 ? .positive : .secondary)
                             Text(item.0).font(.caption2).foregroundStyle(.secondary)
                         }
                     }
