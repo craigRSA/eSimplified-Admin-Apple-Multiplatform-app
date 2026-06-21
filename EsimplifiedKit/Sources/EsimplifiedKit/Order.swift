@@ -48,8 +48,15 @@ public struct Order: Decodable, Identifiable, Equatable, Sendable {
         func str(_ key: K, _ fallback: String = "") throws -> String {
             try c.decodeIfPresent(String.self, forKey: key) ?? fallback
         }
+        // order_number comes over the wire as a JSON number, not the string the
+        // web's TS type claims — accept either or the whole page fails to decode.
+        func numericOrString(_ key: K) -> String {
+            if let s = try? c.decode(String.self, forKey: key) { return s }
+            if let i = try? c.decode(Int.self, forKey: key) { return String(i) }
+            return ""
+        }
         orderUUID = try str(.orderUUID)
-        orderNumber = try str(.orderNumber)
+        orderNumber = numericOrString(.orderNumber)
         orderType = try str(.orderType)
         packageName = try str(.packageName)
         finalPrice = try str(.finalPrice, "0")

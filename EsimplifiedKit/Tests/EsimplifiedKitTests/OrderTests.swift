@@ -59,6 +59,50 @@ final class OrderTests: XCTestCase {
         XCTAssertNil(second.customerName)
     }
 
+    func test_decode_handles_numeric_order_number() throws {
+        // Live responses send order_number as a JSON number (133831), not the
+        // string the web's TS type claims. Decoding the page must not throw.
+        let json = """
+        {
+          "count": 2,
+          "results": [
+            {
+              "total": 2, "total_purchases": 1, "total_topups": 1,
+              "orders": [
+                {
+                  "order_uuid": "86d7", "order_number": 133831, "order_type": "BUY",
+                  "package_name": "Algeria 1 GB 7 Days", "final_price": "4.25",
+                  "final_price_local": "4.25", "purchase_currency": "US $",
+                  "purchase_currency_obj": {"symbol":"US $","iso":"USD"},
+                  "purchase_country": null,
+                  "purchase_date": "2026-06-03T08:00:05.665816Z",
+                  "payment_status": "refunded", "payment_method": "agent_payment",
+                  "tenant": "knowroaming",
+                  "customer": {"email":"x@x.io","full_name":"Xolani Khumalo","customer_id":"1f99"}
+                },
+                {
+                  "order_uuid": "c0d5", "order_number": 115051, "order_type": "BUY",
+                  "package_name": "UAE 1 GB 7 Days", "final_price": "3.89",
+                  "purchase_currency": "US $",
+                  "purchase_country": {"iso":"ZA","name":"South Africa"},
+                  "purchase_date": "2026-04-09T07:48:53.515496Z",
+                  "payment_status": "refunded", "payment_method": "stripe_intent",
+                  "tenant": "knowroaming", "customer": {"email":"x@x.io"}
+                }
+              ]
+            }
+          ]
+        }
+        """
+        let page = try JSONDecoder().decode(OrdersPage.self, from: Data(json.utf8))
+        XCTAssertEqual(page.count, 2)
+        XCTAssertEqual(page.orders.count, 2)
+        XCTAssertEqual(page.orders[0].orderNumber, "133831")
+        XCTAssertEqual(page.orders[0].purchaseCountry, nil)
+        XCTAssertEqual(page.orders[1].orderNumber, "115051")
+        XCTAssertEqual(page.orders[1].purchaseCountry, "South Africa")
+    }
+
     func test_decode_tolerates_empty() throws {
         let page = try JSONDecoder().decode(OrdersPage.self, from: Data("{}".utf8))
         XCTAssertEqual(page.count, 0)
