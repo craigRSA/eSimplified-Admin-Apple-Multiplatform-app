@@ -5,7 +5,9 @@ import EsimplifiedKit
 /// tenant) and by ICCID (global). Results open the customer detail screen.
 struct SearchScreen: View {
     let session: Session
-    var tenant: String?
+    let tenants: [Tenant]
+    @Binding var selectedTenant: Tenant?
+    @Binding var focusSearchField: Bool
 
     enum Mode: String, CaseIterable, Identifiable {
         case customer = "Customer", iccid = "ICCID"
@@ -13,102 +15,141 @@ struct SearchScreen: View {
     }
 
     @Environment(\.tokenProvider) private var tokenProvider
+    @FocusState private var searchFocused
     @State private var mode: Mode = .customer
     @State private var term = ""
     @State private var phase: Phase = .idle
 
     enum Phase { case idle, loading, customers([Customer]), esim(EsimSummary, String), empty(String), failed(String) }
 
+    private var tenantScope: String? { selectedTenant?.schemaName }
+
     var body: some View {
         NavigationStack {
-            Group {
-                switch phase {
-                case .idle:
-                    idleView
-                case .loading:
-                    ProgressView()
-                        .controlSize(.large)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                case let .customers(list):
-                    resultsScaffold(count: list.count) {
-                        List(list) { c in
-                            NavigationLink(value: CustomerRef(tenant: tenant ?? "",
-                                                            customerId: c.customerId ?? "")) {
-                                CustomerSearchRow(customer: c)
-                            }
-                            .listRowInsets(Self.rowInsets)
-                            .listRowSeparator(.visible)
-                            .listRowBackground(Color.clear)
-                        }
-                    }
-                case let .esim(esim, esimTenant):
-                    resultsScaffold(count: 1) {
-                        List {
-                            NavigationLink(value: CustomerRef(tenant: esimTenant,
-                                                              customerId: esim.customer?.customerId ?? "",
-                                                              iccid: esim.iccid)) {
-                                EsimSearchRow(esim: esim, tenant: esimTenant)
-                            }
-                            .listRowInsets(Self.rowInsets)
-                            .listRowSeparator(.visible)
-                            .listRowBackground(Color.clear)
-                        }
-                    }
-                case let .empty(message):
-                    ContentUnavailableView(message, systemImage: "magnifyingglass")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                case let .failed(message):
-                    ContentUnavailableView {
-                        Label("Search failed", systemImage: "exclamationmark.triangle")
-                    } description: {
-                        Text(message)
-                    } actions: {
-                        Button("Try Again") { Task { await run() } }
-                            .buttonStyle(.glassProminent)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
+            VStack(spacing: 0) {
+                searchPanel
+                    .padding(Spacing.lg)
+                Divider()
+                mainContent
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .background(AppBackground())
             .navigationTitle("Search")
             .navigationDestination(for: CustomerRef.self) { CustomerDetailScreen(session: session, ref: $0) }
-            .toolbar { searchToolbar }
             .onChange(of: mode) { _, _ in phase = .idle; term = "" }
+            .onChange(of: selectedTenant) { _, _ in phase = .idle }
+            .onChange(of: focusSearchField) { _, focus in
+                if focus { applySearchFocus() }
+            }
+            .onAppear { if focusSearchField { applySearchFocus() } }
+            .searchFocusCommand { applySearchFocus() }
         }
         .searchable(text: $term, prompt: promptText)
         .onSubmit(of: .search) { Task { await run() } }
     }
 
-    @ToolbarContentBuilder private var searchToolbar: some ToolbarContent {
-        ToolbarItem(placement: .principal) {
+    private func applySearchFocus() {
+        focusSearchField = false
+        searchFocused = true
+    }
+
+    private var searchPanel: some View {
+        VStack(alignment: .leading, spacing: Spacing.md) {
             Picker("Search by", selection: $mode) {
                 ForEach(Mode.allCases) { Text($0.rawValue).tag($0) }
             }
             .pickerStyle(.segmented)
-            .frame(maxWidth: 240)
-            .labelsHidden()
+
+            if mode == .customer && tenants.count > 1 {
+                Picker("Tenant", selection: $selectedTenant) {
+                    Text("Select a tenant").tag(Optional<Tenant>.none)
+                    ForEach(tenants) { tenant in
+                        Text(tenant.name).tag(Optional(tenant))
+                    }
+                }
+                .pickerStyle(.menu)
+            }
+
+            HStack(spacing: Spacing.sm) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+                TextField(promptText, text: $term)
+                    .textFieldStyle(.plain)
+                    #if os(iOS)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .keyboardType(mode == .iccid ? .numberPad : .default)
+                    #endif
+                    .focused($searchFocused)
+                    .onSubmit { Task { await run() } }
+
+                Button("Search") { Task { await run() } }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!canSearch)
+            }
+            .padding(.horizontal, Spacing.md)
+            .padding(.vertical, Spacing.sm + 2)
+            .background {
+                RoundedRectangle(cornerRadius: Radius.chip, style: .continuous)
+                    .fill(.quaternary.opacity(0.35))
+            }
+
+            if mode == .customer && selectedTenant == nil && tenants.count > 1 {
+                Text("Pick a tenant to search customers.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
-        ToolbarItem(placement: .primaryAction) {
-            Button("Search", systemImage: "magnifyingglass") { Task { await run() } }
-                .disabled(!canSearch)
-                .help("Search")
-        }
+        .frame(maxWidth: 540, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .onAppear { searchFocused = true }
     }
 
-    @ViewBuilder private var idleView: some View {
-        if mode == .customer && tenant == nil {
-            ContentUnavailableView {
-                Label("Pick a Tenant", systemImage: "building.2")
-            } description: {
-                Text("Choose a tenant in the toolbar to search customers.")
+    @ViewBuilder private var mainContent: some View {
+        switch phase {
+        case .idle:
+            Spacer(minLength: 0)
+        case .loading:
+            ProgressView()
+                .controlSize(.large)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        case let .customers(list):
+            resultsScaffold(count: list.count) {
+                List(list) { c in
+                    NavigationLink(value: CustomerRef(tenant: tenantScope ?? "",
+                                                    customerId: c.customerId ?? "")) {
+                        CustomerSearchRow(customer: c)
+                    }
+                    .listRowInsets(Self.rowInsets)
+                    .listRowSeparator(.visible)
+                    .listRowBackground(Color.clear)
+                }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else {
+        case let .esim(esim, esimTenant):
+            resultsScaffold(count: 1) {
+                List {
+                    NavigationLink(value: CustomerRef(tenant: esimTenant,
+                                                      customerId: esim.customer?.customerId ?? "",
+                                                      iccid: esim.iccid)) {
+                        EsimSearchRow(esim: esim, tenant: esimTenant)
+                    }
+                    .listRowInsets(Self.rowInsets)
+                    .listRowSeparator(.visible)
+                    .listRowBackground(Color.clear)
+                }
+            }
+        case let .empty(message):
+            ContentUnavailableView(message, systemImage: "magnifyingglass")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        case let .failed(message):
             ContentUnavailableView {
-                Label("Search", systemImage: "magnifyingglass")
+                Label("Search failed", systemImage: "exclamationmark.triangle")
             } description: {
-                Text(idleHint)
+                Text(message)
+            } actions: {
+                Button("Try Again") { Task { await run() } }
+                    .buttonStyle(.glassProminent)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -132,18 +173,12 @@ struct SearchScreen: View {
     }
 
     private var promptText: String {
-        mode == .iccid ? "ICCID" : "Name, email, or phone"
-    }
-
-    private var idleHint: String {
-        mode == .iccid
-            ? "Enter a 19–20 digit ICCID starting with 89, then press Return or tap Search."
-            : "Enter at least 3 characters, then press Return or tap Search."
+        mode == .iccid ? "ICCID (starts with 89…)" : "Name, email, or phone"
     }
 
     private var canSearch: Bool {
         let t = term.trimmingCharacters(in: .whitespaces)
-        return mode == .iccid ? !t.isEmpty : (t.count >= 3 && tenant != nil)
+        return mode == .iccid ? !t.isEmpty : (t.count >= 3 && tenantScope != nil)
     }
 
     private static let rowInsets = EdgeInsets(top: Spacing.sm, leading: Spacing.lg,
@@ -158,12 +193,12 @@ struct SearchScreen: View {
             if mode == .iccid {
                 let resp = try await client.get("/api/esim/\(t)/", query: ["search": "true"], as: EsimSearchResponse.self)
                 if let e = resp.esim, !e.iccid.isEmpty {
-                    phase = .esim(e, resp.tenant ?? tenant ?? "")
+                    phase = .esim(e, resp.tenant ?? tenantScope ?? "")
                 } else {
                     phase = .empty("No eSIM found for that ICCID.")
                 }
             } else {
-                guard let tn = tenant else { phase = .idle; return }
+                guard let tn = tenantScope else { phase = .idle; return }
                 let page = try await client.get("/api/customers/\(tn)/", query: ["search": t], as: CustomersPage.self)
                 phase = page.customers.isEmpty ? .empty("No customers found.") : .customers(page.customers)
             }

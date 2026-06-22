@@ -63,6 +63,7 @@ struct AdminShell: View {
             detail
                 .toolbar {
                     ToolbarItemGroup(placement: .primaryAction) {
+                        if model.sections.contains(.search) { SearchToolbarButton(model: model) }
                         if !model.tenants.isEmpty { TenantMenu(model: model) }
                         RefreshIntervalMenu(seconds: $autoRefreshSeconds)
                     }
@@ -87,7 +88,11 @@ struct AdminShell: View {
         case .inventory:
             if let session = model.session { InventoryScreen(session: session) }
         case .search:
-            if let session = model.session { SearchScreen(session: session, tenant: scope) }
+            if let session = model.session {
+                SearchScreen(session: session, tenants: model.tenants,
+                             selectedTenant: $model.selectedTenant,
+                             focusSearchField: $model.focusSearchField)
+            }
         case .agentApprovals:
             if let session = model.session { AgentApprovalsScreen(session: session, tenant: scope) }
         case .profile:
@@ -101,6 +106,21 @@ struct AdminShell: View {
         case nil:
             PlaceholderDetail(title: "Select a section")
         }
+    }
+}
+
+/// Jump-to-search control in the shell toolbar — same row as tenant scope and
+/// auto-refresh. Tapping opens Search and focuses the query field.
+private struct SearchToolbarButton: View {
+    let model: AdminAppModel
+    var body: some View {
+        Button { model.openSearch() } label: {
+            Label("Search", systemImage: "magnifyingglass")
+                .labelStyle(.iconOnly)
+                .symbolVariant(model.selection == .search ? .fill : .none)
+        }
+        .help("Search")
+        .accessibilityLabel("Search")
     }
 }
 

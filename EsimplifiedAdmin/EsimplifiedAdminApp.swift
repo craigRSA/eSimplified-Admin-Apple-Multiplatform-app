@@ -88,6 +88,9 @@ final class AdminAppModel {
     /// drive the same selection the shell binds to.
     var selection: AdminSection?
 
+    /// Set by the Find (⌘F) menu command; SearchScreen consumes this to focus its field.
+    var focusSearchField = false
+
     // Client credentials injected from the build (Info.plist keys), never hardcoded.
     let clientID: String
     let clientSecret: String
@@ -196,6 +199,13 @@ final class AdminAppModel {
             $0 != .agentOrder && ($0.scopeResource == nil || session.hasScope($0.scopeResource!))
         }
     }
+
+    /// Jump to Search and focus its query field — wired to the Find menu (⌘F).
+    func openSearch() {
+        guard sections.contains(.search) else { return }
+        selection = .search
+        focusSearchField = true
+    }
 }
 
 private struct TenantLogosKey: EnvironmentKey {
@@ -290,6 +300,9 @@ struct AdminCommands: Commands {
             Button("Refresh") { refresh?() }
                 .keyboardShortcut("r", modifiers: .command)
                 .disabled(refresh == nil)
+            Button("Search") { model.openSearch() }
+                .keyboardShortcut("f", modifiers: .command)
+                .disabled(!model.sections.contains(.search))
         }
         CommandMenu("Go") {
             ForEach(Array(model.sections.prefix(9).enumerated()), id: \.element) { index, section in

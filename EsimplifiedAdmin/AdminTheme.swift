@@ -275,6 +275,23 @@ extension View {
     }
 }
 
+// MARK: - Focused search action (⌘F while already on Search)
+
+/// SearchScreen publishes this so a second ⌘F focuses the query field in place.
+struct SearchFocusActionKey: FocusedValueKey { typealias Value = @MainActor () -> Void }
+extension FocusedValues {
+    var searchFocusAction: SearchFocusActionKey.Value? {
+        get { self[SearchFocusActionKey.self] }
+        set { self[SearchFocusActionKey.self] = newValue }
+    }
+}
+
+extension View {
+    func searchFocusCommand(_ action: @escaping @MainActor () -> Void) -> some View {
+        focusedSceneValue(\.searchFocusAction, action)
+    }
+}
+
 // MARK: - Section header
 
 /// A small eyebrow + title used above grouped content. Uppercase tracking gives
