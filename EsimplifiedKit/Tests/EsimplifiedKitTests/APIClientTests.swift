@@ -11,6 +11,18 @@ final class APIClientTests: XCTestCase {
                       session: MockURLProtocol.makeSession())
     }
 
+    func test_get_percent_encodes_plus_in_query_values() async throws {
+        var captured: URLRequest?
+        MockURLProtocol.handler = { req in
+            captured = req
+            let resp = HTTPURLResponse(url: req.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (resp, Data(#"{"id":1,"name":"a"}"#.utf8))
+        }
+        _ = try await makeClient().get("/api/customers/foo/", query: ["search": "a+b@c"], as: Widget.self)
+        XCTAssertEqual(captured?.url?.absoluteString,
+                       "https://live.esimplified.io/api/customers/foo/?search=a%2Bb%40c")
+    }
+
     func test_get_builds_url_query_and_bearer_then_decodes() async throws {
         var captured: URLRequest?
         MockURLProtocol.handler = { req in

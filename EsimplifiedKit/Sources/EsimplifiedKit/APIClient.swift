@@ -38,9 +38,10 @@ public final class LiveAPIClient: APIClient {
         guard var components = URLComponents(string: host) else { throw APIError.unreachable }
         components.path = path
         if !query.isEmpty {
-            // Sort for deterministic URL ordering (Dictionary iteration order is undefined).
-            components.queryItems = query.sorted { $0.key < $1.key }
-                .map { URLQueryItem(name: $0.key, value: $0.value) }
+            // URLComponents leaves `+` unencoded in query values; servers decode
+            // that as a space (form-urlencoded rules). Reuse the auth client's
+            // RFC 3986 encoder so emails like `user+tag@…` survive intact.
+            components.percentEncodedQuery = LiveAuthClient.formEncode(query)
         }
         guard let url = components.url else { throw APIError.unreachable }
 

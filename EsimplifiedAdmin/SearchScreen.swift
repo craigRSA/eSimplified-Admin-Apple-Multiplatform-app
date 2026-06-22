@@ -21,103 +21,133 @@ struct SearchScreen: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: Spacing.md) {
-                Picker("Search by", selection: $mode) {
-                    ForEach(Mode.allCases) { Text($0.rawValue).tag($0) }
+            Group {
+                switch phase {
+                case .idle:
+                    idleView
+                case .loading:
+                    ProgressView()
+                        .controlSize(.large)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                case let .customers(list):
+                    resultsScaffold(count: list.count) {
+                        List(list) { c in
+                            NavigationLink(value: CustomerRef(tenant: tenant ?? "",
+                                                            customerId: c.customerId ?? "")) {
+                                CustomerSearchRow(customer: c)
+                            }
+                            .listRowInsets(Self.rowInsets)
+                            .listRowSeparator(.visible)
+                            .listRowBackground(Color.clear)
+                        }
+                    }
+                case let .esim(esim, esimTenant):
+                    resultsScaffold(count: 1) {
+                        List {
+                            NavigationLink(value: CustomerRef(tenant: esimTenant,
+                                                              customerId: esim.customer?.customerId ?? "",
+                                                              iccid: esim.iccid)) {
+                                EsimSearchRow(esim: esim, tenant: esimTenant)
+                            }
+                            .listRowInsets(Self.rowInsets)
+                            .listRowSeparator(.visible)
+                            .listRowBackground(Color.clear)
+                        }
+                    }
+                case let .empty(message):
+                    ContentUnavailableView(message, systemImage: "magnifyingglass")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                case let .failed(message):
+                    ContentUnavailableView {
+                        Label("Search failed", systemImage: "exclamationmark.triangle")
+                    } description: {
+                        Text(message)
+                    } actions: {
+                        Button("Try Again") { Task { await run() } }
+                            .buttonStyle(.glassProminent)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .pickerStyle(.segmented)
-
-                HStack(spacing: Spacing.sm) {
-                    TextField(promptText, text: $term)
-                        .textFieldStyle(.roundedBorder)
-                        #if os(iOS)
-                        .textInputAutocapitalization(.never).autocorrectionDisabled()
-                        .keyboardType(mode == .iccid ? .numberPad : .default)
-                        #endif
-                        .onSubmit { Task { await run() } }
-                    Button("Search") { Task { await run() } }
-                        .disabled(!canSearch)
-                }
-
-                resultArea
             }
-            .padding(Spacing.lg)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .background(AppBackground())
             .navigationTitle("Search")
             .navigationDestination(for: CustomerRef.self) { CustomerDetailScreen(session: session, ref: $0) }
+            .toolbar { searchToolbar }
             .onChange(of: mode) { _, _ in phase = .idle; term = "" }
+        }
+        .searchable(text: $term, prompt: promptText)
+        .onSubmit(of: .search) { Task { await run() } }
+    }
+
+    @ToolbarContentBuilder private var searchToolbar: some ToolbarContent {
+        ToolbarItem(placement: .principal) {
+            Picker("Search by", selection: $mode) {
+                ForEach(Mode.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .frame(maxWidth: 240)
+            .labelsHidden()
+        }
+        ToolbarItem(placement: .primaryAction) {
+            Button("Search", systemImage: "magnifyingglass") { Task { await run() } }
+                .disabled(!canSearch)
+                .help("Search")
+        }
+    }
+
+    @ViewBuilder private var idleView: some View {
+        if mode == .customer && tenant == nil {
+            ContentUnavailableView {
+                Label("Pick a Tenant", systemImage: "building.2")
+            } description: {
+                Text("Choose a tenant in the toolbar to search customers.")
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            ContentUnavailableView {
+                Label("Search", systemImage: "magnifyingglass")
+            } description: {
+                Text(idleHint)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    private func resultsScaffold<Content: View>(count: Int, @ViewBuilder content: () -> Content) -> some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text(count == 1 ? "1 result" : "\(count) results")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+            .padding(.horizontal, Spacing.lg)
+            .padding(.vertical, Spacing.sm)
+            Divider()
+            content()
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
         }
     }
 
     private var promptText: String {
-        mode == .iccid ? "ICCID (starts with 89…)" : "Name, email, or phone"
+        mode == .iccid ? "ICCID" : "Name, email, or phone"
     }
+
+    private var idleHint: String {
+        mode == .iccid
+            ? "Enter a 19–20 digit ICCID starting with 89, then press Return or tap Search."
+            : "Enter at least 3 characters, then press Return or tap Search."
+    }
+
     private var canSearch: Bool {
         let t = term.trimmingCharacters(in: .whitespaces)
-        // ICCID: any non-empty term (matches the web, which only checks for empty).
         return mode == .iccid ? !t.isEmpty : (t.count >= 3 && tenant != nil)
     }
 
-    @ViewBuilder private var resultArea: some View {
-        switch phase {
-        case .idle:
-            if mode == .customer && tenant == nil {
-                QuietEmptyState(title: "Pick a tenant", systemImage: "building.2",
-                                message: "Choose a tenant in the toolbar to search customers.")
-            } else {
-                QuietEmptyState(title: "Search by \(mode.rawValue.lowercased())", systemImage: "magnifyingglass",
-                                message: mode == .iccid ? "Enter an ICCID." : "Enter a name, email, or phone.")
-            }
-        case .loading:
-            ProgressView().controlSize(.large).frame(maxWidth: .infinity, maxHeight: .infinity)
-        case let .customers(list):
-            List(list) { c in
-                NavigationLink(value: CustomerRef(tenant: tenant ?? "", customerId: c.customerId ?? "")) {
-                    customerRow(c)
-                }
-            }
-            .listStyle(.plain)
-        case let .esim(esim, esimTenant):
-            List {
-                NavigationLink(value: CustomerRef(tenant: esimTenant,
-                                                  customerId: esim.customer?.customerId ?? "",
-                                                  iccid: esim.iccid)) {
-                    esimRow(esim, esimTenant)
-                }
-            }
-            .listStyle(.plain)
-        case let .empty(message):
-            ContentUnavailableView(message, systemImage: "magnifyingglass")
-        case let .failed(message):
-            ContentUnavailableView("Search failed", systemImage: "exclamationmark.triangle",
-                                   description: Text(message))
-        }
-    }
-
-    private func customerRow(_ c: Customer) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.xs / 2) {
-            Text(c.displayName).font(.headline)
-            if let e = c.email, e != c.displayName { Text(e).font(.caption).foregroundStyle(.secondary) }
-            if let p = c.phoneNumber, !p.isEmpty { Text(p).font(.caption).foregroundStyle(.secondary) }
-        }
-        .padding(.vertical, Spacing.xs)
-        .accessibilityElement(children: .combine)
-    }
-
-    private func esimRow(_ e: EsimSummary, _ esimTenant: String) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.xs / 2) {
-            Text(e.iccid).font(.headline.monospaced()).lineLimit(1)
-            if let who = e.customer?.displayName { Text(who).font(.subheadline) }
-            HStack(spacing: Spacing.sm) {
-                if let cov = e.coverageName {
-                    Label(cov, systemImage: "globe").font(.caption).foregroundStyle(.secondary)
-                }
-                if !esimTenant.isEmpty { Text(esimTenant).font(.caption).foregroundStyle(.secondary) }
-            }
-        }
-        .padding(.vertical, Spacing.xs)
-        .accessibilityElement(children: .combine)
-    }
+    private static let rowInsets = EdgeInsets(top: Spacing.sm, leading: Spacing.lg,
+                                              bottom: Spacing.sm, trailing: Spacing.lg)
 
     private func run() async {
         let t = term.trimmingCharacters(in: .whitespaces)
@@ -138,11 +168,81 @@ struct SearchScreen: View {
                 phase = page.customers.isEmpty ? .empty("No customers found.") : .customers(page.customers)
             }
         } catch let error as APIError {
-            phase = .failed(adminErrorMessage(error))
+            if case let .requestFailed(400, message) = error,
+               message?.contains("Unable to find requested resource") == true {
+                phase = .empty(mode == .iccid ? "No eSIM found for that ICCID." : "No customers found.")
+            } else {
+                phase = .failed(searchErrorMessage(error))
+            }
         } catch is CancellationError {
             // View navigated away mid-search — not a real error.
         } catch {
             phase = .failed("Unexpected error.")
         }
+    }
+
+    private func searchErrorMessage(_ error: APIError) -> String {
+        switch error {
+        case .unreachable: return "Couldn't reach the server."
+        case .authExpired: return "Your session expired — sign in again."
+        case .notFound: return "Not found."
+        case let .requestFailed(code, message):
+            if let message, message.hasPrefix("{") { return "Request failed (\(code))." }
+            return message.map { "Server (\(code)): \($0)" } ?? "Request failed (\(code))."
+        case .decoding: return "Couldn't read the server response."
+        }
+    }
+}
+
+// MARK: - Rows
+
+private struct CustomerSearchRow: View {
+    let customer: Customer
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(customer.displayName)
+                .font(.body.weight(.medium))
+            if let email = customer.email, !email.isEmpty, email != customer.displayName {
+                Text(email)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            if let phone = customer.phoneNumber, !phone.isEmpty {
+                Text(phone)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, Spacing.xs)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct EsimSearchRow: View {
+    let esim: EsimSummary
+    let tenant: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(esim.iccid)
+                .font(.body.weight(.medium).monospaced())
+                .lineLimit(1)
+            if let who = esim.customer?.displayName {
+                Text(who).font(.subheadline).foregroundStyle(.secondary)
+            }
+            HStack(spacing: Spacing.sm) {
+                if let cov = esim.coverageName {
+                    Label(cov, systemImage: "globe")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                if !tenant.isEmpty {
+                    Text(tenant).font(.subheadline).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(.vertical, Spacing.xs)
+        .accessibilityElement(children: .combine)
     }
 }
