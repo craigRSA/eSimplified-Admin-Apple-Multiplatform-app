@@ -98,21 +98,49 @@ final class AdminDashboardStatsTests: XCTestCase {
         XCTAssertEqual(stats.deltaPercent, (Decimal(string: "1523.45")! - Decimal(string: "1402.10")!) / Decimal(string: "1402.10")! * 100)
     }
 
-    func test_best_day_and_yearly_rollups_derive_from_series() throws {
+    func test_best_day_and_yearly_rollups() throws {
         let json = """
         {
           "revenue_per_month": {"2025-11":"1000","2025-12":"2000","2026-01":"3000","2026-06":"5000"},
-          "current": {"revenue_per_date":[
+          "best_day": {"date":"2026-06-02","revenue":"950.50"},
+          "revenue_per_date":[
             {"date":"2026-06-01","revenue":"100"},
             {"date":"2026-06-02","revenue":"950.50"},
             {"date":"2026-06-03","revenue":"300"}
-          ]}
+          ]
         }
         """
         let s = try JSONDecoder().decode(AdminDashboardStats.self, from: Data(json.utf8))
         XCTAssertEqual(s.bestDay, DayRevenue(date: "2026-06-02", revenue: Decimal(string: "950.50")!))
         XCTAssertEqual(s.revenueThisYear, Decimal(string: "8000"))   // 3000 + 5000 (2026)
         XCTAssertEqual(s.revenueLastYear, Decimal(string: "3000"))   // 1000 + 2000 (2025)
+    }
+
+    func test_best_day_absent_before_backend_ships() throws {
+        let s = try JSONDecoder().decode(AdminDashboardStats.self, from: Data("{}".utf8))
+        XCTAssertNil(s.bestDay)
+    }
+
+    func test_decode_top_level_best_day() throws {
+        let json = """
+        {
+          "best_day": {"date":"2026-06-02","revenue":"950.50"},
+          "revenue_per_date": [{"date":"2026-06-01","revenue":"100"}]
+        }
+        """
+        let s = try JSONDecoder().decode(AdminDashboardStats.self, from: Data(json.utf8))
+        XCTAssertEqual(s.bestDay, DayRevenue(date: "2026-06-02", revenue: Decimal(string: "950.50")!))
+    }
+
+    func test_top_level_best_day_null_when_no_sales() throws {
+        let json = """
+        {
+          "best_day": null,
+          "revenue_per_date": []
+        }
+        """
+        let s = try JSONDecoder().decode(AdminDashboardStats.self, from: Data(json.utf8))
+        XCTAssertNil(s.bestDay)
     }
 
     func test_decode_tolerates_missing_fields() throws {

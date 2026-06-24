@@ -82,21 +82,21 @@ struct DashboardScreen: View {
                      hourlyToday: s.revenuePerHourToday, hourlyYesterday: s.revenuePerHourYesterday,
                      trend: s.current.revenuePerDate)
 
-            // Headline metrics
+            // Headline metrics — each tile declares how its value should read.
             MetricGrid(items: [
-                .init("Tenants", s.tenants.formatted()),
-                .init("Customers", Fmt.countCompact(s.customers)),
-                .init("Successful orders", Fmt.countCompact(s.successOrders)),
-                .init("Revenue (all time)", Fmt.money(s.revenue)),
-                .init("Avg order value", Fmt.money(s.averageOrderValue)),
-                .init("Best day", Fmt.money(s.bestDay?.revenue ?? 0)),
-                .init("Yesterday", Fmt.money(s.revenueYesterday)),
-                .comparison("This month", Fmt.money(s.revenueCurrentMonth),
-                            AdminDashboardStats.change(s.revenueCurrentMonth, vs: s.revenueLastMonth),
-                            "vs last: \(Fmt.money(s.revenueLastMonth))"),
-                .comparison("This year", Fmt.money(s.revenueThisYear),
-                            AdminDashboardStats.change(s.revenueThisYear, vs: s.revenueLastYear),
-                            "vs last yr: \(Fmt.money(s.revenueLastYear))"),
+                .text("Tenants", s.tenants.formatted()),
+                .count("Customers", s.customers),
+                .count("Successful orders", s.successOrders),
+                .money("Revenue (all time)", s.revenue, style: .whole),
+                .money("Avg order value", s.averageOrderValue, style: .cents),
+                .money("Yesterday", s.revenueYesterday, style: .whole),
+                .money("Best day", s.bestDay?.revenue ?? 0, style: .whole, sub: s.bestDay?.date),
+                .moneyComparison("This month", s.revenueCurrentMonth, .whole,
+                                 delta: AdminDashboardStats.change(s.revenueCurrentMonth, vs: s.revenueLastMonth),
+                                 prev: s.revenueLastMonth, subPrefix: "vs last"),
+                .moneyComparison("This year", s.revenueThisYear, .whole,
+                                 delta: AdminDashboardStats.change(s.revenueThisYear, vs: s.revenueLastYear),
+                                 prev: s.revenueLastYear, subPrefix: "vs last yr"),
             ], columns: 3)
 
             // Selected range vs previous comparable period — the date picker
@@ -109,10 +109,18 @@ struct DashboardScreen: View {
                 }
                 let cur = s.current, prev = s.comparison
                 MetricGrid(items: [
-                    .comparison("Revenue", Fmt.money(cur.revenue), AdminDashboardStats.change(cur.revenue, vs: prev.revenue), "Prev: \(Fmt.money(prev.revenue))"),
-                    .comparison("Customers", Fmt.countCompact(cur.customers), AdminDashboardStats.change(Decimal(cur.customers), vs: Decimal(prev.customers)), "Prev: \(Fmt.countCompact(prev.customers))"),
-                    .comparison("Avg order value", Fmt.money(cur.averageOrderValue), AdminDashboardStats.change(cur.averageOrderValue, vs: prev.averageOrderValue), "Prev: \(Fmt.money(prev.averageOrderValue))"),
-                    .comparison("Orders", Fmt.countCompact(cur.orders), AdminDashboardStats.change(Decimal(cur.orders), vs: Decimal(prev.orders)), "Prev: \(Fmt.countCompact(prev.orders))"),
+                    .moneyComparison("Revenue", cur.revenue, .whole,
+                                     delta: AdminDashboardStats.change(cur.revenue, vs: prev.revenue),
+                                     prev: prev.revenue),
+                    .countComparison("Customers", cur.customers,
+                                     delta: AdminDashboardStats.change(Decimal(cur.customers), vs: Decimal(prev.customers)),
+                                     prev: prev.customers),
+                    .moneyComparison("Avg order value", cur.averageOrderValue, .cents,
+                                     delta: AdminDashboardStats.change(cur.averageOrderValue, vs: prev.averageOrderValue),
+                                     prev: prev.averageOrderValue),
+                    .countComparison("Orders", cur.orders,
+                                     delta: AdminDashboardStats.change(Decimal(cur.orders), vs: Decimal(prev.orders)),
+                                     prev: prev.orders),
                 ])
                 if !s.current.revenuePerDate.isEmpty {
                     ComparisonAreaChart(current: s.current.revenuePerDate, previous: s.comparison.revenuePerDate,
@@ -237,11 +245,11 @@ private struct HeroCard: View {
             // Hero eyebrow (the big number below is the headline, drawn at hero scale).
             Eyebrow("Today's gross volume")
             HStack(alignment: .firstTextBaseline, spacing: Spacing.md) {
-                Text(Fmt.money(today))
+                Text(Fmt.money(today, style: .whole))
                     .font(Font.display(.largeTitle)).monospacedDigit()
                     .contentTransition(.numericText())
                     .lineLimit(1).minimumScaleFactor(0.5)
-                    .accessibilityLabel("Today's gross volume: \(Fmt.money(today))")
+                    .accessibilityLabel("Today's gross volume: \(Fmt.money(today, style: .whole))")
                 TrendDelta(percent: AdminDashboardStats.change(today, vs: comparisonBase), pill: true)
             }
             Text(deltaCaption)
@@ -322,8 +330,8 @@ struct HourlyComparisonChart: View {
                     .annotation(position: .top, spacing: 0,
                                 overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
                         ChartTooltip(title: String(format: "%02d:00", min(max(Int(selectedX.rounded()), 0), 24)), rows: [
-                            ("Today", Fmt.money(Decimal(Self.valueAt(t, selectedX))), .accentColor),
-                            ("Yesterday", Fmt.money(Decimal(Self.valueAt(y, selectedX))), .gray),
+                            ("Today", Fmt.money(Decimal(Self.valueAt(t, selectedX)), style: .whole), .accentColor),
+                            ("Yesterday", Fmt.money(Decimal(Self.valueAt(y, selectedX)), style: .whole), .gray),
                         ])
                     }
             }
@@ -340,7 +348,7 @@ struct HourlyComparisonChart: View {
         .accessibilityElement()
         .accessibilityLabel("Cumulative sales today versus yesterday")
         .accessibilityValue(
-            "Today \(Fmt.money(Decimal(Self.valueAt(t, 24)))), yesterday \(Fmt.money(Decimal(Self.valueAt(y, 24))))"
+            "Today \(Fmt.money(Decimal(Self.valueAt(t, 24)), style: .whole)), yesterday \(Fmt.money(Decimal(Self.valueAt(y, 24)), style: .whole))"
         )
     }
 
@@ -394,18 +402,35 @@ private struct Sparkline: View {
 private struct MetricItem: Identifiable {
     let id = UUID()
     let title: String
-    let value: String
+    let displayValue: String
     let delta: Decimal?
     let sub: String?
 
-    init(_ title: String, _ value: String) {
-        self.title = title; self.value = value; self.delta = nil; self.sub = nil
+    static func text(_ title: String, _ value: String) -> MetricItem {
+        MetricItem(title: title, displayValue: value)
     }
-    static func comparison(_ title: String, _ value: String, _ delta: Decimal?, _ sub: String) -> MetricItem {
-        MetricItem(title: title, value: value, delta: delta, sub: sub)
+
+    static func count(_ title: String, _ value: Int) -> MetricItem {
+        MetricItem(title: title, displayValue: Fmt.count(value))
     }
-    private init(title: String, value: String, delta: Decimal?, sub: String) {
-        self.title = title; self.value = value; self.delta = delta; self.sub = sub
+
+    static func money(_ title: String, _ value: Decimal, style: Fmt.MoneyStyle, sub: String? = nil) -> MetricItem {
+        MetricItem(title: title, displayValue: Fmt.money(value, style: style), sub: sub)
+    }
+
+    static func moneyComparison(_ title: String, _ value: Decimal, _ style: Fmt.MoneyStyle,
+                                delta: Decimal?, prev: Decimal, subPrefix: String = "Prev") -> MetricItem {
+        MetricItem(title: title, displayValue: Fmt.money(value, style: style), delta: delta,
+                   sub: "\(subPrefix): \(Fmt.money(prev, style: style))")
+    }
+
+    static func countComparison(_ title: String, _ value: Int, delta: Decimal?, prev: Int) -> MetricItem {
+        MetricItem(title: title, displayValue: Fmt.count(value), delta: delta,
+                   sub: "Prev: \(Fmt.count(prev))")
+    }
+
+    private init(title: String, displayValue: String, delta: Decimal? = nil, sub: String? = nil) {
+        self.title = title; self.displayValue = displayValue; self.delta = delta; self.sub = sub
     }
 }
 
@@ -436,7 +461,7 @@ private struct MetricGrid: View {
                         ? AnyLayout(VStackLayout(alignment: .leading, spacing: Spacing.xs))
                         : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: Spacing.sm))
                     valueDelta {
-                        Text(item.value).font(.title3.weight(.semibold).monospacedDigit())
+                        Text(item.displayValue).font(.title3.weight(.semibold).monospacedDigit())
                             .lineLimit(1).minimumScaleFactor(0.55)
                         if let delta = item.delta {
                             TrendDelta(percent: delta, font: .caption.weight(.semibold)).fixedSize()
@@ -490,8 +515,8 @@ private struct ComparisonAreaChart: View {
                     .annotation(position: .top, spacing: 0,
                                 overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
                         ChartTooltip(title: label(selected), rows: [
-                            ("This", Fmt.money(current[selected].revenue), .accentColor),
-                            ("Prev", Fmt.money(previous.indices.contains(selected) ? previous[selected].revenue : 0), .gray),
+                            ("This", Fmt.money(current[selected].revenue, style: .whole), .accentColor),
+                            ("Prev", Fmt.money(previous.indices.contains(selected) ? previous[selected].revenue : 0, style: .whole), .gray),
                         ])
                     }
             }
@@ -513,8 +538,8 @@ private struct ComparisonAreaChart: View {
         .accessibilityElement()
         .accessibilityLabel("This period versus the previous comparable period")
         .accessibilityValue(
-            "This period total \(Fmt.money(current.reduce(Decimal(0)) { $0 + $1.revenue })), "
-            + "previous \(Fmt.money(previous.reduce(Decimal(0)) { $0 + $1.revenue }))"
+            "This period total \(Fmt.money(current.reduce(Decimal(0)) { $0 + $1.revenue }, style: .whole)), "
+            + "previous \(Fmt.money(previous.reduce(Decimal(0)) { $0 + $1.revenue }, style: .whole))"
         )
     }
 }
@@ -534,7 +559,7 @@ private struct RevenueBarChart: View {
                         // Value on top so short bars stay legible; skipped once there
                         // are enough bars (the monthly chart) that labels would collide.
                         if items.count <= 8 {
-                            Text(Fmt.money(item.1)).font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                            Text(Fmt.money(item.1, style: .whole)).font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
                         }
                     }
             }
@@ -544,7 +569,7 @@ private struct RevenueBarChart: View {
                     .accessibilityHidden(true)
                     .annotation(position: .top, spacing: 0,
                                 overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
-                        ChartTooltip(title: selected, rows: [("", Fmt.money(value), .accentColor)])
+                        ChartTooltip(title: selected, rows: [("", Fmt.money(value, style: .whole), .accentColor)])
                     }
             }
         }
@@ -565,7 +590,7 @@ private struct RevenueBarChart: View {
     /// Names the top entries so VoiceOver conveys the chart without the visual bars.
     private var axSummary: String {
         items.prefix(3)
-            .map { "\($0.0) \(Fmt.money($0.1))" }
+            .map { "\($0.0) \(Fmt.money($0.1, style: .whole))" }
             .joined(separator: ", ")
     }
 }

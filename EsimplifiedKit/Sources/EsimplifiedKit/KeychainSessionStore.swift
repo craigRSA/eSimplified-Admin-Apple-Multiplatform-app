@@ -5,8 +5,12 @@ public final class KeychainSessionStore: SessionStore, @unchecked Sendable {
     private let service = "io.esimplified.admin"
     private let sessionAccount = "session"
     private let biometricAccount = "biometric-enabled"
+    /// From the signed `keychain-access-groups` entitlement — shared with the widget.
+    private let accessGroup: String?
 
-    public init() {}
+    public init(accessGroup: String? = nil) {
+        self.accessGroup = accessGroup ?? Self.resolvedAccessGroup()
+    }
 
     public func save(_ session: Session) throws {
         let encoder = JSONEncoder()
@@ -44,26 +48,26 @@ public final class KeychainSessionStore: SessionStore, @unchecked Sendable {
     }
 
     private func write(_ data: Data, account: String) throws {
-        try delete(account: account)
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
-        ]
-        let status = SecItemAdd(query as CFDictionary, nil)
+        let query = itemQuery(account: account)
+        let update: [String: Any] = [kSecValueData as String: data]
+        var status = SecItemUpdate(query as CFDictionary, update as CFDictionary)
+        if status == errSecItemNotFound {
+            var add = query
+            add[kSecValueData as String] = data
+            add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            #if os(macOS)
+            // Data-protection keychain items share cleanly with the widget extension.
+            add[kSecUseDataProtectionKeychain as String] = true
+            #endif
+            status = SecItemAdd(add as CFDictionary, nil)
+        }
         guard status == errSecSuccess else { throw KeychainError.unhandled(status) }
     }
 
     private func read(account: String) throws -> Data? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-        ]
+        var query = itemQuery(account: account)
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
         if status == errSecItemNotFound { return nil }
@@ -74,15 +78,28 @@ public final class KeychainSessionStore: SessionStore, @unchecked Sendable {
     }
 
     private func delete(account: String) throws {
-        let query: [String: Any] = [
+        let status = SecItemDelete(itemQuery(account: account) as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            throw KeychainError.unhandled(status)
+        }
+    }
+
+    /// Shared lookup attributes for one stored secret. Updates in place so macOS
+    /// doesn't re-prompt after "Always Allow" on every token refresh.
+    private func itemQuery(account: String) -> [String: Any] {
+        var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
         ]
-        let status = SecItemDelete(query as CFDictionary)
-        guard status == errSecSuccess || status == errSecItemNotFound else {
-            throw KeychainError.unhandled(status)
-        }
+        if let accessGroup { query[kSecAttrAccessGroup as String] = accessGroup }
+        return query
+    }
+
+    /// First group from the target's signed entitlements (`io.esimplified.admin.shared`).
+    private static func resolvedAccessGroup() -> String? {
+        guard let task = SecTaskCreateFromSelf(nil) else { return nil }
+        return (SecTaskCopyValueForEntitlement(task, "keychain-access-groups" as CFString, nil) as? [String])?.first
     }
 }
 

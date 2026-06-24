@@ -102,6 +102,9 @@ public struct AdminDashboardStats: Decodable, Sendable {
     public let successOrders: Int
     public let customers: Int
     public let revenue: Decimal
+    /// All-time highest-revenue day across the caller's tenants; not scoped by
+    /// `date_range`. Null when there have been no paid (SUCCESS) orders.
+    public let bestDay: DayRevenue?
     public let revenueToday: Decimal
     public let revenueYesterday: Decimal
     public let revenueCurrentMonth: Decimal
@@ -119,6 +122,7 @@ public struct AdminDashboardStats: Decodable, Sendable {
 
     private enum K: String, CodingKey {
         case tenants, customers, revenue, current, comparison
+        case bestDay = "best_day"
         case successOrders = "success_orders"
         case revenueToday = "revenue_today"
         case revenueYesterday = "revenue_yesterday"
@@ -140,6 +144,7 @@ public struct AdminDashboardStats: Decodable, Sendable {
         successOrders = try c.decodeIfPresent(Int.self, forKey: .successOrders) ?? 0
         customers = try c.decodeIfPresent(Int.self, forKey: .customers) ?? 0
         revenue = try money(.revenue)
+        bestDay = try c.decodeIfPresent(DayRevenue.self, forKey: .bestDay)
         revenueToday = try money(.revenueToday)
         revenueYesterday = try money(.revenueYesterday)
         revenueCurrentMonth = try money(.revenueCurrentMonth)
@@ -196,12 +201,6 @@ public struct AdminDashboardStats: Decodable, Sendable {
     public func deltaPercentToDate(currentHour: Int) -> Decimal? {
         guard let base = revenueYesterdayThroughHour(currentHour) else { return nil }
         return Self.change(revenueToday, vs: base)
-    }
-
-    /// The single highest-revenue day in the period (best day).
-    public var bestDay: DayRevenue? {
-        let series = current.revenuePerDate.isEmpty ? revenuePerDate : current.revenuePerDate
-        return series.max { $0.revenue < $1.revenue }
     }
 
     /// Year (e.g. "2026") of the most recent month present in `revenuePerMonth`.

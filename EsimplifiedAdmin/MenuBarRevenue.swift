@@ -61,7 +61,7 @@ struct MenuBarLabel: View {
     var body: some View {
         if revenue.phase == .loaded || revenue.today != 0 {
             HStack(spacing: 3) {
-                Text(Fmt.money(revenue.today))
+                Text(Fmt.moneyCompact(revenue.today))
                 if let d = revenue.deltaPercent {
                     Label("\(d.formatted(.number.precision(.fractionLength(0))))%",
                           systemImage: d >= 0 ? "arrow.up" : "arrow.down")
@@ -99,7 +99,7 @@ struct MenuBarPanel: View {
             default:
                 Overline("Today's gross volume")
                 HStack(alignment: .firstTextBaseline, spacing: Spacing.sm) {
-                    Text(Fmt.money(revenue.today))
+                    Text(Fmt.money(revenue.today, style: .whole))
                         .font(.display(.title)).monospacedDigit()
                     TrendDelta(percent: revenue.deltaPercent, font: .subheadline.weight(.semibold))
                 }
@@ -107,10 +107,10 @@ struct MenuBarPanel: View {
                 .accessibilityLabel(volumeAccessibilityLabel)
                 VStack(alignment: .leading, spacing: Spacing.xs) {
                     if let toDate = revenue.yesterdayToDate {
-                        Text("vs \(Fmt.money(toDate)) yesterday (to date)")
+                        Text("vs \(Fmt.money(toDate, style: .whole)) yesterday (to date)")
                             .font(.caption).foregroundStyle(.secondary)
                     } else {
-                        Text("vs \(Fmt.money(revenue.yesterday)) yesterday")
+                        Text("vs \(Fmt.money(revenue.yesterday, style: .whole)) yesterday")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     if let at = revenue.updatedAt {
@@ -147,7 +147,7 @@ struct MenuBarPanel: View {
 
     /// One coherent VoiceOver phrase for the hero figure + change + freshness.
     private var volumeAccessibilityLabel: String {
-        var parts = ["Today's gross volume \(Fmt.money(revenue.today))"]
+        var parts = ["Today's gross volume \(Fmt.money(revenue.today, style: .whole))"]
         if let d = revenue.deltaPercent {
             let dir = d >= 0 ? "up" : "down"
             let mag = d.magnitude.formatted(.number.precision(.fractionLength(1)))

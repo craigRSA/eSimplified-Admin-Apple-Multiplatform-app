@@ -30,17 +30,30 @@ func dbl(_ d: Decimal) -> Double { (d as NSDecimalNumber).doubleValue }
 
 /// App-wide money / count formatting.
 enum Fmt {
-    /// One consistent rule: abbreviate at/above $1,000 ($2.3K, $129K, $2.0M);
-    /// show exact dollars and cents below ($12.90).
-    static func money(_ d: Decimal) -> String {
-        let v = dbl(d)
-        if abs(v) >= 1000 {
+    /// How a money figure should read — chosen per card/metric, not inferred from size.
+    enum MoneyStyle {
+        /// Revenue totals and aggregates ($3,900, $152,340).
+        case whole
+        /// Per-order averages ($12.34).
+        case cents
+    }
+
+    static func money(_ d: Decimal, style: MoneyStyle) -> String {
+        if d == 0 { return "$0" }
+        let cents = style == .cents
+        return "$" + d.formatted(.number.precision(.fractionLength(cents ? 2 : 0)).grouping(.automatic))
+    }
+    /// Abbreviated for the macOS menu-bar label only.
+    static func moneyCompact(_ d: Decimal) -> String {
+        let v = abs(dbl(d))
+        if v >= 1000 {
             return "$" + v.formatted(.number.notation(.compactName).precision(.fractionLength(1)))
         }
-        return "$" + d.formatted(.number.precision(.fractionLength(2)).grouping(.automatic))
+        return money(d, style: .whole)
     }
-    static func countCompact(_ n: Int) -> String {
-        n >= 1000 ? Double(n).formatted(.number.notation(.compactName).precision(.fractionLength(1))) : n.formatted()
+    /// Grouped whole numbers (157,234) — integer counts, never abbreviated.
+    static func count(_ n: Int) -> String {
+        n.formatted(.number.grouping(.automatic))
     }
 }
 
