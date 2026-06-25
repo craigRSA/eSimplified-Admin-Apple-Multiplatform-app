@@ -96,10 +96,15 @@ public final class KeychainSessionStore: SessionStore, @unchecked Sendable {
         return query
     }
 
-    /// First group from the target's signed entitlements (`io.esimplified.admin.shared`).
+    /// Shared keychain access group — `KeychainAccessGroup` in the host app's
+    /// Info.plist, build-expanded to `$(AppIdentifierPrefix)io.esimplified.admin.shared`.
     private static func resolvedAccessGroup() -> String? {
-        guard let task = SecTaskCreateFromSelf(nil) else { return nil }
-        return (SecTaskCopyValueForEntitlement(task, "keychain-access-groups" as CFString, nil) as? [String])?.first
+        guard let raw = Bundle.main.object(forInfoDictionaryKey: "KeychainAccessGroup") as? String else {
+            return nil
+        }
+        let group = raw.trimmingCharacters(in: .whitespaces)
+        guard !group.isEmpty, !group.contains("$(") else { return nil }
+        return group
     }
 }
 

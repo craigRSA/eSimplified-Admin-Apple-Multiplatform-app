@@ -31,7 +31,6 @@ struct InventoryScreen: View {
         .navigationTitle("Inventory")
         .reload(on: 0) { await load() }
         .refreshable { await load() }
-        .autoRefresh { await load() }
         .refreshCommand { Task { await load() } }
     }
 

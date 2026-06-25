@@ -104,6 +104,52 @@ the app/widget are UI shells verified by build + run.
   `/Users/craig/WebstormProjects/admin_front_end/` (`src/app/actions/index.ts`,
   `src/lib/api.ts`, `src/types/index.ts`). Don't invent shapes.
 
+## Design philosophy (what would Apple do?)
+
+This is a **native Apple app**, not a web admin in a window. When porting a web
+screen, ask what Mail / Finder / Photos would do — not what the React page looks
+like. The web source is the **API + feature checklist**; the UI follows HIG.
+
+**Core rule:** same affordance everywhere, progressive disclosure for complexity,
+content area is for data.
+
+### Toolbar & search
+- **Search** → `.searchable` (server-side when the API supports it).
+- **Filters** → toolbar, never an inline filter bar above the list (that's a web
+  pattern). One shared control per screen: `AdminFilterIcon` +
+  `AdminPickerFilter` in `AdminTheme.swift`.
+- **Results count** → one place only (list header or nav subtitle), not repeated in
+  a filter status row.
+
+### Single-choice filters (Active / Inactive / All, Agent Approvals status, …)
+- Toolbar `Menu` + inline `Picker` with checkmarks — label shows the **current
+  choice** (e.g. "Active", "Requested"). See `CustomersScreen`, `AgentApprovalsScreen`.
+
+### Multi-category / multi-select filters (Order History payment method, status, type)
+- Web `FilterBar` maps to **one "Filter" toolbar button** (`AdminFilterToolbarButton`),
+  not dropdowns in the content area.
+- **Sheet** (iPhone) / **popover** (Mac, regular iPad) with grouped toggles per
+  category via `.adminFilterPresentation`, **Clear all** at the bottom. Toolbar
+  label stays **"Filter"**, with count when active — e.g. `Filter (3)`. See
+  `OrderHistoryFilterPanel` in `OrdersScreen.swift`.
+
+### Lists & tables
+- Mac/iPad: native `Table` with sortable columns; iPhone: rich rows, not a cramped
+  table. Whole row navigates where the web row links.
+- **Colour + plain text** for status/category — not badge pills (web table style,
+  not HIG). Tint encodes category; non-success status gets words, not colour alone.
+- **Liquid Glass** for surfaces (`.glassEffect`, `.glassProminent`); quiet
+  `AppBackground` gradient behind scrolling content so glass has something to
+  refract. Data is the subject, not chrome.
+
+### When in doubt
+1. Would this feel at home in a built-in Apple app?
+2. Is the same control in the same toolbar slot on every similar screen?
+3. Is anything duplicated (count, filter state, status) that the user already
+   sees elsewhere?
+
+If no to (1) or yes to (3), simplify.
+
 ## Auth flow
 OAuth2 password grant: `POST {host}/auth/token/` (form-encoded + `Authorization:
 Basic base64(clientID:clientSecret)`). 2FA challenge: `POST {host}/auth/token/2fa/`

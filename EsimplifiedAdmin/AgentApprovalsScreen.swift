@@ -51,18 +51,11 @@ struct AgentApprovalsScreen: View {
         .navigationTitle("Agent Approvals")
         .reload(on: tenant) { await load() }
         .refreshable { await load() }
-        .autoRefresh { await load() }
         .refreshCommand { Task { await load() } }
         .toolbar {
             ToolbarItem {
-                Menu {
-                    Picker("Show", selection: $filter) {
-                        ForEach(ApprovalFilter.allCases) { Text($0.label).tag($0) }
-                    }
-                    .pickerStyle(.inline)
-                } label: {
-                    Label(filter.label, systemImage: "line.3.horizontal.decrease.circle")
-                }
+                AdminPickerFilter(menuTitle: "Show", selection: $filter,
+                                  options: ApprovalFilter.allCases, label: \.label)
             }
         }
         .onChange(of: filter) { _, _ in Task { await load() } }

@@ -8,6 +8,8 @@
 	<string>$(ESP_CLIENT_SECRET)</string>
 	<key>ESPHost</key>
 	<string>https://live.esimplified.io</string>
+	<key>KeychainAccessGroup</key>
+	<string>$(AppIdentifierPrefix)io.esimplified.admin.shared</string>
 	<key>CFBundleSpokenName</key>
 	<string>eSimplified</string>
 	<key>INAlternativeAppNames</key>

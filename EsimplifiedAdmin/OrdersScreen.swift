@@ -13,10 +13,15 @@ struct OrdersScreen: View {
     @State private var search = ""
     @State private var path = NavigationPath()
     @State private var offset = 0
+    @State private var filters = OrderHistoryFilterSelection()
+    @State private var orderFiltersEnabled = false
+    @State private var showOrderFilters = false
     /// Persisted across launches — change it once and it sticks.
     @AppStorage("ordersPageSize") private var pageSize = 25
 
     enum Phase { case loading, loaded, failed(String) }
+
+    private var isFiltering: Bool { !search.isEmpty || !filters.isEmpty }
 
     private static let pageSizes = [25, 50, 100, 200]
     private var totalPages: Int { total == 0 ? 1 : (total + pageSize - 1) / pageSize }
@@ -42,7 +47,7 @@ struct OrdersScreen: View {
                 default:
                     VStack(spacing: 0) {
                         HStack(spacing: Spacing.md) {
-                            OrdersCountHeader(total: total, filtering: !search.isEmpty)
+                            OrdersCountHeader(total: total, filtering: isFiltering)
                             #if os(macOS)
                             Spacer()
                             pageSizeMenu
@@ -89,14 +94,40 @@ struct OrdersScreen: View {
             .background(AppBackground())
             .refreshCommand { Task { await load() } }
         }
+        .toolbar {
+            if orderFiltersEnabled {
+                ToolbarItem {
+                    AdminFilterToolbarButton(activeCount: filters.activeCount) {
+                        showOrderFilters = true
+                    }
+                }
+            }
+        }
+        .adminFilterPresentation(isPresented: $showOrderFilters, usePopover: useTable) {
+            OrderHistoryFilterPanel(selection: $filters)
+        }
         .searchable(text: $search, prompt: "Package, customer, email, order #")
         // Server-side search (the web searches server-side; a local filter would only
         // see the rows already loaded and silently miss matches beyond the page).
         .debouncedSearch(of: search) { offset = 0; await load() }
         .reload(on: tenant) { offset = 0; await load() }
         .refreshable { await load() }
-        .autoRefresh { await load() }
+        .refreshCommand { Task { await load() } }
         .onChange(of: pageSize) { offset = 0; Task { await load() } }
+        .onChange(of: filters) { offset = 0; Task { await load() } }
+        .task { await refreshFilterPermission() }
+    }
+
+    /// Mirrors the web: Payment Method / Payment Status / Order Type filters are
+    /// superuser-only (we also allow staff as a stand-in for the web's Admin group).
+    private func refreshFilterPermission() async {
+        do {
+            let client = LiveAPIClient(host: session.host, tokenProvider: tokenProvider)
+            let user = try await client.get("/api/me/", query: [:], as: MeUser.self)
+            orderFiltersEnabled = user.isSuperuser || user.isStaff
+        } catch {
+            orderFiltersEnabled = false
+        }
     }
 
     private func load() async {
@@ -105,6 +136,7 @@ struct OrdersScreen: View {
             let client = LiveAPIClient(host: session.host, tokenProvider: tokenProvider)
             let path = tenant.map { "/api/orders/\($0)/" } ?? "/api/orders/"
             var query = ["limit": "\(pageSize)", "offset": "\(offset)"]
+            query.merge(filters.queryParams()) { _, new in new }
             let term = search.trimmingCharacters(in: .whitespaces)
             if !term.isEmpty { query["search"] = term }
             let page = try await client.get(path, query: query, as: OrdersPage.self)
@@ -166,6 +198,137 @@ struct OrdersScreen: View {
     }
 }
 
+// MARK: - Order history filters (mirrors web FilterBar on /admin/order-history)
+
+enum OrderHistoryFilterCategory: CaseIterable, Identifiable {
+    case paymentMethod, paymentStatus, orderType
+
+    var id: String { queryKey }
+
+    var name: String {
+        switch self {
+        case .paymentMethod: "Payment Method"
+        case .paymentStatus: "Payment Status"
+        case .orderType: "Order Type"
+        }
+    }
+
+    var queryKey: String {
+        switch self {
+        case .paymentMethod: "payment_method"
+        case .paymentStatus: "payment_status"
+        case .orderType: "order_type"
+        }
+    }
+
+    /// Display label + API value (web `toKey`: lowercase, spaces → underscores).
+    var options: [(label: String, value: String)] {
+        switch self {
+        case .paymentMethod:
+            [
+                ("Complimentary", "complimentary"),
+                ("Stripe Checkout", "stripe_checkout"),
+                ("Stripe Intent", "stripe_intent"),
+                ("Agent Payment", "agent_payment"),
+                ("Voucher", "voucher"),
+            ]
+        case .paymentStatus:
+            [
+                ("Refunded", "refunded"),
+                ("Pending", "pending"),
+                ("Success", "success"),
+            ]
+        case .orderType:
+            [
+                ("Buy", "buy"),
+                ("Top Up", "top_up"),
+                ("Auto Top Up", "auto_top_up"),
+                ("Add Plan", "add_plan"),
+            ]
+        }
+    }
+}
+
+struct OrderHistoryFilterSelection: Equatable {
+    private var values: [String: Set<String>] = [:]
+
+    func selected(for category: OrderHistoryFilterCategory) -> Set<String> {
+        values[category.queryKey] ?? []
+    }
+
+    mutating func setSelected(_ set: Set<String>, for category: OrderHistoryFilterCategory) {
+        if set.isEmpty {
+            values.removeValue(forKey: category.queryKey)
+        } else {
+            values[category.queryKey] = set
+        }
+    }
+
+    mutating func clear(category: OrderHistoryFilterCategory) {
+        setSelected([], for: category)
+    }
+
+    mutating func clearAll() { values = [:] }
+
+    var isEmpty: Bool { values.isEmpty }
+
+    var activeCount: Int {
+        OrderHistoryFilterCategory.allCases.reduce(0) { $0 + selected(for: $1).count }
+    }
+
+    func queryParams() -> [String: String] {
+        var params: [String: String] = [:]
+        for cat in OrderHistoryFilterCategory.allCases {
+            let sel = selected(for: cat)
+            if !sel.isEmpty {
+                params[cat.queryKey] = sel.sorted().joined(separator: ",")
+            }
+        }
+        return params
+    }
+
+}
+
+/// Grouped toggles for Order History — shown in a sheet (iPhone) or popover (Mac/iPad).
+private struct OrderHistoryFilterPanel: View {
+    @Binding var selection: OrderHistoryFilterSelection
+
+    var body: some View {
+        List {
+            ForEach(OrderHistoryFilterCategory.allCases) { cat in
+                Section(cat.name) {
+                    ForEach(cat.options, id: \.value) { opt in
+                        Toggle(opt.label, isOn: toggleBinding(cat, opt.value))
+                    }
+                }
+            }
+            if !selection.isEmpty {
+                Section {
+                    Button("Clear all", role: .destructive) { selection.clearAll() }
+                }
+            }
+        }
+        #if os(macOS)
+        .frame(width: 320, height: 440)
+        #else
+        .frame(minHeight: 360)
+        #endif
+    }
+
+    private func toggleBinding(_ cat: OrderHistoryFilterCategory, _ value: String) -> Binding<Bool> {
+        Binding(
+            get: { selection.selected(for: cat).contains(value) },
+            set: { on in
+                var next = selection
+                var set = next.selected(for: cat)
+                if on { set.insert(value) } else { set.remove(value) }
+                next.setSelected(set, for: cat)
+                selection = next
+            }
+        )
+    }
+}
+
 private struct OrdersCountHeader: View {
     let total: Int
     let filtering: Bool
@@ -194,47 +357,17 @@ func orderAccent(_ order: Order) -> Color? {
     return nil
 }
 
-/// A non-color signal for the order's category. Colour alone (`orderAccent`) is
-/// invisible to color-blind users and VoiceOver, so we pair the tint with a glyph
-/// + word: Refunded / Agent / Voucher / Comp / Promo. Returns nil for plain
-/// card-paid orders (no badge needed).
-struct OrderCategory {
-    let word: String
-    let glyph: String
-    let color: Color
-
-    init?(_ order: Order) {
-        if order.paymentStatus.lowercased() == "refunded" {
-            self = OrderCategory(word: "Refunded", glyph: "arrow.uturn.backward", color: .red); return
-        }
-        switch order.paymentMethod {
-        case "complimentary": self = OrderCategory(word: "Comp", glyph: "gift.fill", color: .green); return
-        case "agent_payment": self = OrderCategory(word: "Agent", glyph: "person.fill", color: .purple); return
-        case "voucher": self = OrderCategory(word: "Voucher", glyph: "ticket.fill", color: .cyan); return
-        default: break
-        }
-        if order.discountCode != nil && order.paymentStatus.lowercased() == "success" {
-            self = OrderCategory(word: "Promo", glyph: "tag.fill", color: .orange); return
-        }
-        return nil
+/// Category word for VoiceOver only — visual distinction is `orderAccent` tint.
+private func orderCategoryWord(_ order: Order) -> String? {
+    if order.paymentStatus.lowercased() == "refunded" { return "Refunded" }
+    if order.isComplimentary { return "Complimentary" }
+    switch order.paymentMethod {
+    case "agent_payment": return "Agent"
+    case "voucher": return "Voucher"
+    default: break
     }
-
-    private init(word: String, glyph: String, color: Color) {
-        self.word = word; self.glyph = glyph; self.color = color
-    }
-}
-
-/// The category Badge with a VoiceOver label — the non-color reinforcement for
-/// `orderAccent`, used in both the iPhone row and the Mac table.
-private struct OrderCategoryBadge: View {
-    let order: Order
-    var body: some View {
-        if let cat = OrderCategory(order) {
-            Badge(text: cat.word, color: cat.color, systemImage: cat.glyph)
-                .accessibilityElement()
-                .accessibilityLabel("Category: \(cat.word)")
-        }
-    }
+    if order.discountCode != nil && order.paymentStatus.lowercased() == "success" { return "Promo" }
+    return nil
 }
 
 /// Skeleton placeholder shown while the first page loads — keeps layout stable
@@ -273,7 +406,8 @@ private func copyToClipboard(_ string: String) {
 
 /// Columnar table for Mac/iPad — mirrors the web's Order History columns.
 /// The whole row is clickable (selection → `onOpen`), like a native table.
-/// Columns are click-to-sort; sorting is client-side over the loaded page.
+/// Columns are click-to-sort (client-side over the loaded page) and drag-to-reorder
+/// (persisted via `TableColumnCustomization`).
 private struct OrdersTable: View {
     let orders: [Order]
     var onOpen: (CustomerRef) -> Void
@@ -281,41 +415,68 @@ private struct OrdersTable: View {
     @State private var sortOrder: [KeyPathComparator<Order>] = [
         KeyPathComparator(\Order.purchaseDate, order: .reverse)
     ]
+    @AppStorage("ordersTableColumnCustomization")
+    private var columnCustomization = TableColumnCustomization<Order>()
+
+    /// Stable IDs for column reordering — must be compile-time literals, not localized.
+    private enum ColumnID {
+        static let tenant = "tenant"
+        static let package = "package"
+        static let customer = "customer"
+        static let purchasedIn = "purchasedIn"
+        static let type = "type"
+        static let price = "price"
+        static let local = "local"
+        static let discount = "discount"
+        static let status = "status"
+        static let date = "date"
+    }
 
     /// The loaded page, re-sorted by the active column. Search/pagination are
     /// unchanged — this only reorders the rows already on screen.
     private var shown: [Order] { orders.sorted(using: sortOrder) }
 
     var body: some View {
-        Table(shown, selection: $selectedID, sortOrder: $sortOrder) {
+        Table(shown, selection: $selectedID, sortOrder: $sortOrder,
+              columnCustomization: $columnCustomization) {
             TableColumn("Tenant", value: \.tenant) { o in
                 HStack(spacing: Spacing.sm) {
                     TenantAvatar(tenant: o.tenant, size: 22)
                     Text(o.tenant).foregroundStyle(orderAccent(o) ?? .primary).lineLimit(1)
                 }
             }
+            .customizationID(ColumnID.tenant)
             TableColumn("Package", value: \.packageName) { o in
-                HStack(spacing: Spacing.sm) {
-                    Text(o.packageName).foregroundStyle(orderAccent(o) ?? .primary).lineLimit(1)
-                    OrderCategoryBadge(order: o)
-                }
+                Text(o.packageName).foregroundStyle(orderAccent(o) ?? .primary).lineLimit(1)
             }
+            .customizationID(ColumnID.package)
             TableColumn("Customer") { o in customerCell(o) }
+                .customizationID(ColumnID.customer)
             TableColumn("Purchased In") { o in
                 Text(o.purchaseCountry ?? "—").foregroundStyle(.secondary)
             }
+            .customizationID(ColumnID.purchasedIn)
             TableColumn("Type", value: \.orderType) { o in Text(o.orderType).foregroundStyle(.secondary) }
+                .customizationID(ColumnID.type)
             TableColumn("Price", value: \.finalPrice) { o in Text(o.usdPriceDisplay).monospacedDigit() }
+                .customizationID(ColumnID.price)
             TableColumn("Local") { o in
                 Text(o.localPriceDisplay ?? "").font(.callout.monospacedDigit()).foregroundStyle(.secondary)
             }
+            .customizationID(ColumnID.local)
             TableColumn("Discount") { o in
                 if let code = o.discountCode { Text(code).foregroundStyle(.orange) } else { Text("") }
             }
-            TableColumn("Status", value: \.paymentStatus) { o in StatusBadge(status: o.paymentStatus) }
+            .customizationID(ColumnID.discount)
+            TableColumn("Status", value: \.paymentStatus) { o in
+                Text(o.paymentStatus.capitalized)
+                    .foregroundStyle(StatusStyle.color(o.paymentStatus))
+            }
+                .customizationID(ColumnID.status)
             TableColumn("Date", value: \.purchaseDate) { o in
                 Text(shortDate(o.purchaseDate)).font(.callout).foregroundStyle(.secondary).lineLimit(1)
             }
+            .customizationID(ColumnID.date)
         }
         .scrollContentBackground(.hidden)   // let the app gradient show instead of the Table's opaque black
         .contextMenu(forSelectionType: Order.ID.self) { ids in
@@ -412,7 +573,7 @@ private struct OrderRow: View {
     /// its status + category, the USD price, the tenant, when, and for whom.
     private var accessibilityLabel: String {
         var parts: [String] = [title, "Status \(order.paymentStatus.capitalized)"]
-        if let cat = OrderCategory(order) { parts.append(cat.word) }
+        if let cat = orderCategoryWord(order) { parts.append(cat) }
         parts.append("\(order.usdPriceDisplay) USD")
         if let t = tenantName { parts.append(t) }
         parts.append(shortDate(order.purchaseDate))

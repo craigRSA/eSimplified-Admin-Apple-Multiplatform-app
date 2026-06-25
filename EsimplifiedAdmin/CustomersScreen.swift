@@ -63,20 +63,14 @@ struct CustomersScreen: View {
             .debouncedSearch(of: search) { await load() }
             .toolbar {
                 ToolbarItem {
-                    Menu {
-                        Picker("Show", selection: $activeFilter) {
-                            ForEach(CustomerFilter.allCases) { Text($0.label).tag($0) }
-                        }
-                    } label: {
-                        Label(activeFilter.label, systemImage: "line.3.horizontal.decrease.circle")
-                    }
+                    AdminPickerFilter(menuTitle: "Show", selection: $activeFilter,
+                                      options: CustomerFilter.allCases, label: \.label)
                 }
             }
             .onChange(of: activeFilter) { _, _ in Task { await load() } }
             .reload(on: tenant) { await load() }
-            .refreshable { await load() }
-            .autoRefresh { await load() }
-            .refreshCommand { Task { await load() } }
+        .refreshable { await load() }
+        .refreshCommand { Task { await load() } }
         }
     }
 

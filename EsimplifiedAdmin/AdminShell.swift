@@ -65,12 +65,14 @@ struct AdminShell: View {
                     ToolbarItemGroup(placement: .primaryAction) {
                         if model.sections.contains(.search) { SearchToolbarButton(model: model) }
                         if !model.tenants.isEmpty { TenantMenu(model: model) }
-                        RefreshIntervalMenu(seconds: $autoRefreshSeconds)
+                        if model.selection == .dashboard {
+                            RefreshIntervalMenu(seconds: $autoRefreshSeconds)
+                        }
                     }
                 }
         }
         #if os(macOS)
-        .safeAreaInset(edge: .bottom) { StatusBar() }
+        .safeAreaInset(edge: .bottom) { StatusBar(showAutoRefresh: model.selection == .dashboard) }
         #endif
         .task { await model.loadTenants() }
         .onAppear { if model.selection == nil { model.selection = model.sections.first } }
@@ -152,15 +154,16 @@ private struct TenantMenu: View {
 }
 
 #if os(macOS)
-/// Slim bottom status bar — the auto-refresh countdown (when on) and the live UTC
-/// clock, centered together with a hairline between them. macOS-only: it's hosted
-/// in the window's bottom safe-area inset.
+/// Slim bottom status bar — the Overview auto-refresh countdown (when on) and
+/// the live UTC clock, centered together with a hairline between them. macOS-only:
+/// it's hosted in the window's bottom safe-area inset.
 private struct StatusBar: View {
+    var showAutoRefresh: Bool
     @AppStorage("autoRefreshSeconds") private var seconds = 0
     var body: some View {
         HStack(spacing: 10) {
             Spacer(minLength: 0)
-            if seconds > 0 {
+            if showAutoRefresh, seconds > 0 {
                 RefreshStatus()
                 Divider().frame(height: 10)
             }

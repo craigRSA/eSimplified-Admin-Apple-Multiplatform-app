@@ -110,6 +110,88 @@ struct QuietEmptyState: View {
     }
 }
 
+// MARK: - Toolbar filters
+
+/// Shared filter icon — every list screen uses the same toolbar control.
+enum AdminFilterIcon {
+    static let systemName = "line.3.horizontal.decrease.circle"
+}
+
+/// Single-choice filter in the toolbar (Customers Active/Inactive/All, Agent Approvals, etc.).
+struct AdminPickerFilter<Item: Hashable & Identifiable>: View {
+    let menuTitle: String
+    @Binding var selection: Item
+    let options: [Item]
+    let label: (Item) -> String
+
+    var body: some View {
+        Menu {
+            Picker(menuTitle, selection: $selection) {
+                ForEach(options) { item in
+                    Text(label(item)).tag(item)
+                }
+            }
+            .pickerStyle(.inline)
+        } label: {
+            Label(label(selection), systemImage: AdminFilterIcon.systemName)
+        }
+    }
+}
+
+/// Multi-category filter toolbar button — label stays "Filter", count when active.
+struct AdminFilterToolbarButton: View {
+    let activeCount: Int
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label {
+                Text(activeCount > 0 ? "Filter (\(activeCount))" : "Filter")
+            } icon: {
+                Image(systemName: AdminFilterIcon.systemName)
+            }
+        }
+        .accessibilityLabel(
+            activeCount > 0 ? "Filter, \(activeCount) active" : "Filter"
+        )
+    }
+}
+
+extension View {
+    /// Sheet on iPhone; popover on Mac and regular-width iPad — Mail-style filter panel.
+    @ViewBuilder
+    func adminFilterPresentation<Content: View>(
+        isPresented: Binding<Bool>,
+        usePopover: Bool,
+        @ViewBuilder content: @escaping () -> Content
+    ) -> some View {
+        if usePopover {
+            popover(isPresented: isPresented, arrowEdge: .top) {
+                content()
+            }
+        } else {
+            sheet(isPresented: isPresented) {
+                NavigationStack {
+                    content()
+                        .navigationTitle("Filter")
+                        #if os(iOS)
+                        .navigationBarTitleDisplayMode(.inline)
+                        #endif
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("Done") { isPresented.wrappedValue = false }
+                            }
+                        }
+                }
+                #if os(iOS)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                #endif
+            }
+        }
+    }
+}
+
 // MARK: - Glass card
 
 private struct GlassCard: ViewModifier {
@@ -436,7 +518,7 @@ extension View {
 
 // MARK: - Auto-refresh
 
-/// App-wide auto-refresh interval (seconds; 0 = off), persisted across launches.
+/// Overview auto-refresh interval (seconds; 0 = off), persisted across launches.
 enum RefreshInterval {
     static let options: [Int] = [0, 15, 30, 60, 300]
     static func label(_ s: Int) -> String {
@@ -451,8 +533,8 @@ enum RefreshInterval {
     }
 }
 
-/// Toolbar control for auto-refresh: one flat menu — "Refresh now" plus the cadence
-/// choices (checkmark on the active one). The label shows the chosen cadence.
+/// Toolbar control for Overview auto-refresh: one flat menu — "Refresh now" plus the
+/// cadence choices (checkmark on the active one). The label shows the chosen cadence.
 struct RefreshIntervalMenu: View {
     @Binding var seconds: Int
     @FocusedValue(\.refreshAction) private var refreshAction
@@ -579,8 +661,9 @@ private struct AutoRefresh: ViewModifier {
 }
 
 extension View {
-    /// Runs `action` on the shared auto-refresh cadence (no-op while set to Off).
-    /// The cadence control lives in the shell toolbar (`RefreshIntervalMenu`).
+    /// Runs `action` on the Overview auto-refresh cadence (no-op while set to Off).
+    /// Only `DashboardScreen` applies this; the cadence control lives in the shell
+    /// toolbar (`RefreshIntervalMenu`) and is shown on Overview only.
     func autoRefresh(_ action: @escaping () async -> Void) -> some View {
         modifier(AutoRefresh(action: action))
     }
