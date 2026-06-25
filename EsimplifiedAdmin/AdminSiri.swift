@@ -43,78 +43,91 @@ enum RevenueIntentError: Error, CustomLocalizedStringResourceConvertible {
 }
 
 struct TodaysRevenueIntent: AppIntent {
-    static let title: LocalizedStringResource = "Today's Revenue"
-    static let description = IntentDescription("eSimplified's consolidated revenue so far today.")
+    static let title: LocalizedStringResource = "Today"
+    static let description = IntentDescription("Today's overview total so far.")
     static let openAppWhenRun = false
 
     func perform() async throws -> some IntentResult & ReturnsValue<String> & ProvidesDialog {
         let stats = try await RevenueIntentSupport.fetch()
         let amount = RevenueIntentSupport.money(stats.revenueToday)
-        return .result(value: amount, dialog: IntentDialog("eSimplified's revenue today is \(amount)."))
+        return .result(value: amount, dialog: IntentDialog("Sales so far today: \(amount)."))
     }
 }
 
 struct YesterdayRevenueIntent: AppIntent {
-    static let title: LocalizedStringResource = "Yesterday's Revenue"
-    static let description = IntentDescription("eSimplified's consolidated revenue for yesterday.")
+    static let title: LocalizedStringResource = "Yesterday"
+    static let description = IntentDescription("Yesterday's overview total.")
     static let openAppWhenRun = false
 
     func perform() async throws -> some IntentResult & ReturnsValue<String> & ProvidesDialog {
         let stats = try await RevenueIntentSupport.fetch()
         let amount = RevenueIntentSupport.money(stats.revenueYesterday)
-        return .result(value: amount, dialog: IntentDialog("eSimplified's revenue yesterday was \(amount)."))
+        return .result(value: amount, dialog: IntentDialog("Sales yesterday: \(amount)."))
     }
 }
 
 struct RevenueVsYesterdayIntent: AppIntent {
-    static let title: LocalizedStringResource = "Revenue vs Yesterday"
-    static let description = IntentDescription("How today's eSimplified revenue compares to yesterday.")
+    static let title: LocalizedStringResource = "Today vs Yesterday"
+    static let description = IntentDescription("How today compares to yesterday.")
     static let openAppWhenRun = false
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let stats = try await RevenueIntentSupport.fetch()
         let today = RevenueIntentSupport.money(stats.revenueToday)
         guard let delta = stats.deltaPercent else {
-            return .result(dialog: IntentDialog("eSimplified's revenue today is \(today)."))
+            return .result(dialog: IntentDialog("Sales so far today: \(today)."))
         }
         let up = delta >= 0
         let pct = abs(delta).formatted(.number.precision(.fractionLength(1)))
         return .result(dialog: IntentDialog(
-            "eSimplified's revenue today is \(today), \(up ? "up" : "down") \(pct) percent versus yesterday."))
+            "Sales today are \(today), \(up ? "up" : "down") \(pct) percent from yesterday."))
     }
 }
 
 /// Voice phrases. Every phrase must contain `\(.applicationName)`; the app's
 /// alternative names (Info.plist `INAlternativeAppNames`) let "eSimplified"
-/// match too.
+/// match too. Wording stays broad — "today", "numbers", "how are we doing" —
+/// not revenue jargon.
 struct EsimplifiedShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
             intent: TodaysRevenueIntent(),
             phrases: [
-                "What's today's revenue in \(.applicationName)",
-                "Show today's revenue in \(.applicationName)",
-                "How much did \(.applicationName) make today",
+                "How are sales today in \(.applicationName)",
+                "How's sales today in \(.applicationName)",
+                "\(.applicationName) how are sales today",
+                "\(.applicationName) sales today",
+                "Sales today in \(.applicationName)",
+                "What are sales today in \(.applicationName)",
+                "How's today in \(.applicationName)",
+                "Today's numbers in \(.applicationName)",
+                "What's today looking like in \(.applicationName)",
+                "Give me today in \(.applicationName)",
             ],
-            shortTitle: "Today's Revenue",
+            shortTitle: "Today",
             systemImageName: "dollarsign.circle"
         )
         AppShortcut(
             intent: YesterdayRevenueIntent(),
             phrases: [
-                "What was yesterday's revenue in \(.applicationName)",
-                "Show yesterday's revenue in \(.applicationName)",
+                "Sales yesterday in \(.applicationName)",
+                "What were sales yesterday in \(.applicationName)",
+                "How was yesterday in \(.applicationName)",
+                "Yesterday's numbers in \(.applicationName)",
+                "What did we do yesterday in \(.applicationName)",
             ],
-            shortTitle: "Yesterday's Revenue",
+            shortTitle: "Yesterday",
             systemImageName: "calendar"
         )
         AppShortcut(
             intent: RevenueVsYesterdayIntent(),
             phrases: [
-                "How is \(.applicationName) doing today",
-                "Compare \(.applicationName) revenue to yesterday",
+                "How are we doing in \(.applicationName)",
+                "Compare today to yesterday in \(.applicationName)",
+                "Am I up or down in \(.applicationName)",
+                "Today versus yesterday in \(.applicationName)",
             ],
-            shortTitle: "Revenue vs Yesterday",
+            shortTitle: "Today vs Yesterday",
             systemImageName: "chart.line.uptrend.xyaxis"
         )
     }

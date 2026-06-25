@@ -94,7 +94,9 @@ the app/widget are UI shells verified by build + run.
   modifier (unstructured Task) — not `.task(id:)`.
 - **Siri:** App Shortcut phrases must contain `\(.applicationName)`. Display name
   is "eSimplified Admin"; `CFBundleSpokenName` + `INAlternativeAppNames` add
-  "eSimplified" as a spoken alias (re-indexes on launch, may need a reboot).
+  "eSimplified" (preferred when speaking) and other aliases — re-indexes on launch,
+  may need a reboot.
+  Phrasing stays general ("How's today", "How are we doing") — not revenue jargon.
 - **DEVELOPMENT_TEAM = 8GVFL9KS7M.** `project.pbxproj` is hand-authored (no Xcode
   GUI) — UUID prefixes A0=project, A2=widget, A3=admin app. Adding a file = 4
   edits (PBXBuildFile, PBXFileReference, group children, Sources phase).
