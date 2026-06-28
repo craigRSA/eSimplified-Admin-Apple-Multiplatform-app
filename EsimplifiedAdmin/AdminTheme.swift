@@ -15,14 +15,28 @@ func adminErrorMessage(_ error: APIError) -> String {
     }
 }
 
+/// Backend timestamps are UTC — format in UTC everywhere, never local time.
+private let utcTimeZone = TimeZone(identifier: "UTC")!
+
 /// Parses an ISO-8601 timestamp (with or without fractional seconds) to a short
-/// local date-time, falling back to the date prefix if it can't parse.
+/// UTC date-time, falling back to the date prefix if it can't parse.
 func shortDate(_ iso: String) -> String {
     let parser = ISO8601DateFormatter()
     parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
     let date = parser.date(from: iso) ?? ISO8601DateFormatter().date(from: iso)
     guard let date else { return String(iso.prefix(10)) }
-    return date.formatted(date: .abbreviated, time: .shortened)
+    var style = Date.FormatStyle(date: .abbreviated, time: .shortened)
+    style.timeZone = utcTimeZone
+    return date.formatted(style) + " UTC"
+}
+
+/// Formats an instant as UTC time (or date+time when `includeDate` is true).
+func utcTime(_ date: Date, includeDate: Bool = false) -> String {
+    var style = includeDate
+        ? Date.FormatStyle(date: .abbreviated, time: .shortened)
+        : Date.FormatStyle(date: .omitted, time: .shortened)
+    style.timeZone = utcTimeZone
+    return date.formatted(style) + " UTC"
 }
 
 /// Decimal → Double, for the (Double-based) Charts API and the money formatter.

@@ -928,16 +928,11 @@ private struct LabeledValue: View {
 
 // MARK: - Shared building blocks
 
-/// Formats a server epoch (seconds or milliseconds) as a UTC wall-clock string,
-/// e.g. "Jun 20, 2026 at 2:10 PM UTC". Every backend timestamp is UTC, so we pin
-/// the zone and label it — matching the web admin's `from_timestamp()`. Returning
-/// the " UTC" suffix here keeps it the single source of truth for all call sites.
+/// Formats a server epoch (seconds or milliseconds) as a UTC wall-clock string.
 private func epochDate(_ e: Double?) -> String? {
     guard let e, e.isFinite, e > 0, e < 1e15 else { return nil }
     let seconds = e > 1_000_000_000_000 ? e / 1000 : e
-    var style = Date.FormatStyle(date: .abbreviated, time: .shortened)
-    style.timeZone = TimeZone(identifier: "UTC")!
-    return Date(timeIntervalSince1970: seconds).formatted(style) + " UTC"
+    return utcTime(Date(timeIntervalSince1970: seconds), includeDate: true)
 }
 
 private func fmtGB(_ gb: Double) -> String {

@@ -114,7 +114,7 @@ struct MenuBarPanel: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     if let at = revenue.updatedAt {
-                        Text("Updated \(at.formatted(date: .omitted, time: .shortened))")
+                        Text("Updated \(utcTime(at))")
                             .font(.caption2).foregroundStyle(.tertiary)
                     }
                 }
@@ -155,7 +155,7 @@ struct MenuBarPanel: View {
             parts.append("\(dir) \(mag) percent \(base)")
         }
         if let at = revenue.updatedAt {
-            parts.append("updated \(at.formatted(date: .omitted, time: .shortened))")
+            parts.append("updated \(utcTime(at))")
         }
         return parts.joined(separator: ", ")
     }

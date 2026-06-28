@@ -60,10 +60,16 @@ struct OrdersScreen: View {
                         .padding(.horizontal, Spacing.lg).padding(.vertical, Spacing.sm)
                         Divider()
                         if orders.isEmpty {
-                            ContentUnavailableView("No matching orders", systemImage: "tray")
-                                .frame(maxHeight: .infinity)
+                            ScrollView {
+                                ContentUnavailableView("No matching orders", systemImage: "tray")
+                                    .frame(maxWidth: .infinity, minHeight: 280)
+                            }
+                            .frame(maxHeight: .infinity)
+                            .scrollBounceBehavior(.always, axes: .vertical)
+                            .refreshable { await load() }
                         } else if useTable {
-                            OrdersTable(orders: orders) { path.append($0) }
+                            RefreshableOrdersTable(orders: orders, onRefresh: load) { path.append($0) }
+                                .frame(maxHeight: .infinity)
                         } else {
                             List(orders) { order in
                                 Group {
@@ -81,6 +87,7 @@ struct OrdersScreen: View {
                             }
                             .listStyle(.plain)
                             .scrollContentBackground(.hidden)
+                            .refreshable { await load() }
                         }
                         #if !os(macOS)
                         Divider()
@@ -111,7 +118,6 @@ struct OrdersScreen: View {
         // see the rows already loaded and silently miss matches beyond the page).
         .debouncedSearch(of: search) { offset = 0; await load() }
         .reload(on: tenant) { offset = 0; await load() }
-        .refreshable { await load() }
         .refreshCommand { Task { await load() } }
         .onChange(of: pageSize) { offset = 0; Task { await load() } }
         .onChange(of: filters) { offset = 0; Task { await load() } }
@@ -402,6 +408,32 @@ private func copyToClipboard(_ string: String) {
     #else
     UIPasteboard.general.string = string
     #endif
+}
+
+/// `Table` on Mac/iPad hosts an AppKit scroll view, so `.refreshable` on the table
+/// itself never fires. Size the table to its full row height inside a bouncing
+/// `ScrollView` — same pattern as `DashboardScreen`.
+private struct RefreshableOrdersTable: View {
+    let orders: [Order]
+    var onRefresh: () async -> Void
+    var onOpen: (CustomerRef) -> Void
+
+    private static let rowHeight: CGFloat = 48
+    private static let headerHeight: CGFloat = 28
+
+    private var contentHeight: CGFloat {
+        CGFloat(max(orders.count, 1)) * Self.rowHeight + Self.headerHeight
+    }
+
+    var body: some View {
+        ScrollView {
+            OrdersTable(orders: orders, onOpen: onOpen)
+                .frame(height: contentHeight)
+                .scrollDisabled(true)
+        }
+        .scrollBounceBehavior(.always, axes: .vertical)
+        .refreshable { await onRefresh() }
+    }
 }
 
 /// Columnar table for Mac/iPad — mirrors the web's Order History columns.
