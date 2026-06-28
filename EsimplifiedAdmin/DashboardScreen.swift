@@ -130,17 +130,25 @@ struct DashboardScreen: View {
             }
             .glassCard()
 
+            let todayLeaders = s.tenantsByTodayRevenue.filter { $0.today > 0 }
+            if !todayLeaders.isEmpty {
+                SectionCard(title: "Top tenants today") {
+                    TenantTodayList(items: Array(todayLeaders.prefix(8)))
+                }
+            }
+
             if !s.revenuePerTenant.isEmpty {
-                SectionCard(title: "Revenue per tenant") {
-                    RevenueBarChart(items: Array(s.revenuePerTenant.prefix(8)).map { ($0.tenant, $0.amount) })
+                SectionCard(title: "Revenue per tenant", eyebrow: "All time") {
+                    RevenueBarChart(items: Array(s.revenuePerTenant.prefix(8)).map { ($0.tenant, $0.overall) })
                         .frame(height: 240)
                 }
             }
 
-            if !s.revenuePerMonth.isEmpty {
-                SectionCard(title: "Revenue per month") {
-                    RevenueBarChart(items: s.revenuePerMonth.map { (shortMonth($0.month), $0.amount) })
-                        .frame(height: 220)
+            let monthComparison = s.revenuePerMonthComparison()
+            if monthComparison.contains(where: { $0.current > 0 || $0.previous > 0 }) {
+                SectionCard(title: "Revenue per month", eyebrow: "Last 12 months vs prior 12") {
+                    MonthlyRevenueChart(points: monthComparison)
+                        .frame(height: 240)
                 }
             }
 
@@ -303,7 +311,6 @@ struct HourlyComparisonChart: View {
     let today: [HourPoint]
     let yesterday: [HourPoint]
     @State private var selectedX: Double?
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         // Today's line stops at the elapsed fraction of the current UTC hour (08:30 →
@@ -343,7 +350,6 @@ struct HourlyComparisonChart: View {
             AxisValueLabel { if let h = v.as(Double.self) { Text(String(format: "%02d:00", Int(h))) } }
         } }
         .chartXSelection(value: $selectedX)
-        .animation(reduceMotion ? nil : .snappy, value: selectedX)
         .chartLegend(position: .top, alignment: .leading, spacing: Spacing.sm)
         .accessibilityElement()
         .accessibilityLabel("Cumulative sales today versus yesterday")
@@ -486,7 +492,6 @@ private struct ComparisonAreaChart: View {
     /// day index.
     var monthly: Bool = false
     @State private var selected: Int?
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private func label(_ i: Int) -> String {
         monthly && current.indices.contains(i) ? shortMonth(current[i].date) : "Day \(i + 1)"
@@ -523,7 +528,6 @@ private struct ComparisonAreaChart: View {
         }
         .chartForegroundStyleScale(["This period": Color.accentColor, "Previous": Color.gray])
         .chartXSelection(value: $selected)
-        .animation(reduceMotion ? nil : .snappy, value: selected)
         .chartXAxis {
             if monthly {
                 AxisMarks(values: tickIndices(count: current.count, desired: 6)) { value in
@@ -544,17 +548,57 @@ private struct ComparisonAreaChart: View {
     }
 }
 
+/// Grouped monthly bars — standard Swift Charts `position(by:)` pattern.
+private struct MonthlyRevenueChart: View {
+    let points: [MonthRevenueComparisonPoint]
+
+    private static let prior = "Prior 12 mo"
+    private static let last = "Last 12 mo"
+
+    private struct Row: Identifiable {
+        let id: String
+        let month: String
+        let series: String
+        let amount: Double
+    }
+
+    private var rows: [Row] {
+        points.flatMap { p in
+            let label = shortMonth(p.currentMonth)
+            return [
+                Row(id: "\(p.currentMonth)-prior", month: label,
+                    series: Self.prior, amount: dbl(p.previous)),
+                Row(id: "\(p.currentMonth)-last", month: label,
+                    series: Self.last, amount: dbl(p.current)),
+            ]
+        }
+    }
+
+    var body: some View {
+        Chart(rows) { row in
+            BarMark(
+                x: .value("Month", row.month),
+                y: .value("Revenue", row.amount)
+            )
+            .foregroundStyle(by: .value("Period", row.series))
+            .position(by: .value("Period", row.series))
+        }
+        .chartForegroundStyleScale(domain: [Self.prior, Self.last],
+                                   range: [Color.gray, Color.accentColor])
+        .chartLegend(position: .top, alignment: .leading, spacing: Spacing.sm)
+        .accessibilityElement()
+        .accessibilityLabel("Monthly revenue, last twelve months compared to the prior twelve")
+    }
+}
+
 private struct RevenueBarChart: View {
     let items: [(String, Decimal)]
     @State private var selected: String?
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
         Chart {
             ForEach(Array(items.enumerated()), id: \.offset) { _, item in
-                // A categorical x gives each bar a full, centered slot (the old index
-                // axis drew thin slivers and clipped the first bar at the edge).
                 BarMark(x: .value("Name", item.0), y: .value("Revenue", dbl(item.1)))
-                    .foregroundStyle(Color.accentColor.opacity(selected == nil || selected == item.0 ? 1 : 0.4))
+                    .foregroundStyle(Color.accentColor)
                     .annotation(position: .top, spacing: 2) {
                         // Value on top so short bars stay legible; skipped once there
                         // are enough bars (the monthly chart) that labels would collide.
@@ -574,7 +618,6 @@ private struct RevenueBarChart: View {
             }
         }
         .chartXSelection(value: $selected)
-        .animation(reduceMotion ? nil : .snappy, value: selected)
         .chartXAxis {
             AxisMarks { value in
                 AxisValueLabel(orientation: .verticalReversed) {
@@ -608,6 +651,130 @@ private func shortMonth(_ date: String) -> String {
     guard parts.count >= 2, let m = Int(parts[1]), (1...12).contains(m) else { return "" }
     return ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
             "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][m - 1]
+}
+
+/// Ranked tenants by today's revenue — tenant names left, aligned Today · Yesterday · delta block right.
+private struct TenantTodayList: View {
+    let items: [TenantRevenueSlice]
+    @Environment(\.horizontalSizeClass) private var hSize
+
+    private let rowSpacing = Spacing.sm
+    private let metricGap = Spacing.md
+
+    var body: some View {
+        if hSize == .compact { compactBody } else { regularBody }
+    }
+
+    // MARK: Regular — names flex left, numeric columns share one aligned grid
+
+    private var regularBody: some View {
+        VStack(spacing: 0) {
+            HStack(alignment: .lastTextBaseline, spacing: Spacing.xl) {
+                Color.clear.frame(maxWidth: .infinity)
+                metricsHeader
+            }
+            .padding(.bottom, rowSpacing)
+
+            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                if index > 0 { rowDivider.padding(.vertical, rowSpacing) }
+                HStack(alignment: .firstTextBaseline, spacing: Spacing.xl) {
+                    Text(item.tenant)
+                        .font(.subheadline)
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    metricsRow(item)
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(axLabel(for: item))
+            }
+        }
+    }
+
+    private var metricsHeader: some View {
+        HStack(alignment: .lastTextBaseline, spacing: metricGap) {
+            columnTitle("Today").frame(width: todayWidth, alignment: .trailing)
+            columnTitle("Yesterday").frame(width: yesterdayWidth, alignment: .trailing)
+            Color.clear.frame(width: deltaWidth)
+        }
+        .fixedSize(horizontal: true, vertical: false)
+    }
+
+    private func metricsRow(_ item: TenantRevenueSlice) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: metricGap) {
+            moneyText(item.today, emphasized: true)
+                .frame(width: todayWidth, alignment: .trailing)
+            moneyText(item.yesterday, emphasized: false)
+                .frame(width: yesterdayWidth, alignment: .trailing)
+            delta(for: item)
+                .frame(width: deltaWidth, alignment: .trailing)
+        }
+        .fixedSize(horizontal: true, vertical: false)
+    }
+
+    // MARK: Compact — name, then a mini aligned metrics row
+
+    private var compactBody: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                if index > 0 { rowDivider.padding(.vertical, rowSpacing) }
+                VStack(alignment: .leading, spacing: Spacing.xs) {
+                    Text(item.tenant).font(.subheadline).lineLimit(1)
+                    HStack(alignment: .firstTextBaseline, spacing: metricGap) {
+                        compactMetric("Today", item.today, emphasized: true)
+                        compactMetric("Yesterday", item.yesterday, emphasized: false)
+                        Spacer(minLength: Spacing.sm)
+                        delta(for: item).fixedSize()
+                    }
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(axLabel(for: item))
+                .padding(.vertical, rowSpacing)
+            }
+        }
+    }
+
+    // MARK: Shared pieces
+
+    private var rowDivider: some View { Divider() }
+
+    private var todayWidth: CGFloat { moneyColumnWidth(items.map(\.today)) }
+    private var yesterdayWidth: CGFloat { moneyColumnWidth(items.map(\.yesterday)) }
+    private var deltaWidth: CGFloat { 76 }
+
+    private func columnTitle(_ text: String) -> some View {
+        Text(text).font(.caption2.weight(.medium)).foregroundStyle(.tertiary)
+    }
+
+    private func moneyText(_ amount: Decimal, emphasized: Bool) -> some View {
+        Text(Fmt.money(amount, style: .whole))
+            .font(.subheadline.monospacedDigit().weight(emphasized ? .semibold : .regular))
+            .foregroundStyle(emphasized ? .primary : .secondary)
+    }
+
+    private func compactMetric(_ label: String, _ amount: Decimal, emphasized: Bool) -> some View {
+        VStack(alignment: .trailing, spacing: 2) {
+            Text(label).font(.caption2.weight(.medium)).foregroundStyle(.tertiary)
+            moneyText(amount, emphasized: emphasized)
+        }
+    }
+
+    private func delta(for item: TenantRevenueSlice) -> some View {
+        TrendDelta(percent: AdminDashboardStats.change(item.today, vs: item.yesterday),
+                   font: .caption2.weight(.semibold))
+            .fixedSize()
+    }
+
+    private func axLabel(for item: TenantRevenueSlice) -> String {
+        "\(item.tenant): today \(Fmt.money(item.today, style: .whole)), "
+            + "yesterday \(Fmt.money(item.yesterday, style: .whole))"
+    }
+
+    /// Width for a money column from the widest formatted value in the set.
+    private func moneyColumnWidth(_ amounts: [Decimal]) -> CGFloat {
+        let strings = amounts.map { Fmt.money($0, style: .whole) }
+        let widest = strings.max(by: { $0.count < $1.count }) ?? "$0"
+        return ceil(Double(widest.count) * 8.2) + 4
+    }
 }
 
 private struct TopList: View {

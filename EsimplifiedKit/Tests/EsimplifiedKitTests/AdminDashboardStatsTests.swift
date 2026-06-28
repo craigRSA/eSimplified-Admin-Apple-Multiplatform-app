@@ -150,4 +150,76 @@ final class AdminDashboardStatsTests: XCTestCase {
         XCTAssertEqual(stats.revenuePerDate, [])
         XCTAssertNil(stats.deltaPercent)
     }
+
+    func test_decode_revenue_per_tenant_object_shape() throws {
+        let json = """
+        {
+          "revenue_per_tenant": {
+            "Acme":   { "overall": "12345.00", "today": "120.00", "yesterday": "95.00" },
+            "Globex": { "overall": 6789, "today": 0, "yesterday": 40 }
+          }
+        }
+        """
+        let s = try JSONDecoder().decode(AdminDashboardStats.self, from: Data(json.utf8))
+        XCTAssertEqual(s.revenuePerTenant.count, 2)
+        let acme = s.revenuePerTenant.first { $0.tenant == "Acme" }
+        XCTAssertEqual(acme?.overall, Decimal(string: "12345.00"))
+        XCTAssertEqual(acme?.today, Decimal(string: "120.00"))
+        XCTAssertEqual(acme?.yesterday, Decimal(string: "95.00"))
+        let globex = s.revenuePerTenant.first { $0.tenant == "Globex" }
+        XCTAssertEqual(globex?.overall, Decimal(string: "6789"))
+        XCTAssertEqual(globex?.today, 0)
+        XCTAssertEqual(globex?.yesterday, Decimal(string: "40"))
+        // All-time chart order: Acme first.
+        XCTAssertEqual(s.revenuePerTenant.first?.tenant, "Acme")
+        // Today leaderboard: Acme only (Globex today is zero).
+        XCTAssertEqual(s.tenantsByTodayRevenue.filter { $0.today > 0 }.map(\.tenant), ["Acme"])
+    }
+
+    func test_revenuePerMonthChart_drops_future_and_caps_at_twelve() throws {
+        let json = """
+        {
+          "revenue_per_month": {
+            "2024-01": "1",
+            "2025-07": "70", "2025-08": "80", "2025-09": "90",
+            "2025-10": "2", "2025-11": "3", "2025-12": "4",
+            "2026-01": "5", "2026-02": "6", "2026-03": "7", "2026-04": "8",
+            "2026-05": "9", "2026-06": "10", "2026-07": "11", "2026-08": "12", "2026-09": "13"
+          }
+        }
+        """
+        let s = try JSONDecoder().decode(AdminDashboardStats.self, from: Data(json.utf8))
+        let chart = s.revenuePerMonthChart(through: "2026-06")
+        XCTAssertEqual(chart.count, 12)
+        XCTAssertEqual(chart.first?.month, "2025-07")
+        XCTAssertEqual(chart.last?.month, "2026-06")
+        XCTAssertEqual(chart.last?.amount, Decimal(string: "10"))
+        XCTAssertFalse(chart.contains { $0.month == "2026-09" })
+    }
+
+    func test_revenuePerMonthComparison_pairs_prior_twelve() throws {
+        let json = """
+        {
+          "revenue_per_month": {
+            "2025-07": "100", "2026-07": "200",
+            "2025-08": "110", "2026-08": "210"
+          }
+        }
+        """
+        let s = try JSONDecoder().decode(AdminDashboardStats.self, from: Data(json.utf8))
+        let cmp = s.revenuePerMonthComparison(through: "2026-08")
+        let july = cmp.first { $0.currentMonth == "2026-07" }
+        XCTAssertEqual(july?.previousMonth, "2025-07")
+        XCTAssertEqual(july?.current, Decimal(string: "200"))
+        XCTAssertEqual(july?.previous, Decimal(string: "100"))
+        let aug = cmp.first { $0.currentMonth == "2026-08" }
+        XCTAssertEqual(aug?.previousMonth, "2025-08")
+        XCTAssertEqual(aug?.previous, Decimal(string: "110"))
+    }
+
+    func test_decode_revenue_per_tenant_legacy_flat_number_is_ignored() throws {
+        let json = #"{"revenue_per_tenant":{"LegacyCo":"5000.00"}}"#
+        let s = try JSONDecoder().decode(AdminDashboardStats.self, from: Data(json.utf8))
+        XCTAssertTrue(s.revenuePerTenant.isEmpty)
+    }
 }

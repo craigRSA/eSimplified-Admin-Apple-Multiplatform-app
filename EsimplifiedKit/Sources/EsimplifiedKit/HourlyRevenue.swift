@@ -19,6 +19,14 @@ public func utcHourFractionNow() -> Double {
     return Double(c.hour ?? 0) + (Double(c.minute ?? 0) * 60 + Double(c.second ?? 0)) / 3600
 }
 
+/// Current calendar month in UTC as `YYYY-MM` — matches backend month keys.
+public func utcYearMonthNow() -> String {
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = TimeZone(identifier: "UTC") ?? .gmt
+    let c = cal.dateComponents([.year, .month], from: Date())
+    return String(format: "%04d-%02d", c.year ?? 0, c.month ?? 0)
+}
+
 /// A point on the cumulative hourly-revenue curve: an x position on the 0…24 axis
 /// and the running total through that point.
 public struct CumulativeHourPoint: Equatable, Sendable {
