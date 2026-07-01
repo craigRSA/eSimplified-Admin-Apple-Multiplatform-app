@@ -138,6 +138,29 @@ final class AuthClientTests: XCTestCase {
         return acc
     }
 
+    func test_refresh_maps_invalid_grant_to_authExpired_regardless_of_message() async {
+        // Classify off the OAuth `error` code, not the prose: the message here
+        // ("Invalid credentials given.") contains no "invalid_grant"/"refresh".
+        MockURLProtocol.handler = respond(#"{"error":"invalid_grant","error_description":"Invalid credentials given."}"#, 400)
+        do {
+            _ = try await makeClient().refresh(host: "https://h.io", refreshToken: "dead")
+            XCTFail("expected authExpired")
+        } catch let e as APIError {
+            XCTAssertEqual(e, .authExpired, "invalid_grant on refresh must map to authExpired")
+        } catch { XCTFail("unexpected \(error)") }
+    }
+
+    func test_refresh_other_400_still_surfaces_as_server_error() async {
+        // A non-invalid_grant 400 is not a dead token — stays a server error.
+        MockURLProtocol.handler = respond(#"{"error":"invalid_request","error_description":"Missing grant_type."}"#, 400)
+        do {
+            _ = try await makeClient().refresh(host: "https://h.io", refreshToken: "r")
+            XCTFail("expected requestFailed")
+        } catch let e as APIError {
+            XCTAssertEqual(e, .requestFailed(status: 400, serverMessage: "Missing grant_type."))
+        } catch { XCTFail("unexpected \(error)") }
+    }
+
     func test_formEncode_percent_encodes_special_characters() {
         // %, @, space, and + must all be encoded so credentials survive intact.
         XCTAssertEqual(LiveAuthClient.formEncode(["a": "x%y@z d+e"]), "a=x%25y%40z%20d%2Be")

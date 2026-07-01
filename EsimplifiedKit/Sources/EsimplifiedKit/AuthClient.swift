@@ -55,14 +55,21 @@ public final class LiveAuthClient: AuthClient {
         // Basic header instead is rejected with `invalid_grant`.
         let json = try await post(host: host, path: "/auth/token/", extraHeaders: [:], form: [
             "grant_type": "refresh_token", "refresh_token": refreshToken,
-        ])
+        ], classifyError: { status, body in
+            // A dead/rotated refresh token → authExpired, keyed off the OAuth `error`
+            // code (not the rewordable `error_description`), so callers sign out cleanly.
+            guard status == 400, (body?["error"] as? String) == "invalid_grant" else { return nil }
+            return .authExpired
+        })
         return try Self.makeSession(from: json, host: host)
     }
 
     // MARK: - helpers
 
     private func post(host: String, path: String, extraHeaders: [String: String],
-                      form: [String: String], useBasicAuth: Bool = true) async throws -> [String: Any] {
+                      form: [String: String], useBasicAuth: Bool = true,
+                      classifyError: (_ status: Int, _ body: [String: Any]?) -> APIError? = { _, _ in nil }
+    ) async throws -> [String: Any] {
         guard var components = URLComponents(string: host) else { throw APIError.unreachable }
         components.path = path
         guard let url = components.url else { throw APIError.unreachable }
@@ -87,6 +94,8 @@ public final class LiveAuthClient: AuthClient {
         }
         guard let http = response as? HTTPURLResponse else { throw APIError.unreachable }
         guard (200...299).contains(http.statusCode) else {
+            let body = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+            if let mapped = classifyError(http.statusCode, body) { throw mapped }
             throw APIError.requestFailed(status: http.statusCode, serverMessage: Self.serverMessage(from: data))
         }
         guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {

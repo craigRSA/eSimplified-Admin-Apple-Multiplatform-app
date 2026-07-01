@@ -144,6 +144,87 @@ final class SessionManagerTests: XCTestCase {
         XCTAssertNil(sess, "authExpired during refresh must invalidate the session")
     }
 
+    func test_validAccessToken_usesKeychainSession_whenWidgetAlreadyRefreshed() async throws {
+        let auth = FakeAuthClient()
+        let store = InMemorySessionStore()
+        let stale = session(access: "acc-stale", refresh: "ref-stale", expiresIn: 0)
+        let fresh = session(access: "acc-fresh", refresh: "ref-fresh", expiresIn: 3600)
+        try store.save(fresh)
+        let mgr = SessionManager(session: stale, store: store, authClient: auth, refreshBufferSeconds: 60)
+        let token = try await mgr.validAccessToken()
+        XCTAssertEqual(token, "acc-fresh", "must adopt the Keychain session instead of refreshing stale state")
+        let calls = await auth.counter.count
+        XCTAssertEqual(calls, 0, "must not hit the auth server when Keychain already has a valid token")
+    }
+
+    func test_invalidGrant_retriesOnceAfterKeychainRotation() async throws {
+        // Keychain holds the same dead token → one attempt, then sign out.
+        let auth = FakeAuthClient()
+        auth.refreshError = APIError.authExpired
+        let store = InMemorySessionStore()
+        let stale = session(access: "acc-stale", refresh: "ref-stale", expiresIn: 0)
+        try store.save(stale)
+        let mgr = SessionManager(session: stale, store: store, authClient: auth, refreshBufferSeconds: 60)
+        do {
+            _ = try await mgr.validAccessToken()
+            XCTFail("expected authExpired")
+        } catch {
+            XCTAssertEqual(error as? APIError, .authExpired)
+        }
+        XCTAssertEqual(auth.lastRefreshToken, "ref-stale",
+                       "must attempt one refresh before signing out on a dead token")
+    }
+
+    func test_invalidGrant_recoversWhenKeychainHasNewRefreshToken() async throws {
+        final class RotatingAuthClient: AuthClient, @unchecked Sendable {
+            private(set) var tokens: [String] = []
+            func login(username: String, password: String, host: String, trustedDeviceToken: String?) async throws -> AuthResult { .needs2FA(token: "x") }
+            func verify2FA(host: String, twoFAToken: String, code: String, rememberDevice: Bool) async throws -> (Session, trustedDeviceToken: String?) { throw APIError.decoding }
+            func refresh(host: String, refreshToken: String) async throws -> Session {
+                tokens.append(refreshToken)
+                if refreshToken == "ref-stale" {
+                    throw APIError.authExpired   // auth client maps invalid_grant → authExpired
+                }
+                return Session(host: host, accessToken: "acc-fresh", refreshToken: "ref-fresh",
+                               expiresAt: Date(timeIntervalSinceNow: 3600),
+                               scopes: ["statistics:read"], accountType: "human")
+            }
+        }
+
+        let auth = RotatingAuthClient()
+        let store = InMemorySessionStore()
+        let stale = Session(host: "https://h", accessToken: "acc-stale", refreshToken: "ref-stale",
+                            expiresAt: Date(timeIntervalSinceNow: 0),
+                            scopes: ["statistics:read"], accountType: "human")
+        let rotated = Session(host: "https://h", accessToken: "acc-widget", refreshToken: "ref-widget",
+                              expiresAt: Date(timeIntervalSinceNow: 0),
+                              scopes: ["statistics:read"], accountType: "human")
+        try store.save(rotated)
+        let mgr = SessionManager(session: stale, store: store, authClient: auth, refreshBufferSeconds: 60)
+        let token = try await mgr.validAccessToken()
+        XCTAssertEqual(token, "acc-fresh")
+        XCTAssertEqual(auth.tokens, ["ref-widget"], "must retry with the Keychain refresh token after invalid_grant")
+    }
+
+    func test_invalidGrant_invalidatesSession_whenRefreshTokenIsDead() async {
+        let auth = FakeAuthClient()
+        auth.refreshError = APIError.authExpired   // auth client maps invalid_grant → authExpired
+        let store = InMemorySessionStore()
+        let stale = session(access: "acc-0", refresh: "ref-0", expiresIn: 0)
+        try? store.save(stale)
+        let mgr = SessionManager(session: stale, store: store, authClient: auth, refreshBufferSeconds: 60)
+        do {
+            _ = try await mgr.validAccessToken()
+            XCTFail("expected authExpired")
+        } catch {
+            XCTAssertEqual(error as? APIError, .authExpired,
+                           "invalid_grant must sign the user out, not surface as a server error")
+        }
+        let sess = await mgr.currentSession()
+        XCTAssertNil(sess)
+        XCTAssertNil(try store.load())
+    }
+
     func test_onChange_firesOnAdoptAndClear_notOnSilentRefresh() async throws {
         // Thread-safe recorder: a final class with a lock is the simplest Sendable approach.
         final class Recorder: @unchecked Sendable {
